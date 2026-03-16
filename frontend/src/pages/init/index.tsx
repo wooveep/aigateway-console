@@ -1,4 +1,3 @@
-import logo from '@/assets/logo.png';
 import LanguageDropdown from '@/components/LanguageDropdown';
 import { SYSTEM_INITIALIZED } from '@/interfaces/config';
 import { UserInfo } from '@/interfaces/system';
@@ -51,7 +50,7 @@ const Init: React.FC = () => {
       </div>
       <LoginForm
         title=""
-        logo={<img alt="logo" src={logo} />}
+        logo={<img alt="Aigateway logo" src="/banner.png" />}
         subTitle=""
         onFinish={async (values) => {
           await handleSubmit(values as UserInfo);

@@ -9,25 +9,25 @@
   flex-direction: column;
   height: 100vh;
   overflow: auto;
+  background: linear-gradient(180deg, #eef5ff 0%, #ffffff 45%, #f7fbff 100%);
 }
 
 .container :global {
   .ant-pro-form-login-container {
-    padding-top: 200px;
+    padding-top: 160px;
   }
 
   .ant-pro-form-login-logo {
-    width: 70px;
-    height: 70px;
+    width: min(280px, 70vw);
+    height: auto;
   }
 }
 
 @media (min-width: 768px) {
   .container {
-    background-image: url('https://gw.alipayobjects.com/zos/rmsportal/TVYTbAXWheQpRcWDaDMu.svg');
-    background-repeat: no-repeat;
-    background-position: center 110px;
-    background-size: 100%;
+    background:
+      radial-gradient(circle at top, rgba(36, 99, 235, 0.1), transparent 35%),
+      linear-gradient(180deg, #eef5ff 0%, #ffffff 45%, #f7fbff 100%);
   }
 
   .content {

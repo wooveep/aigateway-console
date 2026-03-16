@@ -5,7 +5,7 @@ export default function Document() {
     <html>
       <head>
         <meta charSet="utf-8" />
-        <link rel="icon" href="/higress.jpg" type="image/x-icon" />
+        <link rel="icon" href="/logo-ai.svg" type="image/svg+xml" />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
         {/* 内容安全策略 */}
         <meta

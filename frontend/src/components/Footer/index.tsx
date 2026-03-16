@@ -6,7 +6,7 @@ const Footer: React.FC = () => {
 
   return (
     <div style={{ textAlign: 'center', margin: 10 }}>
-      &copy; {currentYear} Higress
+      &copy; {currentYear} Aigateway
       {
         systemState.version && (
           <>

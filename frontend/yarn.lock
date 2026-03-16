@@ -2379,10 +2379,10 @@
     workbox-routing "6.4.2"
     workbox-strategies "6.4.2"
 
-"@builder/swc-darwin-arm64@^0.1.0":
+"@builder/swc-linux-x64-gnu@^0.1.0":
   version "0.1.3"
-  resolved "https://registry.npmmirror.com/@builder/swc-darwin-arm64/-/swc-darwin-arm64-0.1.3.tgz"
-  integrity sha512-Sm69HjiM3bTFjWQqxpA6x9cnvK8c/RJfA9uyN5ypxAjEq8F9O1sV8qrzjmELUqdnSDcjG1DE3VFWNeyjgrA2Qg==
+  resolved "https://registry.npmmirror.com/@builder/swc-linux-x64-gnu/-/swc-linux-x64-gnu-0.1.3.tgz"
+  integrity sha512-YV2T5RFb19Lo2KzAuwIKRXyTxtLNxb/UfNuZ3xdNDLX5p8jaCw1U3X8q1sCY7phXcHz2w9drdXlK/om+0zPfjw==
 
 "@builder/swc-loader@^1.0.0":
   version "1.0.1"
@@ -2616,10 +2616,10 @@
   resolved "https://registry.npmmirror.com/@emotion/unitless/-/unitless-0.7.5.tgz"
   integrity sha512-OWORNpfjMsSSUBVrRBVGECkhWcULOAJz9ZW8uK9qgxD+87M7jHRcvh/A96XXNhXTLmKcoYSQtBEX7lHMO7YRwg==
 
-"@esbuild/darwin-arm64@0.16.17":
+"@esbuild/linux-x64@0.16.17":
   version "0.16.17"
-  resolved "https://registry.npmmirror.com/@esbuild/darwin-arm64/-/darwin-arm64-0.16.17.tgz"
-  integrity sha512-/2agbUEfmxWHi9ARTX6OQ/KgXnOWfsNlTeLcoV7HSuSTv63E4DqtAc+2XqGw1KHxKMHGZgbVCZge7HXWX9Vn+w==
+  resolved "https://registry.npmmirror.com/@esbuild/linux-x64/-/linux-x64-0.16.17.tgz"
+  integrity sha512-mdPjPxfnmoqhgpiEArqi4egmBAMYvaObgn4poorpUaqmvzzbvqbowRllQ+ZgzGVMGKaPkqUmPDOOFQRUFDmeUw==
 
 "@eslint-community/eslint-utils@^4.2.0":
   version "4.4.0"
@@ -3564,10 +3564,15 @@
     "@svgr/plugin-svgo" "^5.5.0"
     loader-utils "^2.0.0"
 
-"@swc/core-darwin-arm64@1.3.19":
+"@swc/core-linux-x64-gnu@1.3.19":
   version "1.3.19"
-  resolved "https://registry.npmmirror.com/@swc/core-darwin-arm64/-/core-darwin-arm64-1.3.19.tgz"
-  integrity sha512-6xLtmXzS4nNWGQkajbiAjGXspUJfxS2IWoGQ16J9nfOFdttKyoIG5o5+mxUfKeg5bXw9cI+r675kN/irx3z7MQ==
+  resolved "https://registry.npmmirror.com/@swc/core-linux-x64-gnu/-/core-linux-x64-gnu-1.3.19.tgz"
+  integrity sha512-dUbq8mnIqBhU7OppfY3ncOvl26691WFGxd97QtnnlfMZrKnaofKFMIxE9sTHOLSbBo16AylnEMiwa45w2UWDEg==
+
+"@swc/core-linux-x64-musl@1.3.19":
+  version "1.3.19"
+  resolved "https://registry.npmmirror.com/@swc/core-linux-x64-musl/-/core-linux-x64-musl-1.3.19.tgz"
+  integrity sha512-RiVZrlkNGcj9jZyjF7YFOW3fj9fWPC25AYkknLpWxAmLQcp1piAWj+aSixmMWUC4QJau78VZzcm+kRgIOECALw==
 
 "@swc/core@1.3.19":
   version "1.3.19"
@@ -7269,10 +7274,10 @@ es6-promise@^4.1.1:
   resolved "https://registry.npmmirror.com/es6-promise/-/es6-promise-4.2.8.tgz"
   integrity sha512-HJDGx5daxeIvxdBxvG2cb9g4tEvwIk3i8+nhX0yGrYmZUzbkdg8QbDevheDB8gd0//uPj4c1EQua8Q+MViT0/w==
 
-esbuild-darwin-arm64@0.14.54:
+esbuild-linux-64@0.14.54:
   version "0.14.54"
-  resolved "https://registry.npmmirror.com/esbuild-darwin-arm64/-/esbuild-darwin-arm64-0.14.54.tgz"
-  integrity sha512-OPafJHD2oUPyvJMrsCvDGkRrVCar5aVyHfWGQzY1dWnzErjrDuSETxwA2HSsyg2jORLY8yBfzc1MIpUkXlctmw==
+  resolved "https://registry.npmmirror.com/esbuild-linux-64/-/esbuild-linux-64-0.14.54.tgz"
+  integrity sha512-EgjAgH5HwTbtNsTqQOXWApBaPVdDn7XcK+/PtJwZLT1UmpLoznPd8c5CxqsH2dQK3j05YsB3L17T8vE7cp4cCg==
 
 esbuild@^0.14.22:
   version "0.14.54"
@@ -8324,11 +8329,6 @@ fs.realpath@^1.0.0:
   version "1.0.0"
   resolved "https://registry.npmmirror.com/fs.realpath/-/fs.realpath-1.0.0.tgz"
   integrity sha512-OO0pH2lK6a0hZnAdau5ItzHPI6pUlvI7jMVnxUQRtw4owF2wk8lOSabtGDCTP4Ggrg2MbGnWO9X8K1t4+fGMDw==
-
-fsevents@^2.3.2, fsevents@~2.3.2:
-  version "2.3.2"
-  resolved "https://registry.npmmirror.com/fsevents/-/fsevents-2.3.2.tgz"
-  integrity sha512-xiqMQR4xAeHTuB9uWm+fFRcIOgKBMiOBP+eXiyT7jsgVCq1bkVygt00oASowB7EdtpOHaaPgKt812P9ab+DDKA==
 
 function-bind@^1.1.1:
   version "1.1.1"
@@ -14080,7 +14080,7 @@ rollup-plugin-visualizer@^5.5.2:
     source-map "^0.7.4"
     yargs "^17.5.1"
 
-rollup@^0.25.8:
+rollup@^0.25.8, "rollup@2.x || 3.x":
   version "0.25.8"
   resolved "https://registry.npmmirror.com/rollup/-/rollup-0.25.8.tgz"
   integrity sha512-a2S4Bh3bgrdO4BhKr2E4nZkjTvrJ2m2bWjMTzVYtoqSCn0HnuxosXnaJUHrMEziOWr3CzL9GjilQQKcyCQpJoA==
@@ -14100,13 +14100,6 @@ rollup@^0.25.8:
   version "2.77.3"
   resolved "https://registry.npmmirror.com/rollup/-/rollup-2.77.3.tgz"
   integrity sha512-/qxNTG7FbmefJWoeeYJFbHehJ2HNWnjkAFRKzWN/45eNBBF/r8lo992CwcJXEzyVxs5FmfId+vTSTQDb+bxA+g==
-  optionalDependencies:
-    fsevents "~2.3.2"
-
-"rollup@2.x || 3.x":
-  version "3.17.3"
-  resolved "https://registry.npmmirror.com/rollup/-/rollup-3.17.3.tgz"
-  integrity sha512-p5LaCXiiOL/wrOkj8djsIDFmyU9ysUxcyW+EKRLHb6TKldJzXpImjcRSR+vgo09DBdofGcOoLOsRyxxG2n5/qQ==
   optionalDependencies:
     fsevents "~2.3.2"
 

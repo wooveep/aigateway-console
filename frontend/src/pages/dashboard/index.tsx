@@ -194,7 +194,7 @@ const Dashboard: React.FC = () => {
               </li>
               <li style={{ marginBottom: '1rem' }}>
                 <Trans t={t} i18nKey="dashboard.configNotes.item3">
-                  推荐各位使用 Higress 官方提供的 Grafana 看板配置。您可填写 Grafana 中的 Prometheus 数据源 ID 获取可供导入的 JSON 配置文件。
+                  推荐使用 Aigateway 提供的 Grafana 看板配置。您可填写 Grafana 中的 Prometheus 数据源 ID 获取可供导入的 JSON 配置文件。
                   （<a href="" onClick={e => { e.preventDefault(); setDataSourceUidSampleVisible(true); }}>如何获取数据源 ID？</a>）
                 </Trans>
                 <Form

@@ -26,7 +26,7 @@
     "mcpConfigurations": "MCP Configurations"
   },
   "index": {
-    "title": "Higress Console"
+    "title": "Aigateway Console"
   },
   "init": {
     "title": "System Setup",
@@ -177,7 +177,7 @@
     "loadFailed": "Error occurs when loading dashboard data. Please refresh the page later.",
     "uninitialized": "Built-in dashboard is not intialized automatically.Click the button below to initialize it manually.",
     "initDashboard": "Initialize Dashboard",
-    "noBuiltInDashboard": "Higress Console built-in dashboard is not installed. Please configure one manually.",
+    "noBuiltInDashboard": "Aigateway Console built-in dashboard is not installed. Please configure one manually.",
     "configureDashboard": "Please configure the dashboard URL.",
     "reconfigure": "Reconfigure",
     "openInNewPage": "Open dashboard in new page",
@@ -187,13 +187,13 @@
     },
     "configNotes": {
       "header": "Notes on External Dashboard Configuraiton",
-      "brief": "It is recommended to configure Higress dashboard with Prometheus + Grafana.",
+      "brief": "It is recommended to configure the Aigateway dashboard with Prometheus + Grafana.",
       "item1_k8s": "When adding Prometheus collection configurations to get metrics of Higress Gateway Pods, please add following relabel_config items:",
       "item1_standalone": "You can use the following URL in Prometheus to get metrics of Higress Gateway: http://{GatewayIP}:{MetricsPort}/stats/prometheus The default value of MetricsPort is 15020.",
       "item2": "Configure Grafana so dashboard can be displayed within this page.",
       "item2_1": "If configured with grafana.ini, please add following items into the file:",
       "item2_2": "If configured with environment variables, please configure following variables:",
-      "item3": "We recommend you using the built-in dashboard configuration of Higress. You can input the UID of the Prometheus data source in Grafana and download the JSON configuration file for import. (<1>How to obtain the UID of a data source?</1>)",
+      "item3": "We recommend using the built-in Aigateway dashboard configuration. You can input the UID of the Prometheus data source in Grafana and download the JSON configuration file for import. (<1>How to obtain the UID of a data source?</1>)",
       "item3_dataSourceId": "Prometheus Data Source UID",
       "item3_dataSourceId_required": "Please input Prometheus Data Source UID.",
       "item3_templateType": "Template",
@@ -243,7 +243,7 @@
       "label": {
         "type": "LLM Provider",
         "failoverEnabled": "Token Failover",
-        "failoverEnabledExtra": "If enabled, when the count of failed requests with a certain auth token exceeds the threshold, Higress will no long send requests with it, until following health check requests get a certain number of successes.",
+        "failoverEnabledExtra": "If enabled, when the count of failed requests with a certain auth token exceeds the threshold, Aigateway will stop sending requests with it until following health check requests get a certain number of successes.",
         "failureThreshold": "Min Consecuitive Failures to Mark Down a Token",
         "healthCheckInterval": "Health Check Request Interval (ms)",
         "healthCheckModel": "Health Check Request LLM Model",
@@ -349,9 +349,9 @@
       "secretRefModal": {
         "entry": "I'd like to use token info stored in a Secret resource.",
         "title": "How to refer to token info stored in a Secret resource?",
-        "content_brief": "Higress supports referring to a field in a Secret resource when configuring tokens. Details are as following:",
-        "content_sameNs": "If the Secret and Higress share the same namespace:",
-        "content_diffNs": "If the Secret and Higress belong to different namespaces:",
+        "content_brief": "Aigateway supports referring to a field in a Secret resource when configuring tokens. Details are as following:",
+        "content_sameNs": "If the Secret and Aigateway share the same namespace:",
+        "content_diffNs": "If the Secret and Aigateway belong to different namespaces:",
         "example": "e.g. ",
         "roleConfig": "Higress can read Secret data in any namespace by default. But if the role configuration is modified, please make sure the ServiceAccount bound to Higress Controller is allowed to read the configured Secret resource."
       },
@@ -914,7 +914,7 @@
       "copy": "Copy",
       "copySuccess": "Copied successfully",
       "copyError": "Copy failed, please copy manually",
-      "dnsDesc": "Higress does not provide domain resolution capabilities. Users need to configure business domains in DNS services themselves. You can choose appropriate record types (such as CNAME records, A records, etc.) according to actual scenarios and point them to the gateway access entry address to achieve traffic forwarding",
+      "dnsDesc": "Aigateway does not provide domain resolution capabilities. Users need to configure business domains in DNS services themselves. You can choose appropriate record types (such as CNAME records, A records, etc.) according to actual scenarios and point them to the gateway access entry address to achieve traffic forwarding",
       "gatewayAddress": "Gateway Access Address:",
       "commandDesc": "Please run the following command to install <1>{{client}}</1> MCP Server:",
       "authStatus": "Enable Request Authentication",

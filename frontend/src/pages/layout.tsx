@@ -1,9 +1,7 @@
-import logo from '@/assets/logo.png';
 import AvatarDropdown from '@/components/AvatarDropdown';
 import ChatRobot from '@/components/ChatRobot';
 import Footer from '@/components/Footer';
 import LanguageDropdown from '@/components/LanguageDropdown';
-import Navbar from '@/components/Navbar';
 import store from '@/store';
 import ProLayout from '@ant-design/pro-layout';
 import { Route } from '@ant-design/pro-layout/es/typing';
@@ -39,7 +37,7 @@ export default function Layout() {
       <ProLayout
         {...defaultProps}
         className={styles.layout}
-        logo={<img src={logo} alt="logo" />}
+        logo={<img src="/banner.png" alt="Aigateway logo" />}
         pure={route && !!route.usePureLayout}
         title=""
         location={{
@@ -48,7 +46,6 @@ export default function Layout() {
         layout="mix"
         rightContentRender={() => (
           <div style={{ display: 'flex', alignItems: 'center' }}>
-            <Navbar />
             <LanguageDropdown />
             <AvatarDropdown avatar={userState.currentUser.avatarUrl || ''} name={userState.currentUser.displayName} />
           </div>

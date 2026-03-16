@@ -1,21 +1,19 @@
-import logo from '@/assets/logo.png';
 import LanguageDropdown from '@/components/LanguageDropdown';
-import { LOGIN_PROMPT, SYSTEM_INITIALIZED } from '@/interfaces/config';
+import { SYSTEM_INITIALIZED } from '@/interfaces/config';
 import type { LoginParams, UserInfo } from '@/interfaces/user';
 import { login } from '@/services';
 import store from '@/store';
 import { LockOutlined, UserOutlined } from '@ant-design/icons';
 import { LoginForm, ProFormCheckbox, ProFormText } from '@ant-design/pro-form';
-import { Alert, message } from 'antd';
+import { message } from 'antd';
 import { history, useAuth, useNavigate } from 'ice';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import styles from './index.module.css';
 
 const Login: React.FC = () => {
   const { t } = useTranslation();
 
-  const [loginPrompt, setLoginPrompt] = useState<string>();
   const [, userDispatcher] = store.useModel('user');
   const [configModel] = store.useModel('config');
   const [, setAuth] = useAuth();
@@ -25,9 +23,7 @@ const Login: React.FC = () => {
     const properties = configModel ? configModel.properties : {};
     if (!properties[SYSTEM_INITIALIZED]) {
       navigate('/init', { replace: true });
-      return;
     }
-    setLoginPrompt(properties[LOGIN_PROMPT]);
   }, [configModel]);
 
   async function updateUserInfo(user: UserInfo) {
@@ -63,7 +59,7 @@ const Login: React.FC = () => {
       </div>
       <LoginForm
         title=""
-        logo={<img alt="logo" src={logo} />}
+        logo={<img alt="Aigateway logo" src="/banner.png" />}
         subTitle=""
         onFinish={async (values) => {
           await handleSubmit(values as LoginParams);
@@ -104,17 +100,6 @@ const Login: React.FC = () => {
             },
           ]}
         />
-        {loginPrompt && (
-          <div
-            style={{
-              marginBottom: 24,
-              textAlign: 'center',
-              whiteSpace: 'pre-wrap',
-            }}
-          >
-            {loginPrompt}
-          </div>
-        )}
         <div
           style={{
             marginBottom: 24,
@@ -123,13 +108,6 @@ const Login: React.FC = () => {
           <ProFormCheckbox noStyle name="autoLogin">
             {t('login.autoLogin')}
           </ProFormCheckbox>
-          <a
-            style={{
-              float: 'right',
-            }}
-          >
-            {t('login.forgotPassword')}
-          </a>
         </div>
       </LoginForm>
     </div>

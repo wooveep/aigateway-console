@@ -4,4 +4,14 @@
     justify-content: space-between;
     padding: 0 24px;
   }
+
+  .ant-pro-global-header-logo {
+    min-width: 220px;
+  }
+
+  .ant-pro-global-header-logo img {
+    width: auto;
+    height: 40px;
+    object-fit: contain;
+  }
 }
