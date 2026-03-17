@@ -42,7 +42,7 @@ public class SystemConfigKey {
 
     public static final String CONSOLE_SERVICE_HOST_KEY = CONFIG_KEY_PREFIX + "service.host";
 
-    public static final String DEFAULT_CONSOLE_SERVICE_HOST = "higress-console.higress-system.svc.cluster.local";
+    public static final String DEFAULT_CONSOLE_SERVICE_HOST = "aigateway-console.aigateway-system.svc.cluster.local";
 
     public static final String CONSOLE_SERVICE_PORT_KEY = CONFIG_KEY_PREFIX + "service.port";
 
@@ -50,11 +50,11 @@ public class SystemConfigKey {
 
     public static final String CONFIG_MAP_NAME_KEY = CONFIG_KEY_PREFIX + "config-map.name";
 
-    public static final String CONFIG_MAP_NAME_KEY_DEFAULT = "higress-console";
+    public static final String CONFIG_MAP_NAME_KEY_DEFAULT = "aigateway-console";
 
     public static final String SECRET_NAME_KEY = CONFIG_KEY_PREFIX + "secret.name";
 
-    public static final String SECRET_NAME_DEFAULT = "higress-console";
+    public static final String SECRET_NAME_DEFAULT = "aigateway-console";
 
     public static final String ADMIN_COOKIE_NAME_KEY = CONFIG_KEY_PREFIX + "admin.cookie.name";
 
@@ -94,6 +94,15 @@ public class SystemConfigKey {
     public static final String DASHBOARD_DATASOURCE_LOKI_NAME_DEFAULT = "Loki";
 
     public static final String DASHBOARD_DATASOURCE_LOKI_URL_KEY = CONFIG_KEY_PREFIX + "dashboard.datasource.loki.url";
+
+    public static final String DASHBOARD_GATEWAY_LABEL_KEY = CONFIG_KEY_PREFIX + "dashboard.gateway.label-key";
+
+    public static final String DASHBOARD_GATEWAY_NAME_KEY = CONFIG_KEY_PREFIX + "dashboard.gateway.name";
+
+    public static final String DASHBOARD_GATEWAY_CONTAINER_NAME_KEY =
+        CONFIG_KEY_PREFIX + "dashboard.gateway.container-name";
+
+    public static final String DASHBOARD_CORE_CONTAINER_NAME_KEY = CONFIG_KEY_PREFIX + "dashboard.core.container-name";
 
     public static final String DASHBOARD_PROXY_CONNECTION_TIMEOUT_KEY =
         CONFIG_KEY_PREFIX + "dashboard.proxy.connection-timeout";

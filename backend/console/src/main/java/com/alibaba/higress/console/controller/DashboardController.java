@@ -30,6 +30,7 @@ import com.alibaba.higress.console.model.DashboardInfo;
 import com.alibaba.higress.console.model.DashboardType;
 import com.alibaba.higress.console.service.DashboardService;
 import com.alibaba.higress.sdk.exception.ValidationException;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -105,6 +106,23 @@ public class DashboardController {
             description = "The UID of data source set in Grafana for the dashboard") String dataSourceUid) {
         DashboardType dashboardType = toDashboardType(type);
         return ResponseEntity.ok(Response.success(dashboardService.buildConfigData(dashboardType, dataSourceUid)));
+    }
+
+    @GetMapping("/native")
+    @Operation(summary = "Get native dashboard data",
+        description = "Get built-in dashboard data rendered directly from Prometheus without embedding Grafana.")
+    @ApiResponses(value = {@ApiResponse(responseCode = "200", description = "Native dashboard data retrieved"),
+        @ApiResponse(responseCode = "500", description = "Internal server error")})
+    public ResponseEntity<Response<ObjectNode>> nativeDashboard(
+        @RequestParam(required = false) @Parameter(
+            description = "Available types: MAIN/AI Default: MAIN") String type,
+        @RequestParam(required = false) @Parameter(description = "Dashboard query start time in milliseconds") Long from,
+        @RequestParam(required = false) @Parameter(description = "Dashboard query end time in milliseconds") Long to,
+        @RequestParam(required = false) @Parameter(description = "Selected gateway label value") String gateway,
+        @RequestParam(required = false) @Parameter(description = "Selected namespace") String namespace) {
+        DashboardType dashboardType = toDashboardType(type);
+        return ResponseEntity.ok(Response.success(
+            dashboardService.getNativeDashboard(dashboardType, from, to, gateway, namespace)));
     }
 
     private static DashboardType toDashboardType(String type) {

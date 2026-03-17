@@ -1,4 +1,4 @@
-import { DashboardInfo, DashboardType } from '@/interfaces/dashboard';
+import { DashboardInfo, DashboardType, NativeDashboardData } from '@/interfaces/dashboard';
 import request from './request';
 
 export const getDashboardInfo = (type: DashboardType): Promise<DashboardInfo> => {
@@ -16,5 +16,22 @@ export const setDashboardUrl = (url: string): Promise<DashboardInfo> => {
 export const getDashboardConfigData = (dataSourceUid: string, type: string): Promise<string> => {
   return request.get<any, string>("/dashboard/configData", {
     params: { dataSourceUid, type },
+  });
+}
+
+export const getNativeDashboard = (
+  type: DashboardType,
+  params: {
+    from?: number;
+    to?: number;
+    gateway?: string;
+    namespace?: string;
+  },
+): Promise<NativeDashboardData> => {
+  return request.get<any, NativeDashboardData>('/dashboard/native', {
+    params: {
+      type,
+      ...params,
+    },
   });
 }

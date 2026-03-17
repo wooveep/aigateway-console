@@ -111,7 +111,7 @@
             "type": "prometheus",
             "uid": "${datasource.id}"
           },
-          "expr": "round(sum(irate(envoy_http_downstream_rq_total{higress=\"$gateway\"}[5m])), 0.001)",
+          "expr": "round(sum(irate(envoy_http_downstream_rq_total{${monitoring.selector.key}=\"$gateway\"}[5m])), 0.001)",
           "format": "time_series",
           "intervalFactor": 1,
           "refId": "A",
@@ -194,7 +194,7 @@
             "type": "prometheus",
             "uid": "${datasource.id}"
           },
-          "expr": "sum(irate(envoy_http_downstream_rq{higress=\"$gateway\", response_code_class!=\"5xx\"}[5m])) / sum(irate(envoy_http_downstream_rq_total{higress=\"$gateway\"}[5m]))",
+          "expr": "sum(irate(envoy_http_downstream_rq{${monitoring.selector.key}=\"$gateway\", response_code_class!=\"5xx\"}[5m])) / sum(irate(envoy_http_downstream_rq_total{${monitoring.selector.key}=\"$gateway\"}[5m]))",
           "format": "time_series",
           "intervalFactor": 1,
           "refId": "A"
@@ -257,7 +257,7 @@
             "type": "prometheus",
             "uid": "${datasource.id}"
           },
-          "expr": "histogram_quantile(0.50, sum(irate(envoy_http_downstream_rq_time_bucket{higress=\"$gateway\"}[1m])) by (le))",
+          "expr": "histogram_quantile(0.50, sum(irate(envoy_http_downstream_rq_time_bucket{${monitoring.selector.key}=\"$gateway\"}[1m])) by (le))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -269,7 +269,7 @@
             "type": "prometheus",
             "uid": "${datasource.id}"
           },
-          "expr": "histogram_quantile(0.90, sum(irate(envoy_http_downstream_rq_time_bucket{higress=\"$gateway\"}[1m])) by (le))",
+          "expr": "histogram_quantile(0.90, sum(irate(envoy_http_downstream_rq_time_bucket{${monitoring.selector.key}=\"$gateway\"}[1m])) by (le))",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -281,7 +281,7 @@
             "type": "prometheus",
             "uid": "${datasource.id}"
           },
-          "expr": "histogram_quantile(0.99, sum(irate(envoy_http_downstream_rq_time_bucket{higress=\"$gateway\"}[1m])) by (le))",
+          "expr": "histogram_quantile(0.99, sum(irate(envoy_http_downstream_rq_time_bucket{${monitoring.selector.key}=\"$gateway\"}[1m])) by (le))",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -294,7 +294,7 @@
             "uid": "${datasource.id}"
           },
           "editorMode": "code",
-          "expr": "sum(irate(envoy_http_downstream_rq_time_sum{higress=\"$gateway\"}[1m])) / sum(irate(envoy_http_downstream_rq_time_count{higress=\"$gateway\"}[1m]))",
+          "expr": "sum(irate(envoy_http_downstream_rq_time_sum{${monitoring.selector.key}=\"$gateway\"}[1m])) / sum(irate(envoy_http_downstream_rq_time_count{${monitoring.selector.key}=\"$gateway\"}[1m]))",
           "hide": false,
           "interval": "",
           "legendFormat": "Avg",
@@ -403,7 +403,7 @@
             "type": "prometheus",
             "uid": "${datasource.id}"
           },
-          "expr": "sum(irate(envoy_http_downstream_cx_rx_bytes_total{higress=\"$gateway\"}[1m]))",
+          "expr": "sum(irate(envoy_http_downstream_cx_rx_bytes_total{${monitoring.selector.key}=\"$gateway\"}[1m]))",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -483,7 +483,7 @@
             "type": "prometheus",
             "uid": "${datasource.id}"
           },
-          "expr": "round(sum(irate(envoy_cluster_upstream_rq_total{higress=\"$gateway\"}[5m])), 0.001)",
+          "expr": "round(sum(irate(envoy_cluster_upstream_rq_total{${monitoring.selector.key}=\"$gateway\"}[5m])), 0.001)",
           "format": "time_series",
           "intervalFactor": 1,
           "refId": "A",
@@ -566,7 +566,7 @@
             "type": "prometheus",
             "uid": "${datasource.id}"
           },
-          "expr": "sum(irate(envoy_cluster_upstream_rq{higress=\"$gateway\", cluster_name!~\"\\\\.internal$\",response_code_class!=\"5xx\"}[5m])) / sum(irate(envoy_cluster_upstream_rq{higress=\"$gateway\", cluster_name!~\"\\\\.internal$\"}[5m]))",
+          "expr": "sum(irate(envoy_cluster_upstream_rq{${monitoring.selector.key}=\"$gateway\", cluster_name!~\"\\\\.internal$\",response_code_class!=\"5xx\"}[5m])) / sum(irate(envoy_cluster_upstream_rq{${monitoring.selector.key}=\"$gateway\", cluster_name!~\"\\\\.internal$\"}[5m]))",
           "format": "time_series",
           "intervalFactor": 1,
           "refId": "A"
@@ -660,7 +660,7 @@
             "type": "prometheus",
             "uid": "${datasource.id}"
           },
-          "expr": "histogram_quantile(0.50, sum(irate(envoy_cluster_upstream_rq_time_bucket{higress=\"$gateway\"}[1m])) by (le))",
+          "expr": "histogram_quantile(0.50, sum(irate(envoy_cluster_upstream_rq_time_bucket{${monitoring.selector.key}=\"$gateway\"}[1m])) by (le))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -672,7 +672,7 @@
             "type": "prometheus",
             "uid": "${datasource.id}"
           },
-          "expr": "histogram_quantile(0.90, sum(irate(envoy_cluster_upstream_rq_time_bucket{higress=\"$gateway\"}[1m])) by (le))",
+          "expr": "histogram_quantile(0.90, sum(irate(envoy_cluster_upstream_rq_time_bucket{${monitoring.selector.key}=\"$gateway\"}[1m])) by (le))",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -684,7 +684,7 @@
             "type": "prometheus",
             "uid": "${datasource.id}"
           },
-          "expr": "histogram_quantile(0.99, sum(irate(envoy_cluster_upstream_rq_time_bucket{higress=\"$gateway\"}[1m])) by (le))",
+          "expr": "histogram_quantile(0.99, sum(irate(envoy_cluster_upstream_rq_time_bucket{${monitoring.selector.key}=\"$gateway\"}[1m])) by (le))",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -697,7 +697,7 @@
             "uid": "${datasource.id}"
           },
           "editorMode": "code",
-          "expr": "sum(irate(envoy_cluster_upstream_rq_time_sum{higress=\"$gateway\"}[1m])) / sum(irate(envoy_cluster_upstream_rq_time_count{higress=\"$gateway\"}[1m]))",
+          "expr": "sum(irate(envoy_cluster_upstream_rq_time_sum{${monitoring.selector.key}=\"$gateway\"}[1m])) / sum(irate(envoy_cluster_upstream_rq_time_count{${monitoring.selector.key}=\"$gateway\"}[1m]))",
           "hide": false,
           "legendFormat": "Avg",
           "range": true,
@@ -776,7 +776,7 @@
             "type": "prometheus",
             "uid": "${datasource.id}"
           },
-          "expr": "sum(irate(envoy_http_downstream_cx_tx_bytes_total{higress=\"$gateway\"}[1m]))",
+          "expr": "sum(irate(envoy_http_downstream_cx_tx_bytes_total{${monitoring.selector.key}=\"$gateway\"}[1m]))",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -857,7 +857,7 @@
             "uid": "${datasource.id}"
           },
           "editorMode": "code",
-          "expr": "100 * sum(irate(container_cpu_usage_seconds_total{container=\"higress-gateway\", namespace=\"$namespace\"}[1m]))by(pod)",
+          "expr": "100 * sum(irate(container_cpu_usage_seconds_total{container=\"${monitoring.gateway.container.name}\", namespace=\"$namespace\"}[1m]))by(pod)",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 2,
@@ -984,7 +984,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "max(container_memory_working_set_bytes{container=\"higress-gateway\", namespace=\"$namespace\"}) by (pod)",
+          "expr": "max(container_memory_working_set_bytes{container=\"${monitoring.gateway.container.name}\", namespace=\"$namespace\"}) by (pod)",
           "interval": "",
           "legendFormat": "{{pod}}-envoy",
           "range": true,
@@ -1008,7 +1008,7 @@
             "uid": "${datasource.id}"
           },
           "editorMode": "code",
-          "expr": "max(container_memory_working_set_bytes{container=\"higress-core\", namespace=\"$namespace\"}) by (pod)",
+          "expr": "max(container_memory_working_set_bytes{container=\"${monitoring.core.container.name}\", namespace=\"$namespace\"}) by (pod)",
           "hide": false,
           "legendFormat": "{{pod}}-core",
           "range": true,
@@ -1114,7 +1114,7 @@
             "uid": "${datasource.id}"
           },
           "editorMode": "code",
-          "expr": "sum(irate(envoy_http_downstream_rq{higress=\"$gateway\",http_conn_manager_prefix=~\"outbound_0.0.0.0_.*\"}[1m])) by (response_code_class)",
+          "expr": "sum(irate(envoy_http_downstream_rq{${monitoring.selector.key}=\"$gateway\",http_conn_manager_prefix=~\"outbound_0.0.0.0_.*\"}[1m])) by (response_code_class)",
           "legendFormat": "{{response_code_class}}",
           "range": true,
           "refId": "A"
@@ -1206,7 +1206,7 @@
             "uid": "${datasource.id}"
           },
           "editorMode": "code",
-          "expr": "sum(irate(envoy_cluster_upstream_rq{higress=\"$gateway\",cluster_name=~\"outbound.*\"}[1m])) by (response_code_class)",
+          "expr": "sum(irate(envoy_cluster_upstream_rq{${monitoring.selector.key}=\"$gateway\",cluster_name=~\"outbound.*\"}[1m])) by (response_code_class)",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -1311,7 +1311,7 @@
             "uid": "${datasource.id}"
           },
           "editorMode": "code",
-          "expr": "sum(irate(waf_filter_tx_total{higress=\"$gateway\"}[1m]))",
+          "expr": "sum(irate(waf_filter_tx_total{${monitoring.selector.key}=\"$gateway\"}[1m]))",
           "legendFormat": "qps",
           "range": true,
           "refId": "A"
@@ -1403,7 +1403,7 @@
             "uid": "${datasource.id}"
           },
           "editorMode": "code",
-          "expr": "sum(irate(waf_filter_tx_interruptions{higress=\"$gateway\"}[1m])) by (phase)",
+          "expr": "sum(irate(waf_filter_tx_interruptions{${monitoring.selector.key}=\"$gateway\"}[1m])) by (phase)",
           "legendFormat": "{{phase}}",
           "range": true,
           "refId": "A"
@@ -1495,7 +1495,7 @@
             "uid": "${datasource.id}"
           },
           "editorMode": "code",
-          "expr": "sum(irate(waf_filter_tx_interruptions{higress=\"$gateway\"}[1m])) by (ruleid)",
+          "expr": "sum(irate(waf_filter_tx_interruptions{${monitoring.selector.key}=\"$gateway\"}[1m])) by (ruleid)",
           "legendFormat": "{{ruleid}}",
           "range": true,
           "refId": "A"
@@ -1919,7 +1919,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "label_replace(label_replace(topk(10, sum(irate(envoy_cluster_upstream_rq_total{higress=\"$gateway\", cluster_name!=\"xds-grpc\", cluster_name!=\"prometheus_stats\", cluster_name!=\"agent\", cluster_name!=\"BlackHoleCluster\", cluster_name!=\"sds-grpc\"}[5m])) by (cluster_name)), \"service\", \"$3\", \"cluster_name\", \"outbound_([0-9]+)_(.*)_(.*)$\"), \"port\", \"$1\", \"cluster_name\", \"outbound_([0-9]+)_(.*)_(.*)$\")",
+          "expr": "label_replace(label_replace(topk(10, sum(irate(envoy_cluster_upstream_rq_total{${monitoring.selector.key}=\"$gateway\", cluster_name!=\"xds-grpc\", cluster_name!=\"prometheus_stats\", cluster_name!=\"agent\", cluster_name!=\"BlackHoleCluster\", cluster_name!=\"sds-grpc\"}[5m])) by (cluster_name)), \"service\", \"$3\", \"cluster_name\", \"outbound_([0-9]+)_(.*)_(.*)$\"), \"port\", \"$1\", \"cluster_name\", \"outbound_([0-9]+)_(.*)_(.*)$\")",
           "format": "table",
           "instant": true,
           "interval": "",
@@ -2013,7 +2013,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "label_replace(label_replace(topk(10, sum(irate(envoy_cluster_upstream_rq{response_code_class=~\"(4|5)xx\",higress=\"$gateway\", cluster_name!=\"xds-grpc\", cluster_name!=\"prometheus_stats\", cluster_name!=\"agent\", cluster_name!=\"BlackHoleCluster\", cluster_name!=\"sds-grpc\"}[5m])) by (cluster_name)), \"service\", \"$3\", \"cluster_name\", \"outbound_([0-9]+)_(.*)_(.*)$\"), \"port\", \"$1\", \"cluster_name\", \"outbound_([0-9]+)_(.*)_(.*)$\")",
+          "expr": "label_replace(label_replace(topk(10, sum(irate(envoy_cluster_upstream_rq{response_code_class=~\"(4|5)xx\",${monitoring.selector.key}=\"$gateway\", cluster_name!=\"xds-grpc\", cluster_name!=\"prometheus_stats\", cluster_name!=\"agent\", cluster_name!=\"BlackHoleCluster\", cluster_name!=\"sds-grpc\"}[5m])) by (cluster_name)), \"service\", \"$3\", \"cluster_name\", \"outbound_([0-9]+)_(.*)_(.*)$\"), \"port\", \"$1\", \"cluster_name\", \"outbound_([0-9]+)_(.*)_(.*)$\")",
           "format": "table",
           "instant": true,
           "interval": "",
@@ -2107,7 +2107,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "label_replace(label_replace(topk(10, sum(envoy_cluster_upstream_cx_active{higress=\"$gateway\", cluster_name!=\"xds-grpc\", cluster_name!=\"prometheus_stats\", cluster_name!=\"agent\", cluster_name!=\"BlackHoleCluster\", cluster_name!=\"sds-grpc\"}) by (cluster_name)), \"service\", \"$3\", \"cluster_name\", \"outbound_([0-9]+)_(.*)_(.*)$\"), \"port\", \"$1\", \"cluster_name\", \"outbound_([0-9]+)_(.*)_(.*)$\")",
+          "expr": "label_replace(label_replace(topk(10, sum(envoy_cluster_upstream_cx_active{${monitoring.selector.key}=\"$gateway\", cluster_name!=\"xds-grpc\", cluster_name!=\"prometheus_stats\", cluster_name!=\"agent\", cluster_name!=\"BlackHoleCluster\", cluster_name!=\"sds-grpc\"}) by (cluster_name)), \"service\", \"$3\", \"cluster_name\", \"outbound_([0-9]+)_(.*)_(.*)$\"), \"port\", \"$1\", \"cluster_name\", \"outbound_([0-9]+)_(.*)_(.*)$\")",
           "format": "table",
           "instant": true,
           "interval": "",
@@ -2202,7 +2202,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "label_replace(label_replace(topk(10, sum(irate(envoy_cluster_upstream_rq_time_sum{higress=\"$gateway\", cluster_name!=\"xds-grpc\", cluster_name!=\"prometheus_stats\", cluster_name!=\"agent\", cluster_name!=\"BlackHoleCluster\", cluster_name!=\"sds-grpc\"}[5m])) by (cluster_name) / sum(irate(envoy_cluster_upstream_rq_time_count{higress=\"$gateway\",cluster_name!=\"xds-grpc\", cluster_name!=\"prometheus_stats\", cluster_name!=\"agent\", cluster_name!=\"BlackHoleCluster\", cluster_name!=\"sds-grpc\"}[5m])) by (cluster_name)), \"service\", \"$3\", \"cluster_name\", \"outbound_([0-9]+)_(.*)_(.*)$\"), \"port\", \"$1\", \"cluster_name\", \"outbound_([0-9]+)_(.*)_(.*)$\")",
+          "expr": "label_replace(label_replace(topk(10, sum(irate(envoy_cluster_upstream_rq_time_sum{${monitoring.selector.key}=\"$gateway\", cluster_name!=\"xds-grpc\", cluster_name!=\"prometheus_stats\", cluster_name!=\"agent\", cluster_name!=\"BlackHoleCluster\", cluster_name!=\"sds-grpc\"}[5m])) by (cluster_name) / sum(irate(envoy_cluster_upstream_rq_time_count{${monitoring.selector.key}=\"$gateway\",cluster_name!=\"xds-grpc\", cluster_name!=\"prometheus_stats\", cluster_name!=\"agent\", cluster_name!=\"BlackHoleCluster\", cluster_name!=\"sds-grpc\"}[5m])) by (cluster_name)), \"service\", \"$3\", \"cluster_name\", \"outbound_([0-9]+)_(.*)_(.*)$\"), \"port\", \"$1\", \"cluster_name\", \"outbound_([0-9]+)_(.*)_(.*)$\")",
           "format": "table",
           "instant": true,
           "interval": "",
@@ -2248,21 +2248,21 @@
       {
         "current": {
           "selected": false,
-          "text": "higress-system-higress-gateway",
-          "value": "higress-system-higress-gateway"
+          "text": "${monitoring.gateway.selector.value}",
+          "value": "${monitoring.gateway.selector.value}"
         },
         "datasource": {
           "type": "prometheus",
           "uid": "${datasource.id}"
         },
-        "definition": "label_values(envoy_server_live, higress)",
+        "definition": "label_values(envoy_server_live, ${monitoring.selector.key})",
         "hide": 0,
         "includeAll": false,
         "multi": false,
         "name": "gateway",
         "options": [],
         "query": {
-          "query": "label_values(envoy_server_live, higress)",
+          "query": "label_values(envoy_server_live, ${monitoring.selector.key})",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,
@@ -2274,25 +2274,25 @@
       {
         "current": {
           "selected": false,
-          "text": "higress-system",
-          "value": "higress-system"
+          "text": "${monitoring.namespace}",
+          "value": "${monitoring.namespace}"
         },
         "datasource": {
           "type": "prometheus",
           "uid": "${datasource.id}"
         },
-        "definition": "label_values(envoy_server_live, higress)",
+        "definition": "label_values(envoy_server_live, ${monitoring.selector.key})",
         "hide": 0,
         "includeAll": false,
         "multi": false,
         "name": "namespace",
         "options": [],
         "query": {
-          "query": "label_values(envoy_server_live, higress)",
+          "query": "label_values(envoy_server_live, ${monitoring.selector.key})",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,
-        "regex": "/(.*)-higress-gateway/",
+        "regex": "/(.*)-${monitoring.gateway.name}/",
         "skipUrlSync": false,
         "sort": 0,
         "type": "query"

@@ -1,0 +1,691 @@
+[
+  {
+    "spec": {
+      "name": "gatewayclasses",
+      "list_path": "/apis/gateway.networking.k8s.io/v1beta1/gatewayclasses",
+      "create_path": "/apis/gateway.networking.k8s.io/v1beta1/gatewayclasses",
+      "namespaced": false
+    },
+    "items": [
+      {
+        "kind": "GatewayClass",
+        "apiVersion": "gateway.networking.k8s.io/v1beta1",
+        "metadata": {
+          "name": "aigateway-gateway"
+        },
+        "spec": {
+          "controllerName": "higress.io/gateway-controller"
+        }
+      }
+    ]
+  },
+  {
+    "spec": {
+      "name": "configmaps",
+      "list_path": "/api/v1/namespaces/{namespace}/configmaps",
+      "create_path": "/api/v1/namespaces/{namespace}/configmaps",
+      "namespaced": true
+    },
+    "items": [
+      {
+        "kind": "ConfigMap",
+        "apiVersion": "v1",
+        "metadata": {
+          "name": "ai-route-doubao",
+          "namespace": "aigateway-system",
+          "labels": {
+            "higress.io/config-map-type": "ai-route",
+            "higress.io/resource-definer": "higress"
+          }
+        },
+        "data": {
+          "data": "{\"name\":\"doubao\",\"domains\":[\"ai.local\"],\"pathPredicate\":{\"matchType\":\"PRE\",\"matchValue\":\"/doubao\",\"caseSensitive\":false},\"headerPredicates\":[],\"urlParamPredicates\":[],\"upstreams\":[{\"provider\":\"doubao\",\"weight\":100,\"modelMapping\":{\"*\":\"doubao-seed-2-0-pro-260215\"}}],\"modelPredicates\":[{\"matchType\":\"EQUAL\",\"matchValue\":\"doubao-seed-2-0-pro-260215\"}],\"authConfig\":{\"enabled\":true,\"allowedConsumers\":[\"ceshi\"]},\"fallbackConfig\":{\"enabled\":false},\"proxyNextUpstream\":{\"enabled\":true,\"attempts\":3,\"timeout\":120000,\"conditions\":[\"error\",\"timeout\",\"non_idempotent\"]}}"
+        }
+      },
+      {
+        "kind": "ConfigMap",
+        "apiVersion": "v1",
+        "metadata": {
+          "name": "domain-ai.local",
+          "namespace": "aigateway-system",
+          "labels": {
+            "higress.io/config-map-type": "domain",
+            "higress.io/resource-definer": "higress"
+          }
+        },
+        "data": {
+          "domain": "ai.local",
+          "enableHttps": "off"
+        }
+      },
+      {
+        "kind": "ConfigMap",
+        "apiVersion": "v1",
+        "metadata": {
+          "name": "domain-higress-default-domain",
+          "namespace": "aigateway-system",
+          "labels": {
+            "higress.io/config-map-type": "domain",
+            "higress.io/resource-definer": "higress"
+          }
+        },
+        "data": {
+          "cert": "default",
+          "domain": "higress-default-domain",
+          "enableHttps": "on"
+        }
+      },
+      {
+        "kind": "ConfigMap",
+        "apiVersion": "v1",
+        "metadata": {
+          "name": "higress-config",
+          "namespace": "aigateway-system",
+          "labels": {
+            "app": "aigateway-gateway",
+            "aigateway": "aigateway-system-aigateway-gateway"
+          }
+        },
+        "data": {
+          "higress": "mcpServer:\n  enable: false\n  sse_path_suffix: /sse\n  redis:\n    address: redis-address:6379\n    username: \"\"\n    password: \"\"\n    db: 0\n  match_list: []\n  servers: []\ndownstream:\n  connectionBufferLimits: 32768\n  http2:\n    initialConnectionWindowSize: 1048576\n    initialStreamWindowSize: 65535\n    maxConcurrentStreams: 100\n  idleTimeout: 180\n  maxRequestHeadersKb: 60\n  routeTimeout: 0\nupstream:\n  connectionBufferLimits: 10485760\n  idleTimeout: 10",
+          "mesh": "accessLogEncoding: TEXT\naccessLogFile: /var/log/proxy/access.log\naccessLogFormat: |\n  {\"ai_log\":\"%FILTER_STATE(wasm.ai_log:PLAIN)%\",\"authority\":\"%REQ(X-ENVOY-ORIGINAL-HOST?:AUTHORITY)%\",\"bytes_received\":\"%BYTES_RECEIVED%\",\"bytes_sent\":\"%BYTES_SENT%\",\"downstream_local_address\":\"%DOWNSTREAM_LOCAL_ADDRESS%\",\"downstream_remote_address\":\"%DOWNSTREAM_REMOTE_ADDRESS%\",\"duration\":\"%DURATION%\",\"istio_policy_status\":\"%DYNAMIC_METADATA(istio.mixer:status)%\",\"method\":\"%REQ(:METHOD)%\",\"path\":\"%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%\",\"protocol\":\"%PROTOCOL%\",\"request_id\":\"%REQ(X-REQUEST-ID)%\",\"requested_server_name\":\"%REQUESTED_SERVER_NAME%\",\"response_code\":\"%RESPONSE_CODE%\",\"response_flags\":\"%RESPONSE_FLAGS%\",\"route_name\":\"%ROUTE_NAME%\",\"start_time\":\"%START_TIME%\",\"trace_id\":\"%REQ(X-B3-TRACEID)%\",\"upstream_cluster\":\"%UPSTREAM_CLUSTER%\",\"upstream_host\":\"%UPSTREAM_HOST%\",\"upstream_local_address\":\"%UPSTREAM_LOCAL_ADDRESS%\",\"upstream_service_time\":\"%RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)%\",\"upstream_transport_failure_reason\":\"%UPSTREAM_TRANSPORT_FAILURE_REASON%\",\"user_agent\":\"%REQ(USER-AGENT)%\",\"x_forwarded_for\":\"%REQ(X-FORWARDED-FOR)%\"}\nconfigSources:\n- address: xds://controller:15051\n- address: k8s://\ndefaultConfig:\n  disableAlpnH2: true\n  discoveryAddress: pilot:15012\n  proxyStatsMatcher:\n    inclusionRegexps:\n    - .*\ndnsRefreshRate: 200s\nenableAutoMtls: false\nenablePrometheusMerge: true\ningressControllerMode: \"OFF\"\nmseIngressGlobalConfig:\n  enableH3: false\n  enableProxyProtocol: false\nprotocolDetectionTimeout: 100ms\nrootNamespace: aigateway-system\ntrustDomain: cluster.local",
+          "meshNetworks": "networks: {}"
+        }
+      },
+      {
+        "kind": "ConfigMap",
+        "apiVersion": "v1",
+        "metadata": {
+          "name": "aigateway-console",
+          "namespace": "aigateway-system",
+          "labels": {
+            "higress.io/resource-definer": "higress"
+          }
+        },
+        "data": {
+          "dashboard.builtin": "true",
+          "mode": "standalone",
+          "route.default.initialized": "true",
+          "system.initialized": "true"
+        }
+      },
+      {
+        "kind": "ConfigMap",
+        "apiVersion": "v1",
+        "metadata": {
+          "name": "higress-https",
+          "namespace": "aigateway-system"
+        },
+        "data": {
+          "cert": "acmeIssuer:\n- ak: \"\"\n  email: your8076@yours66407.com\n  name: letsencrypt\n  sk: \"\"\nautomaticHttps: true\ncredentialConfig: []\nfallbackForInvalidSecret: false\nrenewBeforeDays: 30\nversion: \"20260317015314\"\n"
+        }
+      }
+    ]
+  },
+  {
+    "spec": {
+      "name": "secrets",
+      "list_path": "/api/v1/namespaces/{namespace}/secrets",
+      "create_path": "/api/v1/namespaces/{namespace}/secrets",
+      "namespaced": true
+    },
+    "items": [
+      {
+        "kind": "Secret",
+        "apiVersion": "v1",
+        "metadata": {
+          "name": "default",
+          "namespace": "aigateway-system",
+          "labels": {
+            "higress.io/domain_higress-gateway": "true",
+            "higress.io/resource-definer": "higress"
+          }
+        },
+        "data": {
+          "tls.crt": "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUZDakNDQXZLZ0F3SUJBZ0lCQVRBTkJna3Foa2lHOXcwQkFRc0ZBREFhTVJnd0ZnWURWUVFERXc5b2FXZHkKWlhOekxXZGhkR1YzWVhrd0hoY05Nall3TXpFM01ERTFNekl4V2hjTk1qY3dNekUzTURFMU16SXhXakFhTVJndwpGZ1lEVlFRREV3OW9hV2R5WlhOekxXZGhkR1YzWVhrd2dnSWlNQTBHQ1NxR1NJYjNEUUVCQVFVQUE0SUNEd0F3CmdnSUtBb0lDQVFEQVMwVCtmY3FuNnNGNDJHeUdVZTlkaG1BcXBNTTUzOW44N1IrSmY3eVdmL2JXNitqV3lEOUwKUlNqZUZRUElnWi9FMVB4OWpvdEUzSFdYby8ydDNtd3JSV2VxOVdYMGN2Q0d2VWlzNm80MHI3c0JDMnJTQnEybgptOG82T2VBSU1sOTRBTkhRM0p5TXZxS0NqOEJaK0Z2WUUydWZMNFBDSnV3cVB1WE1ZYTBsKzExOFRZa1g1QVVJCkUySU8zblZLRGk0TS9haUhRbWV3U01WZlhyR2pxSFkxUjBqM0tkUDBxZEtCTjNFUEhITGZwRmk5VXU4M0FxMHkKMXNXcG8zaUI0QmhXMk4xUEdTNHNwc1dLaUdtZTliZlpYbzVlZFVzWm91bkZ3QWlsNE1JVUZCb21mV3U4eHRaTgp0NlpIdVVpS3diSjF1YjViUTNTdEZkWUFDVTE0Vnpqbm1SREN5ckRRU0IwZkVZbFpWdS9uQWwyOS9KaTVPMzZVCkw3YmpHbFkwYTVPL21RWTI5eCt1YjZCNHpJVVVBNTFNVDdHQkNSUklhaElmbWprZDlQd25zSFRXU2ZxYVprdHkKWVQvS2pacWs3V1pDQWt1cStNS2pUbitMMFVIbHFSQmdUL1dhTlc5VXFTTEZoQ1JLQW9PNWo2Z2xEMW4vb0tteApsZGNlcVRHWE5IRkg4WEpKTitOYllzM0NPcW14YUhlTGtBcW5ycHlpSmF1OVgwNGpwOCsyMXRGNXVHZmUxcUhjCmNncTdWRkpNQ1ZCMjRBWmFvUnRNbGlRRGxBajJlUHB6VVh0a0xNcTUyay9UbldWenU5WFRES1FQMlY4dGM1TVUKSVVTYU5XNlp2ODFhSWZWYTlCQUVRY3MzUzJmajBnbFpnWGFwSS82SDFUL21oMVMzbFF4TWF3SURBUUFCbzFzdwpXVEFNQmdOVkhSTUJBZjhFQWpBQU1BNEdBMVVkRHdFQi93UUVBd0lGb0RBZEJnTlZIU1VFRmpBVUJnZ3JCZ0VGCkJRY0RBUVlJS3dZQkJRVUhBd0l3R2dZRFZSMFJCQk13RVlJUGFHbG5jbVZ6Y3kxbllYUmxkMkY1TUEwR0NTcUcKU0liM0RRRUJDd1VBQTRJQ0FRQndiTnJqNkRsbzRJM1ZwVlpVY2w2NEF3UjRPWVdKYkVBQldiZmtnTGJtV0hmTgpGcjBVak83T2F0R29nS2YzZG5UbEt4b293d2drcXdQcmUzZUhYWVZreCtrdG9BK0JyQmVTYlR3MEVqa0RvV2RzCkRLRkxrdE80ZXVNMHpWZnVmcWdsM3I2TEsydGpXSWNEcjNNb1IwdlNBQkREakZONWtnemZMN0VXYWVJTUdPL04KT0pRSHBMU1E4V2ZWQkRCMFpaQ2ZtZE1TRTJNQk41NGZWY0ZFNklJMVlnWXJLa01SSTRUSVR1OWsrZjBCaUlwNwpwYWdZZHFVNXVsKzFsS2tESDg2WGZiK0J0cXEwR09XTjcreHljZ29sYTgxTi94dDRrVkdtMi81SXFDakZvZG1TCkNiWlpRSXRRSXhWcnIyeDZKQi90azZEeWVIRFNZUnFwdGdtOGI2N3g0OTVmVHNJbkl3WURpT2NJeWVWZk1KRGkKRmk0Y2VPcWtSeTYxUWdTdEVpeFhNTS8xK2g1c0Q2Y0Q0L3c0MTdaQUdSSnNyOE13Y2l4bm1EeHg5ZEJZRDMyRApYRlpiMFlXa1J4bUN6N0pGaVZjbTdNbHl4eklIRGdESXJIbVozQlJPWFZqUERsbnNnd1VnNGE4V2l6TkxQSjg5CndvUTBEWmNXN292YVYwRnhHRzBhQUNCUm9BV1RVTnk4aWhPVVVBaVk1WWNnT050RlArZ1EzWllkTmd0SVJ0eDMKNHNlb0pYSFNxTUZDWWdEaHhDbzdBdytFMDh4U0FRR2NuYkp1RkFMS1pQUXhFVDZOR3FNUXdhZ2JKQTI1VUhpZwo3N0dIQktRK0ZlZXp0K1lBaFlpclcycG0vekNjUjhFK1VRb3ltOHR0dkl2T2lsU1Z5TDF0ZnYxazJ0YWY1dz09Ci0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K",
+          "tls.key": "LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLQpNSUlKUWdJQkFEQU5CZ2txaGtpRzl3MEJBUUVGQUFTQ0NTd3dnZ2tvQWdFQUFvSUNBUURBUzBUK2ZjcW42c0Y0CjJHeUdVZTlkaG1BcXBNTTUzOW44N1IrSmY3eVdmL2JXNitqV3lEOUxSU2plRlFQSWdaL0UxUHg5am90RTNIV1gKby8ydDNtd3JSV2VxOVdYMGN2Q0d2VWlzNm80MHI3c0JDMnJTQnEybm04bzZPZUFJTWw5NEFOSFEzSnlNdnFLQwpqOEJaK0Z2WUUydWZMNFBDSnV3cVB1WE1ZYTBsKzExOFRZa1g1QVVJRTJJTzNuVktEaTRNL2FpSFFtZXdTTVZmClhyR2pxSFkxUjBqM0tkUDBxZEtCTjNFUEhITGZwRmk5VXU4M0FxMHkxc1dwbzNpQjRCaFcyTjFQR1M0c3BzV0sKaUdtZTliZlpYbzVlZFVzWm91bkZ3QWlsNE1JVUZCb21mV3U4eHRaTnQ2Wkh1VWlLd2JKMXViNWJRM1N0RmRZQQpDVTE0Vnpqbm1SREN5ckRRU0IwZkVZbFpWdS9uQWwyOS9KaTVPMzZVTDdiakdsWTBhNU8vbVFZMjl4K3ViNkI0CnpJVVVBNTFNVDdHQkNSUklhaElmbWprZDlQd25zSFRXU2ZxYVprdHlZVC9LalpxazdXWkNBa3VxK01LalRuK0wKMFVIbHFSQmdUL1dhTlc5VXFTTEZoQ1JLQW9PNWo2Z2xEMW4vb0tteGxkY2VxVEdYTkhGSDhYSkpOK05iWXMzQwpPcW14YUhlTGtBcW5ycHlpSmF1OVgwNGpwOCsyMXRGNXVHZmUxcUhjY2dxN1ZGSk1DVkIyNEFaYW9SdE1saVFECmxBajJlUHB6VVh0a0xNcTUyay9UbldWenU5WFRES1FQMlY4dGM1TVVJVVNhTlc2WnY4MWFJZlZhOUJBRVFjczMKUzJmajBnbFpnWGFwSS82SDFUL21oMVMzbFF4TWF3SURBUUFCQW9JQ0FGeUhHM0RWdUtFcC9lU1hSMGt1dmQ0agozYnhIUWNWa2FIRWk3SXp1RVNIZCt6bVpsSlZkRDgrNVBKdjRRclRGWXNxRXJlWUFwQlVEZS9YMnJBZHd3bDNqCjdLay9vY3FKVUNHVmpSWGZXNFFRbHd3K29TemtsOFRSMnZJL2pRU0VzSmwrMDNjTDRLeDh3cGZPY2dFWTE2RFcKWDIvZW5pamJMOEo0TjMwcjl2UVN5djRZRlFLUTdyYmZGTTBRMENGTlIyMXExU0FZbk9vZmFoR2s4QmRPNVdwbgpuYjJJdS91N2g1WXp4a3crSlN4bDJXbG9NY0Vub1kyWCtNN1M0UmFsYlRERTgyQ3ZQaCt3TTllZ0lpcWlFOUFkCmhxWC9ESjhPWEN5U1pkYmptcCtzdUpTU3Z6ZTcrYnkxeE9ZNFNxYXg0NXh3UHgrTkN1U0tZRW51TC8vYkFIN2kKczVCcmUvLytndW1uYXl3UHIyZXZJek55TUVMendFemlacG5QQStEL1RHT3hxY09RYndOenZiTUlFcDdDMUdKMwpKa2dCWEVYdzRtU2xTdC9qODZFYnMybnlOU29VYUJUN3RId0FlZTBOVXZFTTBFZWdxNEJzekJjMGtqdmxvaUtoCm0xaWVBWG8vSjNLSHRrQUY3ZGtBeXJlT0lhVjlBMForRjZmTDhwazNTenJsa3JDaEVVZlRHSGRla0U2THZoc0MKYU9rcjFuSXRESmRJcnpYNCthL1VaZTg1TTJYblYxMzFsNDZqaGZVVFNNVFBFc2YwOXRycDJQNmdrenlRVmMyYgptTW4xWXVJUUFPSVpWSUYzSjFuYmxaWklMbzJLVlBJK0YrTXZyUUVQZ2tsNlR4Zk5QRExHQnR1RUx3cU5RcDU4CkdrMmdKSTg3OVlXazY2c2dwaGpwQW9JQkFRRHF6THU0WWhxMUFGVUFVbi9qSEw4TTZWSDhZTFk0VDdGd0p5V0EKZWIxNnoxMkZ2K1ZrK1V1UW90VkVycDVQV3JKdzVFZ2YrdEEydnN6VklYUnNIUzIrOGJ2YWNMdktXd1ZqZDQ0VgpzMVpjNzJ1QnE4eXEwSjhDbVU2RnIzQ1lmK1FWa0tBQ1ZIdEg3UVR4ekNNeS90d2NnMEI3dDQ1S3pLTVhXVkxQCmV6b1ZzYXpXc0s4OEhwc1hhaVA3RFRsUkg4SmRNS3VUV0ppYlFMVVpDMzJ3dGVkRDhwd0ZJdDhmNEs1aFk3UHcKSDdkRlM5N2FGRURmNERDaFhUcjU1RzRRVndFKzMrTnRnYlhONDZIZXlxcHlIa3N5YlFqMDE2R2drcVg5d1Y1bgpUblBneE56TS9Wa1dFV042ZmRvNjJRcVNyOWxRVk9JeGY0MFY0QUlCWGYrR0s2bmZBb0lCQVFEUnFBbzZvRUFXCld6a21tUy9CZEFDZmREanBUZDA3T0NyakRySWVBZ2pSb2EvZWkzY3lNT0FrTCtRTjFlNzNkYURRb1Rhc1F0NWoKWFdqZW1sd24xME9Ic3NaYVYzWjVzajlCcHhXMnFnTVFzaFJyamtIR09GZUpJUVdIRElIUG5ML1dLNVRlUzdXSQpwa2NrVUxPVEhVR0tBYTYxQmFmTElTRTRJYjFPWjZhUWI5cDdxZXQxRTNhOERFSEkzVC9qM3FiVXc5TitqMGhXClZjc0RtWWVQMi94cXFnbVJreTZoTlJQaWk5MUNMYkJ5TElScFdHdFBXSExTSHlUUE9CUnNPVDh4dEVJWmRmcEMKV2NndFE0azdXNVFTQ2VBNmpIdnlTTXdXYk9ndGJjNTRGQXkyOU1KYmtEVVptdWo0SnAvTlkyUDMwQTVJeDhVcwpRMGV5WmlFb3FJYjFBb0lCQUMyb2NqaUFtMERuTjZCQWFxMzNRUTk1cjMrc0xzTDBmRVNhMkNnTGhGVUZUZUpjClZuYzBJd1dWSkhPZW9SbzlRTVhESG1OWm1uT0sxcm43TDNCMm5CYXRXeUkzR2MxWHRjeUp5dzlkT0VZS0tKV20KbXIzOG8yOFY4TGIrVHA3WS83bFJ6a3Vsc2ZOaW03dUpQcThEOERsN0xHYmlZc0VZMmY0SVdKb1FGRk56b1hCKwpHeFZOdmtyblVPZll3blNNQUhldXB5Nlg0OVVNMkNwdW1acHJSUFZwai8xUHNxTzRSVENhK3JxTzhFeUJYR3g3CjA4RzFEci9TS1UyK3BjaDNvcjVmT3hKb1Ryb2lzYTlwS1l2WGFEZitDK2ZRcHBWYTd2eFJSZEpBNXplbUVHbXMKT2s2WVF3Zm13VEVBVTVZQ3EvZDdDaUVsOUlGMGRlOWVIL292TTNFQ2dnRUFhbEUrcnJBcEQ2MCs5QlhtbzhHQgp0MXFtcVpqMHdWMGdVbmhYVnVSTk9KRTNzREVsUnV5R0haT3pvRmlHa0RLMFZGZ01jNXFOVC9KRWhlM2RJYzhGCnpjQ1kyYU5VenkzVzZpSWkzcmlrU1VrbEZjM1VDUUwxVVBMUDdNWW81ZkZsVHVSVzM4dWd5U1VaR285YUlSWksKOEFNZVoybnd4dytMMnYweEZKdDNXZk4rNWdzcS9mbmEwazJjNXBGY0h0Ly8xaEZnSk9QZ0dQZjB0V1NiM0JZQQprTTZkZjVjVnBHWllLU0FvR2JFMXN4QmtMVS9MU3pkZE1yVGNZOERhaW04VlhzMDhYOUQyRWNPWndXcG9JeE96CnFOb2RQVk9VWHk4UFg2Zm1yWExycXZUdjVhK0ZDQTIrLzdjUXdSWkZIMUJ4bDIrSWJ0dnZYeHpYTk42Wm5oYW8KS1FLQ0FRRUF2VHJ0Q3kvQytySndxRTMyZUg0ZkFxRzdKWWV5OGlDa0xzaG9SWWVISXhZeGVxWjNxcTF6b2M4NgpFUDUvZWlnNGpZV29OQUt1ZWtSSnVuYTZnOWlyU3U4dFM2RU0waU8wcTc2UUk0VGdITGlWTzlmUnlYU0tCRVBFCnM5dFBYa0dNVFd2ZFlDTmlSWVg2dUd4N3NOYTZXV25zd1lvUmZWUDJtT1BZd2FCKzZxVHpzaFpJbm01dlQ4aHcKT3RwTnh5UHJJc3ovSlJvMWVrZTVaRjNFOGFqSHlVVE9QMVRkbVlEU2l6VTdNbFdtTFdwSzQrTjYraTVkVlJrMwpkWnhURFVrSXdjSC90bkNCdnRRSjMrcEhGdUk5eUhCZjVPK1hGbHNJSEd1MEJsV0hhSHlZYm1lV2FmZGhUdHBKCllNQzJIUGFieG4wdG9uWXRNY0R0Qnk5NEJzTzd0QT09Ci0tLS0tRU5EIFJTQSBQUklWQVRFIEtFWS0tLS0tCg=="
+        },
+        "type": "kubernetes.io/tls"
+      },
+      {
+        "kind": "Secret",
+        "apiVersion": "v1",
+        "metadata": {
+          "name": "aigateway-console",
+          "namespace": "aigateway-system",
+          "labels": {
+            "higress.io/resource-definer": "higress"
+          }
+        },
+        "data": {
+          "adminDisplayName": "YWRtaW4=",
+          "adminPassword": "YWRtaW4=",
+          "adminUsername": "YWRtaW4=",
+          "iv": "US8zXklRPVdJZHUhKUJSPg==",
+          "key": "d21Wb1g3aFJAakspUSpuWlRzX3UvUGZheWpXQydOSE4="
+        },
+        "type": "Opaque"
+      }
+    ]
+  },
+  {
+    "spec": {
+      "name": "services",
+      "list_path": "/api/v1/namespaces/{namespace}/services",
+      "create_path": "/api/v1/namespaces/{namespace}/services",
+      "namespaced": true
+    },
+    "items": [
+      {
+        "kind": "Service",
+        "apiVersion": "v1",
+        "metadata": {
+          "name": "aigateway-gateway",
+          "namespace": "aigateway-system",
+          "labels": {
+            "aigateway": "aigateway-system-aigateway-gateway"
+          }
+        },
+        "spec": {
+          "ports": [
+            {
+              "name": "http2",
+              "protocol": "TCP",
+              "port": 80,
+              "targetPort": 80
+            }
+          ],
+          "selector": {
+            "aigateway": "aigateway-system-aigateway-gateway"
+          },
+          "type": "LoadBalancer"
+        }
+      }
+    ]
+  },
+  {
+    "spec": {
+      "name": "mcpbridges",
+      "list_path": "/apis/networking.higress.io/v1/namespaces/{namespace}/mcpbridges",
+      "create_path": "/apis/networking.higress.io/v1/namespaces/{namespace}/mcpbridges",
+      "namespaced": true
+    },
+    "items": [
+      {
+        "kind": "McpBridge",
+        "apiVersion": "networking.higress.io/v1",
+        "metadata": {
+          "name": "default",
+          "namespace": "aigateway-system"
+        },
+        "spec": {
+          "registries": [
+            {
+              "type": "dns",
+              "name": "aigateway-console",
+              "domain": "console.svc",
+              "port": 8080
+            },
+            {
+              "type": "nacos2",
+              "name": "nacos",
+              "domain": "nacos",
+              "port": 8848,
+              "nacosGroups": [
+                "DEFAULT_GROUP"
+              ]
+            },
+            {
+              "type": "dns",
+              "name": "llm-doubao.internal",
+              "domain": "ark.cn-beijing.volces.com",
+              "port": 443,
+              "protocol": "https"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "spec": {
+      "name": "envoyfilters",
+      "list_path": "/apis/networking.istio.io/v1alpha3/namespaces/{namespace}/envoyfilters",
+      "create_path": "/apis/networking.istio.io/v1alpha3/namespaces/{namespace}/envoyfilters",
+      "namespaced": true
+    },
+    "items": [
+      {
+        "kind": "EnvoyFilter",
+        "apiVersion": "networking.istio.io/v1alpha3",
+        "metadata": {
+          "name": "aigateway-gateway-global-custom-response",
+          "namespace": "aigateway-system",
+          "labels": {
+            "app": "aigateway-gateway",
+            "aigateway": "aigateway-system-aigateway-gateway"
+          }
+        },
+        "spec": {
+          "configPatches": [
+            {
+              "applyTo": "HTTP_FILTER",
+              "match": {
+                "context": "GATEWAY",
+                "listener": {
+                  "filterChain": {
+                    "filter": {
+                      "name": "envoy.filters.network.http_connection_manager"
+                    }
+                  }
+                }
+              },
+              "patch": {
+                "operation": "INSERT_FIRST",
+                "value": {
+                  "name": "envoy.filters.http.custom_response",
+                  "typed_config": {
+                    "@type": "type.googleapis.com/envoy.extensions.filters.http.custom_response.v3.CustomResponse"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "spec": {
+      "name": "gateways",
+      "list_path": "/apis/gateway.networking.k8s.io/v1beta1/namespaces/{namespace}/gateways",
+      "create_path": "/apis/gateway.networking.k8s.io/v1beta1/namespaces/{namespace}/gateways",
+      "namespaced": true
+    },
+    "items": [
+      {
+        "kind": "Gateway",
+        "apiVersion": "gateway.networking.k8s.io/v1beta1",
+        "metadata": {
+          "name": "aigateway-gateway",
+          "namespace": "aigateway-system"
+        },
+        "spec": {
+          "gatewayClassName": "aigateway-gateway",
+          "listeners": [
+            {
+              "name": "http",
+              "port": 80,
+              "protocol": "HTTP",
+              "allowedRoutes": {
+                "namespaces": {
+                  "from": "All"
+                }
+              }
+            },
+            {
+              "name": "https",
+              "port": 443,
+              "protocol": "HTTPS",
+              "allowedRoutes": {
+                "namespaces": {
+                  "from": "All"
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "spec": {
+      "name": "wasmplugins",
+      "list_path": "/apis/extensions.higress.io/v1alpha1/namespaces/{namespace}/wasmplugins",
+      "create_path": "/apis/extensions.higress.io/v1alpha1/namespaces/{namespace}/wasmplugins",
+      "namespaced": true
+    },
+    "items": [
+      {
+        "kind": "WasmPlugin",
+        "apiVersion": "extensions.higress.io/v1alpha1",
+        "metadata": {
+          "name": "ai-proxy.internal",
+          "namespace": "aigateway-system",
+          "labels": {
+            "higress.io/internal": "true",
+            "higress.io/resource-definer": "higress",
+            "higress.io/wasm-plugin-built-in": "true",
+            "higress.io/wasm-plugin-category": "ai",
+            "higress.io/wasm-plugin-name": "ai-proxy",
+            "higress.io/wasm-plugin-version": "1.0.0"
+          },
+          "annotations": {
+            "higress.io/comment": "PLEASE DO NOT EDIT DIRECTLY. This resource is managed by Higress.",
+            "higress.io/wasm-plugin-description": "Provide unified OpenAI API compatible interface to call different AI service providers.",
+            "higress.io/wasm-plugin-icon": "https://img.alicdn.com/imgextra/i1/O1CN018iKKih1iVx287RltL_!!6000000004419-2-tps-42-42.png",
+            "higress.io/wasm-plugin-title": "AI Proxy"
+          }
+        },
+        "spec": {
+          "url": "oci://higress-registry.cn-hangzhou.cr.aliyuncs.com/plugins/ai-proxy:2.0.0",
+          "priority": 100,
+          "failStrategy": "FAIL_OPEN",
+          "defaultConfig": {
+            "providers": [
+              {
+                "apiTokens": [
+                  "9e24e829-1b7c-487e-8ccb-27c9810675dc"
+                ],
+                "failover": {
+                  "enabled": false
+                },
+                "id": "doubao",
+                "protocol": "openai",
+                "retryOnFailure": {
+                  "enabled": false
+                },
+                "type": "doubao"
+              }
+            ]
+          },
+          "matchRules": [
+            {
+              "config": {
+                "activeProviderId": "doubao"
+              },
+              "configDisable": false,
+              "service": [
+                "llm-doubao.internal.dns"
+              ]
+            }
+          ],
+          "defaultConfigDisable": false
+        }
+      },
+      {
+        "kind": "WasmPlugin",
+        "apiVersion": "extensions.higress.io/v1alpha1",
+        "metadata": {
+          "name": "ai-statistics-1.0.0",
+          "namespace": "aigateway-system",
+          "labels": {
+            "higress.io/resource-definer": "higress",
+            "higress.io/wasm-plugin-built-in": "true",
+            "higress.io/wasm-plugin-category": "ai",
+            "higress.io/wasm-plugin-name": "ai-statistics",
+            "higress.io/wasm-plugin-version": "1.0.0"
+          },
+          "annotations": {
+            "higress.io/wasm-plugin-description": "Provides statistics of token usage, including logs, monitoring, and alerts.",
+            "higress.io/wasm-plugin-icon": "https://img.alicdn.com/imgextra/i1/O1CN018iKKih1iVx287RltL_!!6000000004419-2-tps-42-42.png",
+            "higress.io/wasm-plugin-title": "AI Statistics"
+          }
+        },
+        "spec": {
+          "url": "oci://higress-registry.cn-hangzhou.cr.aliyuncs.com/plugins/ai-statistics:2.0.0",
+          "priority": 900,
+          "failStrategy": "FAIL_OPEN",
+          "matchRules": [
+            {
+              "ingress": [
+                "ai-route-doubao.internal"
+              ],
+              "config": {
+                "use_default_response_attributes": true
+              },
+              "configDisable": false
+            }
+          ],
+          "defaultConfigDisable": true
+        }
+      },
+      {
+        "kind": "WasmPlugin",
+        "apiVersion": "extensions.higress.io/v1alpha1",
+        "metadata": {
+          "name": "key-auth.internal",
+          "namespace": "aigateway-system",
+          "labels": {
+            "higress.io/internal": "true",
+            "higress.io/resource-definer": "higress",
+            "higress.io/wasm-plugin-built-in": "true",
+            "higress.io/wasm-plugin-category": "auth",
+            "higress.io/wasm-plugin-name": "key-auth",
+            "higress.io/wasm-plugin-version": "1.0.0"
+          },
+          "annotations": {
+            "higress.io/comment": "PLEASE DO NOT EDIT DIRECTLY. This resource is managed by Higress.",
+            "higress.io/wasm-plugin-description": "Authentication based on API Key.",
+            "higress.io/wasm-plugin-icon": "https://img.alicdn.com/imgextra/i4/O1CN01BPFGlT1pGZ2VDLgaH_!!6000000005333-2-tps-42-42.png",
+            "higress.io/wasm-plugin-title": "Key Auth"
+          }
+        },
+        "spec": {
+          "url": "oci://higress-registry.cn-hangzhou.cr.aliyuncs.com/plugins/key-auth:2.0.0",
+          "phase": "AUTHN",
+          "priority": 310,
+          "failStrategy": "FAIL_OPEN",
+          "defaultConfig": {
+            "allow": [],
+            "consumers": [
+              {
+                "credentials": [
+                  "Bearer b8c57cfb-6513-407b-b04e-678ef7e4f878"
+                ],
+                "in_header": true,
+                "in_query": false,
+                "keys": [
+                  "Authorization"
+                ],
+                "name": "ceshi"
+              }
+            ],
+            "global_auth": false,
+            "keys": [
+              "x-higress-dummy-key"
+            ]
+          },
+          "matchRules": [
+            {
+              "ingress": [
+                "ai-route-doubao.internal"
+              ],
+              "config": {
+                "allow": [
+                  "ceshi"
+                ]
+              },
+              "configDisable": false
+            },
+            {
+              "ingress": [
+                "default"
+              ],
+              "config": {},
+              "configDisable": true
+            }
+          ],
+          "defaultConfigDisable": false
+        }
+      },
+      {
+        "kind": "WasmPlugin",
+        "apiVersion": "extensions.higress.io/v1alpha1",
+        "metadata": {
+          "name": "model-mapper.internal",
+          "namespace": "aigateway-system",
+          "labels": {
+            "higress.io/internal": "true",
+            "higress.io/resource-definer": "higress",
+            "higress.io/wasm-plugin-built-in": "true",
+            "higress.io/wasm-plugin-category": "ai",
+            "higress.io/wasm-plugin-name": "model-mapper",
+            "higress.io/wasm-plugin-version": "1.0.0"
+          },
+          "annotations": {
+            "higress.io/comment": "PLEASE DO NOT EDIT DIRECTLY. This resource is managed by Higress.",
+            "higress.io/wasm-plugin-description": "Implements the functionality of rule-based model value mapping in the LLM protocol.",
+            "higress.io/wasm-plugin-icon": "https://img.alicdn.com/imgextra/i1/O1CN018iKKih1iVx287RltL_!!6000000004419-2-tps-42-42.png",
+            "higress.io/wasm-plugin-title": "AI Model Mapper"
+          }
+        },
+        "spec": {
+          "url": "oci://higress-registry.cn-hangzhou.cr.aliyuncs.com/plugins/model-mapper:2.0.0",
+          "phase": "AUTHN",
+          "priority": 800,
+          "failStrategy": "FAIL_OPEN",
+          "matchRules": [
+            {
+              "ingress": [
+                "ai-route-doubao.internal"
+              ],
+              "config": {
+                "modelMapping": {
+                  "*": "doubao-seed-2-0-pro-260215"
+                }
+              },
+              "configDisable": false,
+              "service": [
+                "llm-doubao.internal.dns"
+              ]
+            }
+          ],
+          "defaultConfigDisable": true
+        }
+      },
+      {
+        "kind": "WasmPlugin",
+        "apiVersion": "extensions.higress.io/v1alpha1",
+        "metadata": {
+          "name": "model-router.internal",
+          "namespace": "aigateway-system",
+          "labels": {
+            "higress.io/internal": "true",
+            "higress.io/resource-definer": "higress",
+            "higress.io/wasm-plugin-built-in": "true",
+            "higress.io/wasm-plugin-category": "ai",
+            "higress.io/wasm-plugin-name": "model-router",
+            "higress.io/wasm-plugin-version": "1.0.0"
+          },
+          "annotations": {
+            "higress.io/comment": "PLEASE DO NOT EDIT DIRECTLY. This resource is managed by Higress.",
+            "higress.io/wasm-plugin-description": "Implements the functionality of routing based on the `model` parameter in the LLM protocol.",
+            "higress.io/wasm-plugin-icon": "https://img.alicdn.com/imgextra/i1/O1CN018iKKih1iVx287RltL_!!6000000004419-2-tps-42-42.png",
+            "higress.io/wasm-plugin-title": "AI Model Router"
+          }
+        },
+        "spec": {
+          "url": "oci://higress-registry.cn-hangzhou.cr.aliyuncs.com/plugins/model-router:2.0.0",
+          "phase": "AUTHN",
+          "priority": 900,
+          "failStrategy": "FAIL_OPEN",
+          "defaultConfig": {
+            "modelToHeader": "x-higress-llm-model"
+          },
+          "defaultConfigDisable": false
+        }
+      }
+    ]
+  },
+  {
+    "spec": {
+      "name": "ingresses",
+      "list_path": "/apis/networking.k8s.io/v1/namespaces/{namespace}/ingresses",
+      "create_path": "/apis/networking.k8s.io/v1/namespaces/{namespace}/ingresses",
+      "namespaced": true
+    },
+    "items": [
+      {
+        "kind": "Ingress",
+        "apiVersion": "networking.k8s.io/v1",
+        "metadata": {
+          "name": "ai-route-doubao.internal",
+          "namespace": "aigateway-system",
+          "labels": {
+            "higress.io/domain_ai.local": "true",
+            "higress.io/internal": "true",
+            "higress.io/resource-definer": "higress"
+          },
+          "annotations": {
+            "higress.io/comment": "PLEASE DO NOT EDIT DIRECTLY. This resource is managed by Higress.",
+            "higress.io/destination": "llm-doubao.internal.dns:443",
+            "higress.io/enable-proxy-next-upstream": "true",
+            "higress.io/exact-match-header-x-higress-llm-model": "doubao-seed-2-0-pro-260215",
+            "higress.io/ignore-path-case": "true",
+            "higress.io/proxy-next-upstream": "error,timeout,non_idempotent",
+            "higress.io/proxy-next-upstream-timeout": "120000",
+            "higress.io/proxy-next-upstream-tries": "3"
+          }
+        },
+        "spec": {
+          "ingressClassName": "aigateway",
+          "rules": [
+            {
+              "host": "ai.local",
+              "http": {
+                "paths": [
+                  {
+                    "path": "/doubao",
+                    "pathType": "Prefix",
+                    "backend": {
+                      "resource": {
+                        "apiGroup": "networking.higress.io",
+                        "kind": "McpBridge",
+                        "name": "default"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "kind": "Ingress",
+        "apiVersion": "networking.k8s.io/v1",
+        "metadata": {
+          "name": "default",
+          "namespace": "aigateway-system",
+          "labels": {
+            "higress.io/domain_higress-default-domain": "true",
+            "higress.io/resource-definer": "higress"
+          },
+          "annotations": {
+            "higress.io/destination": "aigateway-console.dns:8080",
+            "higress.io/enable-rewrite": "true",
+            "higress.io/rewrite-path": "/landing"
+          }
+        },
+        "spec": {
+          "ingressClassName": "aigateway",
+          "tls": [
+            {
+              "secretName": "default"
+            }
+          ],
+          "rules": [
+            {
+              "http": {
+                "paths": [
+                  {
+                    "path": "/",
+                    "pathType": "Exact",
+                    "backend": {
+                      "resource": {
+                        "apiGroup": "networking.higress.io",
+                        "kind": "McpBridge",
+                        "name": "default"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+]

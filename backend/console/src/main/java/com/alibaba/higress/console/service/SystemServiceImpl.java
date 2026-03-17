@@ -73,7 +73,7 @@ import lombok.extern.slf4j.Slf4j;
 public class SystemServiceImpl implements SystemService {
 
     private static final String DEFAULT_TLS_CERTIFICATE_NAME = "default";
-    private static final String DEFAULT_TLS_CERTIFICATE_HOST = "higress-gateway";
+    private static final String DEFAULT_TLS_CERTIFICATE_HOST = "aigateway-gateway";
     private static final long DEFAULT_TLS_CERTIFICATE_DURATION = 1000L * 60 * 60 * 24 * 365;
     private static final String DEFAULT_ROUTE_NAME = "default";
     private static final String UNKNOWN = "unknown";

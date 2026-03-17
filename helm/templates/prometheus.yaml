@@ -2,6 +2,7 @@
 {{- if $o11y.enabled }}
 {{- $appName := (include "higress-console-prometheus.name" .) }}
 {{- $config := $o11y.prometheus }}
+{{- $gatewayName := printf "%s-gateway" (default "higress" .Values.global.ingressClass) }}
 {{- $port := $config.port }}
 {{- $storageClassName := $config.pvc.storageClassName }}
 {{- $existedPvc := (lookup "v1" "PersistentVolumeClaim" .Release.Namespace $appName) }}
@@ -55,7 +56,7 @@ data:
           regex: {{ .Release.Namespace }}
           action: keep
         - source_labels: [__meta_kubernetes_pod_label_app]
-          regex: higress-gateway
+          regex: {{ $gatewayName }}
           action: keep
         - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
           action: keep

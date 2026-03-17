@@ -1,4 +1,5 @@
 import dataSourceUidSampleImage from '@/assets/GrafanaDataSourceUID.png';
+import NativeDashboard from '@/components/NativeDashboard';
 import { Mode } from '@/interfaces/config';
 import { DashboardType } from '@/interfaces/dashboard';
 import { getDashboardConfigData, getDashboardInfo, initDashboard, setDashboardUrl } from '@/services';
@@ -40,6 +41,10 @@ const Dashboard: React.FC = () => {
         <h1>{t('dashboard.loadFailed')}</h1>
       </div>
     );
+  }
+
+  if (dashboardInfo.builtIn && dashboardInfo.url && !reconfiguring) {
+    return <NativeDashboard type={DashboardType.MAIN} dashboardInfo={dashboardInfo} />;
   }
 
   if (dashboardInfo.url && !reconfiguring) {

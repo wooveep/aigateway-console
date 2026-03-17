@@ -1,5 +1,5 @@
 import { OptionItem } from '@/interfaces/common';
-import { Service, serviceToString } from '@/interfaces/service';
+import { getServiceDisplayName, Service, serviceToString } from '@/interfaces/service';
 import { getGatewayServices } from '@/services';
 import { RedoOutlined } from '@ant-design/icons';
 import { PageContainer } from '@ant-design/pro-layout';
@@ -19,7 +19,7 @@ const ServiceList: React.FC = () => {
       width: 350,
       ellipsis: true,
       render: (value) => {
-        return value || '-';
+        return getServiceDisplayName(value) || '-';
       },
     },
     {
@@ -91,8 +91,9 @@ const ServiceList: React.FC = () => {
     if (name) {
       Object.assign(factor, { name });
       _dataSource = _dataSource && _dataSource.filter((service: Service) => {
-        const { name: _name } = service;
-        return _name.indexOf(name) > -1;
+        const serviceName = service.name || '';
+        const displayName = getServiceDisplayName(serviceName);
+        return serviceName.indexOf(name) > -1 || displayName.indexOf(name) > -1;
       });
     }
     if (namespace) {

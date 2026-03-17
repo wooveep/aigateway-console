@@ -19,6 +19,7 @@ import javax.servlet.http.HttpServletResponse;
 
 import com.alibaba.higress.console.model.DashboardInfo;
 import com.alibaba.higress.console.model.DashboardType;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 /**
  * @author CH3CHO
@@ -43,6 +44,8 @@ public interface DashboardService {
     String buildConfigData(String dataSourceUid);
 
     String buildConfigData(DashboardType type, String dataSourceUid);
+
+    ObjectNode getNativeDashboard(DashboardType type, Long from, Long to, String gateway, String namespace);
 
     void forwardDashboardRequest(HttpServletRequest request, HttpServletResponse response) throws IOException;
 }

@@ -1,3 +1,4 @@
+import NativeDashboard from '@/components/NativeDashboard';
 import { DashboardType } from '@/interfaces/dashboard';
 import { getDashboardInfo } from '@/services';
 import { useRequest } from 'ahooks';
@@ -24,6 +25,10 @@ const Dashboard: React.FC = () => {
         <h1>{t('dashboard.loadFailed')}</h1>
       </div>
     );
+  }
+
+  if (dashboardInfo.builtIn) {
+    return <NativeDashboard type={DashboardType.AI} dashboardInfo={dashboardInfo} />;
   }
 
   const frameUrl = dashboardInfo.builtIn ? location.origin + dashboardInfo.url : dashboardInfo.url;

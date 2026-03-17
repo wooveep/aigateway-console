@@ -112,6 +112,7 @@ export default {
         name: 'menu.systemSettings',
         path: '/system',
         icon: <SettingOutlined />,
+        hideFromMenu: true,
       },
     ],
   },

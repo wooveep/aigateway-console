@@ -13,6 +13,18 @@ export interface ServiceResponse {
   total: number;
 }
 
+// Keep raw service names unchanged in API payloads and configs.
+const SERVICE_DISPLAY_NAME_MAP: Record<string, string> = {
+  'higress-console.dns': 'aigateway-console.dns',
+};
+
+export function getServiceDisplayName(name?: string): string {
+  if (!name) {
+    return '';
+  }
+  return SERVICE_DISPLAY_NAME_MAP[name] || name;
+}
+
 export function serviceToString(service: Service): string {
   if (!service) {
     return '-';
