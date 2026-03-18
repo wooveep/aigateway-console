@@ -71,6 +71,11 @@ export default {
             path: '/ai/route',
           },
           {
+            name: 'menu.aiQuotaManagement',
+            path: '/ai/quota',
+            visiblePredicate: (_configData: any, menuState: any) => menuState && menuState.aiQuotaEnabled,
+          },
+          {
             name: 'menu.aiDashboard',
             path: '/ai/dashboard',
             visiblePredicate: (configData: any) => configData && configData['dashboard.builtin'],

@@ -10,6 +10,10 @@ metadata:
     {{- include "higress-console.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicaCount }}
+  {{- if or .Values.global.local .Values.global.kind }}
+  strategy:
+    type: Recreate
+  {{- end }}
   selector:
     matchLabels:
       {{- include "higress-console.selectorLabels" . | nindent 6 }}
@@ -99,6 +103,9 @@ spec:
           ports:
             - name: http
               containerPort: 8080
+              {{- if or .Values.global.local .Values.global.kind }}
+              hostPort: 8080
+              {{- end }}
               protocol: TCP
           readinessProbe:
             httpGet:

@@ -7,3 +7,4 @@ export * from './tls-certificate';
 export * from './dashboard';
 export * from './plugin';
 export * from './ai-route';
+export * from './ai-quota';

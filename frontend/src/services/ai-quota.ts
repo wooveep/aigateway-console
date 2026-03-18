@@ -1,0 +1,66 @@
+import {
+  AiQuotaConsumerQuota,
+  AiQuotaMenuState,
+  AiQuotaRouteSummary,
+  AiQuotaScheduleRule,
+  AiQuotaScheduleRuleRequest,
+} from '@/interfaces/ai-quota';
+import request from './request';
+
+const BASE_URL = '/v1/ai/quotas';
+
+export const getAiQuotaMenuState = (): Promise<AiQuotaMenuState> => {
+  return request.get<any, AiQuotaMenuState>(`${BASE_URL}/menu-state`);
+};
+
+export const getAiQuotaRoutes = (): Promise<AiQuotaRouteSummary[]> => {
+  return request.get<any, AiQuotaRouteSummary[]>(`${BASE_URL}/routes`);
+};
+
+export const getAiQuotaConsumers = (routeName: string): Promise<AiQuotaConsumerQuota[]> => {
+  return request.get<any, AiQuotaConsumerQuota[]>(`${BASE_URL}/routes/${routeName}/consumers`);
+};
+
+export const refreshAiQuota = (
+  routeName: string,
+  consumerName: string,
+  value: number,
+): Promise<AiQuotaConsumerQuota> => {
+  return request.put<any, AiQuotaConsumerQuota>(
+    `${BASE_URL}/routes/${routeName}/consumers/${consumerName}/quota`,
+    { value },
+  );
+};
+
+export const deltaAiQuota = (
+  routeName: string,
+  consumerName: string,
+  value: number,
+): Promise<AiQuotaConsumerQuota> => {
+  return request.post<any, AiQuotaConsumerQuota>(
+    `${BASE_URL}/routes/${routeName}/consumers/${consumerName}/delta`,
+    { value },
+  );
+};
+
+export const getAiQuotaScheduleRules = (
+  routeName: string,
+  consumerName?: string,
+): Promise<AiQuotaScheduleRule[]> => {
+  return request.get<any, AiQuotaScheduleRule[]>(`${BASE_URL}/routes/${routeName}/schedules`, {
+    params: {
+      consumerName,
+    },
+  });
+};
+
+export const saveAiQuotaScheduleRule = (
+  routeName: string,
+  payload: AiQuotaScheduleRuleRequest,
+): Promise<AiQuotaScheduleRule> => {
+  return request.put<any, AiQuotaScheduleRule>(`${BASE_URL}/routes/${routeName}/schedules`, payload);
+};
+
+export const deleteAiQuotaScheduleRule = (routeName: string, ruleId: string): Promise<any> => {
+  return request.delete<any, any>(`${BASE_URL}/routes/${routeName}/schedules/${ruleId}`);
+};

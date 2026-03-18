@@ -5,7 +5,24 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "higress-console.labels" . | nindent 4 }}
+  {{- with .Values.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
+  {{- with .Values.service.loadBalancerIP }}
+  loadBalancerIP: "{{ . }}"
+  {{- end }}
+  {{- with .Values.service.loadBalancerClass }}
+  loadBalancerClass: "{{ . }}"
+  {{- end }}
+  {{- with .Values.service.loadBalancerSourceRanges }}
+  loadBalancerSourceRanges:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.service.externalTrafficPolicy }}
+  externalTrafficPolicy: "{{ . }}"
+  {{- end }}
   type: {{ .Values.service.type }}
   ports:
     - port: {{ .Values.service.port }}

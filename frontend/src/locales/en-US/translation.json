@@ -15,6 +15,7 @@
     "routeConfig": "Route Config",
     "aiServiceManagement": "AI Gateway Config",
     "aiRouteManagement": "AI Route Config",
+    "aiQuotaManagement": "AI Quota Management",
     "aiDashboard": "AI Dashboard",
     "llmProviderManagement": "LLM Provider Management",
     "domainManagement": "Domain Management",
@@ -117,6 +118,71 @@
     "aiRouteUsage": "AI Route Usage",
     "aiRouteUsageContent": "You can send a test request using the command below:",
     "searchPlaceholder": "Search routes by route name, domain, routing conditions and target providers."
+  },
+  "aiQuota": {
+    "route": "AI Route",
+    "search": "Consumer Search",
+    "searchPlaceholder": "Please input consumer name",
+    "empty": "No AI routes have ai-quota enabled yet",
+    "columns": {
+      "consumer": "Consumer",
+      "quota": "Current Quota",
+      "actions": "Actions"
+    },
+    "actions": {
+      "refresh": "Refresh Quota",
+      "delta": "Adjust Quota",
+      "schedule": "Schedule"
+    },
+    "summary": {
+      "route": "Route Name",
+      "path": "Path",
+      "domains": "Domains",
+      "redisKeyPrefix": "Redis Key Prefix",
+      "adminConsumer": "Admin Consumer",
+      "adminPath": "Admin Path"
+    },
+    "modals": {
+      "refreshTitle": "Refresh Consumer Quota",
+      "deltaTitle": "Adjust Consumer Quota",
+      "refreshValue": "Target Quota",
+      "deltaValue": "Delta Value"
+    },
+    "schedule": {
+      "title": "Scheduled Quota Rules",
+      "actions": {
+        "refresh": "Scheduled Refresh",
+        "delta": "Scheduled Delta"
+      },
+      "form": {
+        "action": "Rule Type",
+        "cron": "Cron Expression",
+        "cronHelp": "Use Spring cron format, for example 0 0 0 * * * runs at midnight every day.",
+        "value": "Execution Value",
+        "enabled": "Enabled"
+      },
+      "columns": {
+        "action": "Rule Type",
+        "cron": "Cron Expression",
+        "value": "Execution Value",
+        "enabled": "Status",
+        "lastAppliedAt": "Last Applied At",
+        "lastError": "Last Error"
+      }
+    },
+    "validation": {
+      "refreshValueRequired": "Please input the target quota",
+      "deltaValueRequired": "Please input the delta value",
+      "scheduleActionRequired": "Please select a rule type",
+      "scheduleCronRequired": "Please input a cron expression",
+      "scheduleValueRequired": "Please input the execution value"
+    },
+    "messages": {
+      "refreshSuccess": "Quota refreshed successfully",
+      "deltaSuccess": "Quota adjusted successfully",
+      "scheduleSaved": "Scheduled rule saved successfully",
+      "scheduleDeleted": "Scheduled rule deleted successfully"
+    }
   },
   "consumer": {
     "columns": {
@@ -878,6 +944,8 @@
     "error": "Error",
     "close": "Close",
     "save": "Save",
+    "create": "Create",
+    "refresh": "Refresh",
     "strategy": "Strategy",
     "strategyList": "Strategy List",
     "description": "Description",
@@ -897,6 +965,8 @@
     "saveSuccess": "Saved successfully.",
     "detail": "Detail",
     "total": "Total",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
     "keyAuthOnlyTip": "Currently only Key Auth is supported",
     "authType": "Auth Type"
   },

@@ -1,7 +1,7 @@
 global:
   local: false # When deploying to a local cluster (e.g.: kind cluster), set this to true.
   kind: false # Deprecated. Please use "global.local" instead. Will be removed later.
-  ingressClass: "higress"
+  ingressClass: "aigateway"
   watchNamespace: ""
 
   proxy:
@@ -67,7 +67,7 @@ image:
   tag: ""
 
 imagePullSecrets: []
-name: ""
+name: "aigateway-console"
 
 podEnvs: {}
 
@@ -82,12 +82,17 @@ restartPolicy: Always
 schedulerName: default-scheduler
 
 service:
+  annotations: {}
   type: ClusterIP
   port: 8080
+  loadBalancerIP: ""
+  loadBalancerClass: ""
+  loadBalancerSourceRanges: []
+  externalTrafficPolicy: ""
 
 ingress:
   enabled: false
-  domain: console.higress.io
+  domain: console.aigateway.io
   tlsSecretName: ""
   annotations: {}
   paths:
@@ -120,7 +125,7 @@ chat:
   endpoint: ""
 
 controller:
-  serviceName: higress-controller
+  serviceName: aigateway-controller
 
 certmanager:
   enabled: false
@@ -136,7 +141,7 @@ pvc:
   __placeholder__: true
 
 pluginServer:
-  urlPattern: "http://higress-plugin-server.higress-system.svc/plugins/${name}/${version}/plugin.wasm"
+  urlPattern: "http://aigateway-plugin-server.aigateway-system.svc/plugins/${name}/${version}/plugin.wasm"
   # -- Plugin image registry for built-in plugins. If set, will override the default registry in plugins.properties.
   # Example: "my-registry.example.com"
   imageRegistry: ""

@@ -2,6 +2,7 @@ import AvatarDropdown from '@/components/AvatarDropdown';
 import ChatRobot from '@/components/ChatRobot';
 import Footer from '@/components/Footer';
 import LanguageDropdown from '@/components/LanguageDropdown';
+import { getAiQuotaMenuState } from '@/services/ai-quota';
 import store from '@/store';
 import ProLayout from '@ant-design/pro-layout';
 import { Route } from '@ant-design/pro-layout/es/typing';
@@ -9,6 +10,7 @@ import { ConfigProvider, Result } from 'antd';
 import enUS from 'antd/es/locale/en_US';
 import zhCN from 'antd/es/locale/zh_CN';
 import { Link, Outlet, useLocation } from 'ice';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import styles from './layout.module.css';
 import defaultProps from './_defaultProps';
@@ -19,8 +21,47 @@ export default function Layout() {
   const configData = configModel.properties || {};
   const location = useLocation();
   const { t, i18n } = useTranslation();
+  const [menuState, setMenuState] = useState({ aiQuotaEnabled: false });
 
   const antdLocale = i18n.language === 'en-US' ? enUS : zhCN;
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadMenuState = () => {
+      getAiQuotaMenuState()
+        .then((result) => {
+          if (!cancelled) {
+            setMenuState({ aiQuotaEnabled: !!result?.enabled });
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setMenuState({ aiQuotaEnabled: false });
+          }
+        });
+    };
+
+    const handleFocus = () => {
+      loadMenuState();
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadMenuState();
+      }
+    };
+
+    loadMenuState();
+    const timer = window.setInterval(loadMenuState, 10000);
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [location.pathname]);
 
   if (window.frameElement) {
     // Embedded in a same-origin iframe or object
@@ -60,7 +101,7 @@ export default function Layout() {
               return false;
             }
             if (typeof item.visiblePredicate === 'function') {
-              return item.visiblePredicate(configData);
+              return item.visiblePredicate(configData, menuState);
             }
             return true;
           }

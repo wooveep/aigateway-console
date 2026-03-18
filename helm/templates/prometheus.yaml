@@ -2,7 +2,7 @@
 {{- if $o11y.enabled }}
 {{- $appName := (include "higress-console-prometheus.name" .) }}
 {{- $config := $o11y.prometheus }}
-{{- $gatewayName := printf "%s-gateway" (default "higress" .Values.global.ingressClass) }}
+{{- $gatewayName := printf "%s-gateway" (default "aigateway" .Values.global.ingressClass) }}
 {{- $port := $config.port }}
 {{- $storageClassName := $config.pvc.storageClassName }}
 {{- $existedPvc := (lookup "v1" "PersistentVolumeClaim" .Release.Namespace $appName) }}

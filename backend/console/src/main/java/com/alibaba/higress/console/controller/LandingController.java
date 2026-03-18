@@ -33,7 +33,7 @@ import lombok.extern.slf4j.Slf4j;
 public class LandingController {
 
     private static final String BUILTIN_LANDING_PAGE = "landing/index.html";
-    private static final String DEFAULT_LANDING_PAGE_HTML = "<h1>Thanks for using Higress.</h1>";
+    private static final String DEFAULT_LANDING_PAGE_HTML = "<h1>Welcome to aigateway!.</h1>";
 
     private String landingPageHtml;
 
