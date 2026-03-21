@@ -32,6 +32,10 @@ public interface ConsumerService {
 
     void delete(String consumerName);
 
+    List<String> listDepartments();
+
+    void addDepartment(String departmentName);
+
     List<AllowList> listAllowLists();
 
     AllowList getAllowList(Map<WasmPluginInstanceScope, String> targets);

@@ -17,7 +17,6 @@
     "noImplicitAny": false,
     "importHelpers": true,
     "strictNullChecks": true,
-    "suppressImplicitAnyIndexErrors": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
     "esModuleInterop": true,

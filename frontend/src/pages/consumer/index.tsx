@@ -1,34 +1,85 @@
 /* eslint-disable */
 // @ts-nocheck
-import { Consumer, CredentialType, ServiceSourceFormProps as FormProps } from '@/interfaces/consumer';
-import { addConsumer, deleteConsumer, getConsumers, updateConsumer } from '@/services/consumer';
-import { ExclamationCircleOutlined, RedoOutlined } from '@ant-design/icons';
+import { Consumer, CredentialType } from '@/interfaces/consumer';
+import {
+  addConsumer,
+  addConsumerDepartment,
+  deleteConsumer,
+  getConsumerDepartments,
+  getConsumers,
+  updateConsumer,
+} from '@/services/consumer';
+import { ApartmentOutlined, ExclamationCircleOutlined, RedoOutlined, UserOutlined } from '@ant-design/icons';
 import { PageContainer } from '@ant-design/pro-layout';
 import { useRequest } from 'ahooks';
-import { Button, Drawer, Form, Input, message, Modal, Space, Table, Tag } from 'antd';
+import { Button, Drawer, Form, Input, message, Modal, Space, Table, Tag, Typography } from 'antd';
 import React, { useEffect, useRef, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import ConsumerForm from './components/ConsumerForm';
 
+const { Text } = Typography;
+
 interface FormRef {
   reset: () => void;
-  handleSubmit: () => Promise<FormProps>;
+  handleSubmit: () => Promise<Consumer>;
+}
+
+interface OrganizationRow {
+  key: string;
+  rowType: 'department' | 'user';
+  name: string;
+  department?: string;
+  credentials?: any[];
+  memberCount?: number;
+  consumer?: Consumer;
+  children?: OrganizationRow[];
 }
 
 const ConsumerList: React.FC = () => {
   const { t } = useTranslation();
   const columns = [
     {
-      title: t('consumer.columns.name'),
+      title: t('consumer.columns.organization'),
       dataIndex: 'name',
       key: 'name',
       ellipsis: true,
+      render: (_, record: OrganizationRow) => {
+        if (record.rowType === 'department') {
+          return (
+            <Space>
+              <ApartmentOutlined />
+              <Text strong>{record.name}</Text>
+            </Space>
+          );
+        }
+        return (
+          <Space>
+            <UserOutlined />
+            <span>{record.name}</span>
+          </Space>
+        );
+      },
+    },
+    {
+      title: t('consumer.columns.type'),
+      dataIndex: 'rowType',
+      key: 'rowType',
+      width: 120,
+      render: (_, record: OrganizationRow) => {
+        if (record.rowType === 'department') {
+          return <Tag color="processing">{t('consumer.type.department')}</Tag>;
+        }
+        return <Tag color="success">{t('consumer.type.user')}</Tag>;
+      },
     },
     {
       title: t('consumer.columns.authMethods'),
       dataIndex: 'credentials',
       key: 'credentials',
-      render: (value) => {
+      render: (value, record: OrganizationRow) => {
+        if (record.rowType === 'department') {
+          return <Text type="secondary">{t('consumer.departmentSummary', { count: record.memberCount || 0 })}</Text>;
+        }
         if (!Array.isArray(value) || !value.length) {
           return '-';
         }
@@ -61,24 +112,39 @@ const ConsumerList: React.FC = () => {
       key: 'action',
       width: 140,
       align: 'center',
-      render: (_, record) => (
-        <Space size="small">
-          <a onClick={() => onEditDrawer(record)}>{t('misc.edit')}</a>
-          <a onClick={() => onShowModal(record)}>{t('misc.delete')}</a>
-        </Space>
-      ),
+      render: (_, record: OrganizationRow) => {
+        if (record.rowType === 'department') {
+          return (
+            <Space size="small">
+              <a onClick={() => onShowDrawer(record.department)}>{t('consumer.create')}</a>
+            </Space>
+          );
+        }
+        return (
+          <Space size="small">
+            <a onClick={() => onEditDrawer(record.consumer)}>{t('misc.edit')}</a>
+            <a onClick={() => onShowModal(record.consumer)}>{t('misc.delete')}</a>
+          </Space>
+        );
+      },
     },
   ];
 
   const [form] = Form.useForm();
+  const [departmentForm] = Form.useForm();
   const formRef = useRef<FormRef>(null);
   const [allConsumers, setAllConsumers] = useState<Consumer[]>([]);
+  const [allDepartments, setAllDepartments] = useState<string[]>([]);
   const [keyword, setKeyword] = useState('');
+  const [departmentKeyword, setDepartmentKeyword] = useState('');
   const [keySearch, setKeySearch] = useState('');
-  const [currentConsumer, setCurrentConsumer] = useState<Consumer>({} as Consumer);
+  const [currentConsumer, setCurrentConsumer] = useState<Consumer | null>(null);
   const [openDrawer, setOpenDrawer] = useState(false);
   const [openModal, setOpenModal] = useState(false);
+  const [openDepartmentModal, setOpenDepartmentModal] = useState(false);
   const [confirmLoading, setConfirmLoading] = useState(false);
+  const [departmentConfirmLoading, setDepartmentConfirmLoading] = useState(false);
+  const [presetDepartment, setPresetDepartment] = useState<string>('');
 
   const { loading, run, refresh } = useRequest(getConsumers, {
     manual: true,
@@ -92,22 +158,34 @@ const ConsumerList: React.FC = () => {
     },
   });
 
+  const { loading: departmentsLoading, run: loadDepartments } = useRequest(getConsumerDepartments, {
+    manual: true,
+    onSuccess: (result) => {
+      const departments = (result || []).filter(Boolean);
+      departments.sort((i1, i2) => i1.localeCompare(i2));
+      setAllDepartments(departments);
+    },
+  });
+
   useEffect(() => {
     run({});
+    loadDepartments();
   }, []);
 
   const onEditDrawer = (consumer: Consumer) => {
     setCurrentConsumer(consumer);
+    setPresetDepartment('');
     setOpenDrawer(true);
   };
 
-  const onShowDrawer = () => {
+  const onShowDrawer = (department?: string) => {
     setOpenDrawer(true);
     setCurrentConsumer(null);
+    setPresetDepartment(department || '');
   };
 
   const handleDrawerOK = async () => {
-    const values: FormProps = formRef.current ? await formRef.current.handleSubmit() : {} as FormProps;
+    const values: Consumer = formRef.current ? await formRef.current.handleSubmit() : {} as Consumer;
     if (!values) {
       return;
     };
@@ -120,7 +198,9 @@ const ConsumerList: React.FC = () => {
       }
       setOpenDrawer(false);
       formRef.current && formRef.current.reset();
+      setPresetDepartment('');
       refresh();
+      loadDepartments();
     } catch (errInfo) {
       console.log('Save failed: ', errInfo);
     }
@@ -130,6 +210,7 @@ const ConsumerList: React.FC = () => {
     setOpenDrawer(false);
     formRef.current && formRef.current.reset();
     setCurrentConsumer(null);
+    setPresetDepartment('');
   };
 
   const onShowModal = (consumer: Consumer) => {
@@ -146,6 +227,7 @@ const ConsumerList: React.FC = () => {
     setConfirmLoading(false);
     setOpenModal(false);
     refresh();
+    loadDepartments();
   };
 
   const handleModalCancel = () => {
@@ -153,23 +235,102 @@ const ConsumerList: React.FC = () => {
     setCurrentConsumer(null);
   };
 
+  const handleDepartmentModalOk = async () => {
+    try {
+      const values = await departmentForm.validateFields();
+      setDepartmentConfirmLoading(true);
+      await addConsumerDepartment(values.name);
+      message.success(t('consumer.departmentCreateSuccess'));
+      setOpenDepartmentModal(false);
+      departmentForm.resetFields();
+      loadDepartments();
+    } catch (error) {
+    } finally {
+      setDepartmentConfirmLoading(false);
+    }
+  };
+
+  const handleDepartmentModalCancel = () => {
+    setOpenDepartmentModal(false);
+    departmentForm.resetFields();
+  };
+
   const handleReset = () => {
     setKeyword('');
+    setDepartmentKeyword('');
     setKeySearch('');
     form.resetFields();
   };
 
   const dataSource = React.useMemo(() => {
-    return allConsumers.filter((item) => {
-      if (keyword && !item.name.toLowerCase().includes(keyword.toLowerCase())) {
-        return false;
-      }
-      if (keySearch && !item.credentials?.some(c => JSON.stringify(c).toLowerCase().includes(keySearch.toLowerCase()))) {
-        return false;
-      }
-      return true;
+    const ungroupedKey = '__ungrouped__';
+    const groupedConsumers = {};
+    allConsumers.forEach((consumer) => {
+      const department = consumer.department || '';
+      groupedConsumers[department] = groupedConsumers[department] || [];
+      groupedConsumers[department].push(consumer);
     });
-  }, [allConsumers, keyword, keySearch]);
+
+    const departmentSet = new Set(allDepartments);
+    allConsumers.forEach((consumer) => {
+      if (consumer.department) {
+        departmentSet.add(consumer.department);
+      }
+    });
+    if (groupedConsumers['']?.length) {
+      departmentSet.add(ungroupedKey);
+    }
+
+    const normalizedKeyword = keyword.trim().toLowerCase();
+    const normalizedDepartmentKeyword = departmentKeyword.trim().toLowerCase();
+    const normalizedKeySearch = keySearch.trim().toLowerCase();
+
+    return Array.from(departmentSet)
+      .sort((i1, i2) => i1.localeCompare(i2))
+      .map((department): OrganizationRow | null => {
+        const rawDepartment = department === ungroupedKey ? '' : department;
+        const departmentLabel = rawDepartment || t('consumer.ungrouped');
+        const users = (groupedConsumers[rawDepartment] || [])
+          .filter((item) => {
+            if (normalizedDepartmentKeyword && !departmentLabel.toLowerCase().includes(normalizedDepartmentKeyword)) {
+              return false;
+            }
+            if (normalizedKeyword && !item.name.toLowerCase().includes(normalizedKeyword)) {
+              return false;
+            }
+            if (normalizedKeySearch
+              && !item.credentials?.some(c => JSON.stringify(c).toLowerCase().includes(normalizedKeySearch))) {
+              return false;
+            }
+            return true;
+          })
+          .sort((i1, i2) => i1.name.localeCompare(i2.name));
+
+        if (!users.length && (normalizedKeyword || normalizedKeySearch)) {
+          return null;
+        }
+        if (!users.length && normalizedDepartmentKeyword && !departmentLabel.toLowerCase().includes(normalizedDepartmentKeyword)) {
+          return null;
+        }
+
+        return {
+          key: `department-${rawDepartment || ungroupedKey}`,
+          rowType: 'department',
+          name: departmentLabel,
+          department: rawDepartment,
+          memberCount: users.length,
+          children: users.map((consumer) => ({
+            key: `user-${consumer.name}`,
+            rowType: 'user',
+            name: consumer.name,
+            department: consumer.department,
+            credentials: consumer.credentials,
+            consumer,
+          })),
+        };
+      })
+      .filter(Boolean);
+  }, [allConsumers, allDepartments, departmentKeyword, keySearch, keyword]);
 
   return (
     <PageContainer>
@@ -184,6 +345,14 @@ const ConsumerList: React.FC = () => {
       >
         <Space wrap style={{ width: '100%', justifyContent: 'space-between' }}>
           <Space wrap size={24}>
+            <Form.Item name="departmentKeyword" label={t('consumer.columns.department')} style={{ marginBottom: 0 }}>
+              <Input
+                placeholder={t('consumer.consumerForm.departmentPlaceholder')}
+                value={departmentKeyword}
+                onChange={(e) => setDepartmentKeyword(e.target.value)}
+                allowClear
+              />
+            </Form.Item>
             <Form.Item name="keyword" label={t('consumer.columns.name')} style={{ marginBottom: 0 }}>
               <Input
                 placeholder={t('consumer.columns.name')}
@@ -208,26 +377,34 @@ const ConsumerList: React.FC = () => {
           </Space>
           <Space>
             <Button
+              onClick={() => setOpenDepartmentModal(true)}
+            >
+              {t('consumer.createDepartment')}
+            </Button>
+            <Button
               type="primary"
-              onClick={onShowDrawer}
+              onClick={() => onShowDrawer()}
             >
               {t('consumer.create')}
             </Button>
             <Button
               icon={<RedoOutlined />}
-              onClick={refresh}
+              onClick={() => {
+                refresh();
+                loadDepartments();
+              }}
             />
           </Space>
         </Space>
       </Form>
       <Table
-        loading={loading}
+        loading={loading || departmentsLoading}
         dataSource={dataSource}
         columns={columns}
-        pagination={{
-          showSizeChanger: true,
-          showTotal: (total) => `${t('misc.total')} ${total}`,
-        }}
+        pagination={false}
+        defaultExpandAllRows
+        expandable={{ defaultExpandAllRows: true }}
+        locale={{ emptyText: t('mcp.detail.noData') }}
       />
       <Drawer
         title={t(currentConsumer ? "consumer.edit" : "consumer.create")}
@@ -244,7 +421,12 @@ const ConsumerList: React.FC = () => {
           </Space>
         }
       >
-        <ConsumerForm ref={formRef} value={currentConsumer} />
+        <ConsumerForm
+          ref={formRef}
+          value={currentConsumer}
+          departments={allDepartments}
+          presetDepartment={presetDepartment}
+        />
       </Drawer>
       <Modal
         title={<div><ExclamationCircleOutlined style={{ color: '#ffde5c', marginRight: 8 }} />{t('misc.delete')}</div>}
@@ -260,6 +442,30 @@ const ConsumerList: React.FC = () => {
             确定删除 <span style={{ color: '#0070cc' }}>{{ currentConsumerName: (currentConsumer && currentConsumer.name) || '' }}</span> 吗？
           </Trans>
         </p>
+      </Modal>
+      <Modal
+        title={t('consumer.createDepartment')}
+        open={openDepartmentModal}
+        onOk={handleDepartmentModalOk}
+        confirmLoading={departmentConfirmLoading}
+        onCancel={handleDepartmentModalCancel}
+        cancelText={t('misc.cancel')}
+        okText={t('misc.confirm')}
+      >
+        <Form form={departmentForm} layout="vertical">
+          <Form.Item
+            label={t('consumer.departmentForm.name')}
+            name="name"
+            rules={[{ required: true, message: t('consumer.departmentForm.nameRequired') || '' }]}
+          >
+            <Input
+              showCount
+              allowClear
+              maxLength={63}
+              placeholder={t('consumer.departmentForm.namePlaceholder') || ''}
+            />
+          </Form.Item>
+        </Form>
       </Modal>
     </PageContainer>
   );

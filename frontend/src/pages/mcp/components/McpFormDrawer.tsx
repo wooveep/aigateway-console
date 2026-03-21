@@ -3,14 +3,15 @@ import { CredentialType } from '@/interfaces/consumer';
 import { HistoryButton } from '@/pages/ai/components/RouteForm/Components';
 import { getConsumers } from '@/services/consumer';
 import { getGatewayDomains } from '@/services/domain';
-import { getMcpServer } from '@/services/mcp';
+import { getMcpPresetTemplate, getMcpServer, listMcpPresetTemplates } from '@/services/mcp';
 import { getGatewayServices } from '@/services/service';
 import { RedoOutlined } from '@ant-design/icons';
-import { Button, Drawer, Form, Input, Select, Space, Switch } from 'antd';
+import { Button, Drawer, Form, Input, Select, Space, Switch, message } from 'antd';
 import { useWatch } from 'antd/es/form/Form';
 import React, { useEffect, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { getServiceTypeMap, SERVICE_TYPE, SERVICE_TYPES, DB_TYPE_OPTIONS } from '../constant';
+import YamlUtil from './yamlUtil';
 
 interface McpFormDrawerProps {
   visible: boolean;
@@ -31,11 +32,17 @@ const McpFormDrawer: React.FC<McpFormDrawerProps> = ({ visible, mode, name, onCl
   const consumerAuth = useWatch('consumerAuth', form);
   const selectedService = useWatch('service', form);
   const serviceType = useWatch('type', form);
+  const usePresetTemplate = useWatch('usePresetTemplate', form);
+  const presetTemplateId = useWatch('presetTemplateId', form);
   const mcpServerName = useWatch('name', form);
   const [record, setRecord] = useState<any>(null);
   const [allDomainList, setAllDomainList] = useState<string[]>([]);
   const [allBackendServiceList, setAllBackendServiceList] = useState<any[]>([]);
   const [consumerList, setConsumerList] = useState<any[]>([]);
+  const [presetTemplates, setPresetTemplates] = useState<any[]>([]);
+  const [presetTemplatesLoading, setPresetTemplatesLoading] = useState(false);
+  const [selectedTemplateContent, setSelectedTemplateContent] = useState('');
+  const [templateContentCache, setTemplateContentCache] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (visible && mode === 'edit') {
@@ -176,8 +183,63 @@ const McpFormDrawer: React.FC<McpFormDrawerProps> = ({ visible, mode, name, onCl
     }
   }, [visible]);
 
+  useEffect(() => {
+    if (!visible || mode !== 'create' || presetTemplates.length > 0) {
+      return;
+    }
+    setPresetTemplatesLoading(true);
+    listMcpPresetTemplates()
+      .then((res) => setPresetTemplates(res || []))
+      .catch(() => {
+        message.warning(t('mcp.form.presetTemplatesLoadFailed'));
+      })
+      .finally(() => setPresetTemplatesLoading(false));
+  }, [visible, mode, presetTemplates.length, t]);
+
+  useEffect(() => {
+    if (serviceType !== SERVICE_TYPE.OPENAPI || !usePresetTemplate) {
+      setSelectedTemplateContent('');
+      form.setFieldValue('presetTemplateId', undefined);
+    }
+  }, [serviceType, usePresetTemplate, form]);
+
+  useEffect(() => {
+    if (!visible || !usePresetTemplate || !presetTemplateId) {
+      return;
+    }
+    if (templateContentCache[presetTemplateId]) {
+      setSelectedTemplateContent(templateContentCache[presetTemplateId]);
+      return;
+    }
+    setSelectedTemplateContent('');
+    getMcpPresetTemplate(presetTemplateId)
+      .then((content) => {
+        setSelectedTemplateContent(content);
+        setTemplateContentCache((prev) => ({
+          ...prev,
+          [presetTemplateId]: content,
+        }));
+      })
+      .catch(() => {
+        setSelectedTemplateContent('');
+        message.warning(t('mcp.form.presetTemplateContentLoadFailed'));
+      });
+  }, [visible, usePresetTemplate, presetTemplateId, templateContentCache, t]);
+
   // 表单提交
   const handleFinish = (values: any) => {
+    const buildPresetTemplateConfig = (templateContent: string, serverName: string) => {
+      const yamlObject = YamlUtil.parseYaml(templateContent);
+      if (!yamlObject || typeof yamlObject !== 'object') {
+        throw new Error(t('mcp.form.presetTemplateApplyFailed'));
+      }
+      if (!yamlObject.server || typeof yamlObject.server !== 'object') {
+        yamlObject.server = {};
+      }
+      yamlObject.server.name = serverName;
+      return YamlUtil.stringifyYaml(yamlObject);
+    };
+
     let serviceName: string;
     let service: any;
 
@@ -261,6 +323,19 @@ const McpFormDrawer: React.FC<McpFormDrawerProps> = ({ visible, mode, name, onCl
         path: values.directRoute_path,
         transportType: values.directRoute_transportType,
       };
+    }
+
+    if (values.type === SERVICE_TYPE.OPENAPI && values.usePresetTemplate) {
+      if (!selectedTemplateContent) {
+        message.error(t('mcp.form.presetTemplateRequired'));
+        return;
+      }
+      try {
+        submitData.rawConfigurations = buildPresetTemplateConfig(selectedTemplateContent, values.name);
+      } catch (error: any) {
+        message.error(error?.message || t('mcp.form.presetTemplateApplyFailed'));
+        return;
+      }
     }
 
     onSubmit(submitData);
@@ -368,6 +443,37 @@ const McpFormDrawer: React.FC<McpFormDrawerProps> = ({ visible, mode, name, onCl
             placeholder={t('mcp.form.typeRequired')!}
           />
         </Form.Item>
+
+        {mode === 'create' && serviceType === SERVICE_TYPE.OPENAPI && (
+          <>
+            <Form.Item
+              label={t('mcp.form.usePresetTemplate')}
+              name="usePresetTemplate"
+              valuePropName="checked"
+              extra={t('mcp.form.usePresetTemplateExtra')}
+            >
+              <Switch />
+            </Form.Item>
+            {usePresetTemplate && (
+              <Form.Item
+                label={t('mcp.form.presetTemplate')}
+                name="presetTemplateId"
+                rules={[{ required: true, message: t('mcp.form.presetTemplateRequired') || '' }]}
+              >
+                <Select
+                  showSearch
+                  loading={presetTemplatesLoading}
+                  options={presetTemplates.map((item) => ({
+                    label: item.name,
+                    value: item.id,
+                  }))}
+                  placeholder={t('mcp.form.presetTemplatePlaceholder') || ''}
+                  optionFilterProp="label"
+                />
+              </Form.Item>
+            )}
+          </>
+        )}
 
         {serviceType !== SERVICE_TYPE.DIRECT_ROUTE && (
           <Form.Item

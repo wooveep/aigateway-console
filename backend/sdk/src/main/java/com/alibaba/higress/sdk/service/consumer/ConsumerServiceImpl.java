@@ -47,6 +47,7 @@ import lombok.extern.slf4j.Slf4j;
 public class ConsumerServiceImpl implements ConsumerService {
 
     private static final List<String> DEFAULT_CREDENTIAL_TYPES = Collections.singletonList(CredentialType.KEY_AUTH);
+    private static final String DEPARTMENTS_CONFIG_KEY = "departments";
 
     private static final Map<String, CredentialHandler> CREDENTIAL_HANDLERS;
 
@@ -114,6 +115,77 @@ public class ConsumerServiceImpl implements ConsumerService {
             if (handler.deleteConsumer(globalInstance, consumerName)) {
                 wasmPluginInstanceService.addOrUpdate(globalInstance);
             }
+        }
+    }
+
+    @Override
+    public List<String> listDepartments() {
+        Set<String> departments = new LinkedHashSet<>();
+        for (Consumer consumer : getConsumers().values()) {
+            String department = StringUtils.trimToNull(consumer.getDepartment());
+            if (department != null) {
+                departments.add(department);
+            }
+        }
+        CredentialHandler handler = CREDENTIAL_HANDLERS.values().stream().findFirst().orElse(null);
+        if (handler == null) {
+            return new ArrayList<>(departments);
+        }
+        WasmPluginInstance instance = getGlobalPluginInstance(handler);
+        if (instance == null || MapUtils.isEmpty(instance.getConfigurations())) {
+            return new ArrayList<>(departments);
+        }
+        Object departmentsObj = instance.getConfigurations().get(DEPARTMENTS_CONFIG_KEY);
+        if (!(departmentsObj instanceof List<?>)) {
+            return new ArrayList<>(departments);
+        }
+        for (Object departmentObj : (List<?>)departmentsObj) {
+            if (!(departmentObj instanceof String)) {
+                continue;
+            }
+            String department = StringUtils.trimToNull((String)departmentObj);
+            if (department != null) {
+                departments.add(department);
+            }
+        }
+        return new ArrayList<>(departments);
+    }
+
+    @Override
+    public void addDepartment(String departmentName) {
+        String normalizedDepartmentName = StringUtils.trimToNull(departmentName);
+        if (normalizedDepartmentName == null) {
+            throw new IllegalArgumentException("departmentName cannot be blank.");
+        }
+        CredentialHandler handler = CREDENTIAL_HANDLERS.values().stream().findFirst().orElse(null);
+        if (handler == null) {
+            throw new IllegalStateException("No credential handlers found.");
+        }
+        WasmPluginInstance instance = getGlobalPluginInstance(handler);
+        if (instance == null) {
+            instance = createGlobalPluginInstance(handler);
+        }
+        Map<String, Object> configurations = instance.getConfigurations();
+        if (MapUtils.isEmpty(configurations)) {
+            handler.initDefaultGlobalConfigs(instance);
+            configurations = instance.getConfigurations();
+        }
+        Object departmentsObj = configurations.get(DEPARTMENTS_CONFIG_KEY);
+        List<String> departments = new ArrayList<>();
+        if (departmentsObj instanceof List<?>) {
+            for (Object departmentObj : (List<?>)departmentsObj) {
+                if (departmentObj instanceof String) {
+                    String department = StringUtils.trimToNull((String)departmentObj);
+                    if (department != null) {
+                        departments.add(department);
+                    }
+                }
+            }
+        }
+        if (!departments.contains(normalizedDepartmentName)) {
+            departments.add(normalizedDepartmentName);
+            configurations.put(DEPARTMENTS_CONFIG_KEY, departments);
+            wasmPluginInstanceService.addOrUpdate(instance);
         }
     }
 
@@ -291,6 +363,10 @@ public class ConsumerServiceImpl implements ConsumerService {
                     List<Credential> credentials = new ArrayList<>(existedConsumer.getCredentials());
                     credentials.addAll(consumer.getCredentials());
                     existedConsumer.setCredentials(credentials);
+                    if (StringUtils.isBlank(existedConsumer.getDepartment())
+                        && StringUtils.isNotBlank(consumer.getDepartment())) {
+                        existedConsumer.setDepartment(consumer.getDepartment());
+                    }
                 }
             }
         }

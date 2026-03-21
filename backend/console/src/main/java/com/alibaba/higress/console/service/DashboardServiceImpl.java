@@ -516,8 +516,10 @@ public class DashboardServiceImpl implements DashboardService {
 
         gatewayOptions = ensureSelectedOption(gatewayOptions, selectedGateway);
         namespaceOptions = ensureSelectedOption(namespaceOptions, selectedNamespace);
+        String gatewayContainerName = resolveGatewayContainerName(selectedNamespace);
+        String coreContainerName = resolveCoreContainerName(selectedNamespace);
         return new VariableContext(selectedGateway, gatewayOptions, selectedNamespace, namespaceOptions,
-            resolveWorkloadMetricsMode(selectedNamespace));
+            gatewayContainerName, coreContainerName, resolveWorkloadMetricsMode(selectedNamespace, gatewayContainerName));
     }
 
     private ObjectNode buildVariableState(VariableContext variableContext) {
@@ -751,14 +753,15 @@ public class DashboardServiceImpl implements DashboardService {
     }
 
     private ObjectNode adaptPanelForNativeRendering(ObjectNode panelNode, VariableContext variables) {
-        if (variables.getWorkloadMetricsMode() != WorkloadMetricsMode.PROCESS_FALLBACK) {
-            return panelNode;
-        }
         if (isContainerCpuPanel(panelNode)) {
-            return buildStandaloneCpuPanel(panelNode, variables);
+            return variables.getWorkloadMetricsMode() == WorkloadMetricsMode.CONTAINER
+                ? buildContainerCpuPanel(panelNode, variables)
+                : buildStandaloneCpuPanel(panelNode, variables);
         }
         if (isContainerMemoryPanel(panelNode)) {
-            return buildStandaloneMemoryPanel(panelNode, variables);
+            return variables.getWorkloadMetricsMode() == WorkloadMetricsMode.CONTAINER
+                ? buildContainerMemoryPanel(panelNode, variables)
+                : buildStandaloneMemoryPanel(panelNode, variables);
         }
         return panelNode;
     }
@@ -780,6 +783,37 @@ public class DashboardServiceImpl implements DashboardService {
             }
         }
         return false;
+    }
+
+    private ObjectNode buildContainerCpuPanel(ObjectNode panelNode, VariableContext variables) {
+        ObjectNode adjustedPanel = panelNode.deepCopy();
+        ArrayNode targets = adjustedPanel.putArray("targets");
+        targets.addObject()
+            .put("expr", buildContainerCpuExpression(variables))
+            .put("legendFormat", "{{pod}}")
+            .put("refId", "A");
+        return adjustedPanel;
+    }
+
+    private ObjectNode buildContainerMemoryPanel(ObjectNode panelNode, VariableContext variables) {
+        ObjectNode adjustedPanel = panelNode.deepCopy();
+        ArrayNode targets = adjustedPanel.putArray("targets");
+        targets.addObject()
+            .put("expr", buildContainerGatewayMemoryExpression(variables))
+            .put("legendFormat", "{{pod}}-envoy")
+            .put("refId", "A");
+        targets.addObject()
+            .put("expr", buildContainerDiscoveryMemoryExpression(variables))
+            .put("legendFormat", "{{pod}}-istio")
+            .put("refId", "B");
+        if (StringUtils.isNotBlank(variables.getCoreContainerName())
+            && !"discovery".equals(variables.getCoreContainerName())) {
+            targets.addObject()
+                .put("expr", buildContainerCoreMemoryExpression(variables))
+                .put("legendFormat", "{{pod}}-core")
+                .put("refId", "C");
+        }
+        return adjustedPanel;
     }
 
     private ObjectNode buildStandaloneCpuPanel(ObjectNode panelNode, VariableContext variables) {
@@ -810,28 +844,52 @@ public class DashboardServiceImpl implements DashboardService {
         return adjustedPanel;
     }
 
+    private String buildContainerCpuExpression(VariableContext variables) {
+        return String.format(Locale.ROOT,
+            "100 * sum(irate(%s{container=\"%s\", namespace=\"%s\"}[1m])) by (pod)",
+            CONTAINER_CPU_USAGE_METRIC, escapePrometheusLabelValue(variables.getGatewayContainerName()),
+            escapePrometheusLabelValue(resolveDashboardNamespace(variables.getNamespace())));
+    }
+
+    private String buildContainerGatewayMemoryExpression(VariableContext variables) {
+        return String.format(Locale.ROOT, "max(%s{container=\"%s\", namespace=\"%s\"}) by (pod)",
+            CONTAINER_MEMORY_USAGE_METRIC, escapePrometheusLabelValue(variables.getGatewayContainerName()),
+            escapePrometheusLabelValue(resolveDashboardNamespace(variables.getNamespace())));
+    }
+
+    private String buildContainerDiscoveryMemoryExpression(VariableContext variables) {
+        return String.format(Locale.ROOT, "max(%s{container=\"discovery\", namespace=\"%s\"}) by (pod)",
+            CONTAINER_MEMORY_USAGE_METRIC, escapePrometheusLabelValue(resolveDashboardNamespace(variables.getNamespace())));
+    }
+
+    private String buildContainerCoreMemoryExpression(VariableContext variables) {
+        return String.format(Locale.ROOT, "max(%s{container=\"%s\", namespace=\"%s\"}) by (pod)",
+            CONTAINER_MEMORY_USAGE_METRIC, escapePrometheusLabelValue(variables.getCoreContainerName()),
+            escapePrometheusLabelValue(resolveDashboardNamespace(variables.getNamespace())));
+    }
+
     private String buildStandaloneCpuExpression(VariableContext variables) {
         return String.format(Locale.ROOT,
             "100 * max(rate(%s{container=\"%s\", namespace=\"%s\"}[1m])) by (pod)",
-            ISTIO_AGENT_CPU_USAGE_METRIC, escapePrometheusLabelValue(resolveGatewayContainerName()),
+            ISTIO_AGENT_CPU_USAGE_METRIC, escapePrometheusLabelValue(variables.getGatewayContainerName()),
             escapePrometheusLabelValue(resolveDashboardNamespace(variables.getNamespace())));
     }
 
     private String buildStandaloneEnvoyMemoryExpression(VariableContext variables) {
         return String.format(Locale.ROOT, "max(%s{container=\"%s\", namespace=\"%s\"}) by (pod)",
-            ENVOY_MEMORY_USAGE_METRIC, escapePrometheusLabelValue(resolveGatewayContainerName()),
+            ENVOY_MEMORY_USAGE_METRIC, escapePrometheusLabelValue(variables.getGatewayContainerName()),
             escapePrometheusLabelValue(resolveDashboardNamespace(variables.getNamespace())));
     }
 
     private String buildStandaloneAgentMemoryExpression(VariableContext variables) {
         return String.format(Locale.ROOT, "max(%s{container=\"%s\", namespace=\"%s\"}) by (pod)",
-            ISTIO_AGENT_MEMORY_USAGE_METRIC, escapePrometheusLabelValue(resolveGatewayContainerName()),
+            ISTIO_AGENT_MEMORY_USAGE_METRIC, escapePrometheusLabelValue(variables.getGatewayContainerName()),
             escapePrometheusLabelValue(resolveDashboardNamespace(variables.getNamespace())));
     }
 
     private String buildStandaloneTotalMemoryExpression(VariableContext variables) {
         String namespace = escapePrometheusLabelValue(resolveDashboardNamespace(variables.getNamespace()));
-        String containerName = escapePrometheusLabelValue(resolveGatewayContainerName());
+        String containerName = escapePrometheusLabelValue(variables.getGatewayContainerName());
         return String.format(Locale.ROOT,
             "max(%s{container=\"%s\", namespace=\"%s\"}) by (pod) + "
                 + "max(%s{container=\"%s\", namespace=\"%s\"}) by (pod)",
@@ -935,9 +993,9 @@ public class DashboardServiceImpl implements DashboardService {
         return matcher.groupCount() >= 1 ? matcher.group(1) : matcher.group();
     }
 
-    private WorkloadMetricsMode resolveWorkloadMetricsMode(String namespace) {
+    private WorkloadMetricsMode resolveWorkloadMetricsMode(String namespace, String gatewayContainerName) {
         String expression = String.format(Locale.ROOT, "count(%s{container=\"%s\", namespace=\"%s\"})",
-            CONTAINER_MEMORY_USAGE_METRIC, escapePrometheusLabelValue(resolveGatewayContainerName()),
+            CONTAINER_MEMORY_USAGE_METRIC, escapePrometheusLabelValue(gatewayContainerName),
             escapePrometheusLabelValue(resolveDashboardNamespace(namespace)));
         try {
             Double value = extractInstantValue(queryPrometheusInstant(expression, System.currentTimeMillis()));
@@ -963,12 +1021,61 @@ public class DashboardServiceImpl implements DashboardService {
         return StringUtils.firstNonBlank(dashboardGatewayName, resolveSelectorKey() + "-gateway");
     }
 
+    private String resolveGatewayContainerName(String namespace) {
+        return resolveContainerName(namespace,
+            Arrays.asList(dashboardGatewayContainerName, resolveGatewayName(), "aigateway-gateway", "higress-gateway",
+                "istio-proxy"),
+            Arrays.asList(CONTAINER_MEMORY_USAGE_METRIC, ISTIO_AGENT_MEMORY_USAGE_METRIC, ENVOY_MEMORY_USAGE_METRIC));
+    }
+
     private String resolveGatewayContainerName() {
         return StringUtils.firstNonBlank(dashboardGatewayContainerName, resolveGatewayName());
     }
 
+    private String resolveCoreContainerName(String namespace) {
+        return resolveContainerName(namespace,
+            Arrays.asList(dashboardCoreContainerName, resolveSelectorKey() + "-core", "aigateway-core",
+                "higress-core"),
+            Collections.singletonList(CONTAINER_MEMORY_USAGE_METRIC));
+    }
+
     private String resolveCoreContainerName() {
         return StringUtils.firstNonBlank(dashboardCoreContainerName, resolveSelectorKey() + "-core");
+    }
+
+    private String resolveContainerName(String namespace, List<String> candidates, List<String> metricNames) {
+        LinkedHashSet<String> normalizedCandidates = new LinkedHashSet<>();
+        for (String candidate : candidates) {
+            if (StringUtils.isNotBlank(candidate)) {
+                normalizedCandidates.add(candidate);
+            }
+        }
+        if (normalizedCandidates.isEmpty()) {
+            return "";
+        }
+
+        String effectiveNamespace = resolveDashboardNamespace(namespace);
+        for (String candidate : normalizedCandidates) {
+            for (String metricName : metricNames) {
+                if (hasMetricForContainer(metricName, candidate, effectiveNamespace)) {
+                    return candidate;
+                }
+            }
+        }
+        return normalizedCandidates.iterator().next();
+    }
+
+    private boolean hasMetricForContainer(String metricName, String containerName, String namespace) {
+        String expression = String.format(Locale.ROOT, "count(%s{container=\"%s\", namespace=\"%s\"})",
+            metricName, escapePrometheusLabelValue(containerName), escapePrometheusLabelValue(namespace));
+        try {
+            Double value = extractInstantValue(queryPrometheusInstant(expression, System.currentTimeMillis()));
+            return value != null && value > 0;
+        } catch (Exception ex) {
+            log.debug("Failed to inspect Prometheus metric {} for container {} in namespace {}.", metricName,
+                containerName, namespace, ex);
+            return false;
+        }
     }
 
     private String escapePrometheusLabelValue(String value) {
@@ -1483,6 +1590,8 @@ public class DashboardServiceImpl implements DashboardService {
         List<String> gatewayOptions;
         String namespace;
         List<String> namespaceOptions;
+        String gatewayContainerName;
+        String coreContainerName;
         WorkloadMetricsMode workloadMetricsMode;
     }
 

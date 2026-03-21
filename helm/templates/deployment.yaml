@@ -78,7 +78,7 @@ spec:
               value: "{{ .Values.swagger.enabled }}"
             {{- if and .Values.global.enablePluginServer (not (hasKey .Values.podEnvs "HIGRESS_ADMIN_WASM_PLUGIN_CUSTOM_IMAGE_URL_PATTERN"))}}
             - name: HIGRESS_ADMIN_WASM_PLUGIN_CUSTOM_IMAGE_URL_PATTERN
-              value: "{{ .Values.pluginServer.urlPattern }}"
+              value: "{{ include "higress-console.pluginServer.urlPattern" . }}"
             {{- end }}
             {{- if and .Values.pluginServer.imageRegistry (not (hasKey .Values.podEnvs "HIGRESS_ADMIN_WASM_PLUGIN_IMAGE_REGISTRY")) }}
             - name: HIGRESS_ADMIN_WASM_PLUGIN_IMAGE_REGISTRY

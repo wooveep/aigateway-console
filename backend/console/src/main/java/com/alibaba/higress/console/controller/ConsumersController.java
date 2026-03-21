@@ -85,6 +85,27 @@ public class ConsumersController {
         return ControllerUtil.buildResponseEntity(consumer);
     }
 
+    @GetMapping("/departments")
+    @Operation(summary = "List departments")
+    @ApiResponses(value = {@ApiResponse(responseCode = "200", description = "Departments listed successfully"),
+        @ApiResponse(responseCode = "500", description = "Internal server error")})
+    public ResponseEntity<Response<java.util.List<String>>> listDepartments() {
+        return ControllerUtil.buildResponseEntity(consumerService.listDepartments());
+    }
+
+    @PostMapping("/departments")
+    @Operation(summary = "Add a department")
+    @ApiResponses(value = {@ApiResponse(responseCode = "204", description = "Department added successfully"),
+        @ApiResponse(responseCode = "400", description = "Department data is not valid"),
+        @ApiResponse(responseCode = "500", description = "Internal server error")})
+    public ResponseEntity<Void> addDepartment(@RequestBody DepartmentRequest request) {
+        if (request == null || StringUtils.isBlank(request.getName())) {
+            throw new ValidationException("Department name cannot be blank.");
+        }
+        consumerService.addDepartment(request.getName());
+        return ResponseEntity.noContent().build();
+    }
+
     @PutMapping("/{name}")
     @Operation(summary = "Update an existed consumer")
     @ApiResponses(value = {@ApiResponse(responseCode = "200", description = "Consumer updated successfully"),
@@ -109,5 +130,18 @@ public class ConsumersController {
     public ResponseEntity<Response<Consumer>> delete(@PathVariable("name") @NotBlank String name) {
         consumerService.delete(name);
         return ResponseEntity.noContent().build();
+    }
+
+    public static class DepartmentRequest {
+
+        private String name;
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
     }
 }

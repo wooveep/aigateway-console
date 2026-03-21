@@ -34,8 +34,15 @@ public class Consumer {
 
     @Schema(description = "Consumer name")
     private String name;
+    @Schema(description = "Consumer department")
+    private String department;
     @Schema(description = "Consumer credentials")
     private List<Credential> credentials;
+
+    public Consumer(String name, List<Credential> credentials) {
+        this.name = name;
+        this.credentials = credentials;
+    }
 
     public void validate(boolean forUpdate) {
         if (StringUtils.isBlank(name)) {

@@ -1,0 +1,36 @@
+# Production gray deployment values for the standalone higress-console chart.
+# Update tag values if your release pipeline publishes a different version.
+
+global:
+  local: false
+  ingressClass: aigateway
+  o11y:
+    enabled: false
+    grafana:
+      image:
+        repository: aigateway/grafana
+        tag: 9.3.6
+    prometheus:
+      image:
+        repository: aigateway/prometheus
+        tag: v2.40.7
+    loki:
+      image:
+        repository: aigateway/loki
+        tag: 2.9.4
+
+image:
+  repository: aigateway/console
+  pullPolicy: IfNotPresent
+  tag: "2.1.0"
+
+controller:
+  serviceName: aigateway-controller
+
+pluginServer:
+  serviceName: aigateway-plugin-server
+
+certmanager:
+  image:
+    repository: aigateway
+    tag: v1.11.0

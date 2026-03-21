@@ -5,6 +5,14 @@ export const getConsumers = (): Promise<Consumer[]> => {
   return request.get<any, Consumer[]>('/v1/consumers');
 };
 
+export const getConsumerDepartments = (): Promise<string[]> => {
+  return request.get<any, string[]>('/v1/consumers/departments');
+};
+
+export const addConsumerDepartment = (name: string): Promise<any> => {
+  return request.post<any, any>('/v1/consumers/departments', { name });
+};
+
 export const addConsumer = (payload: Consumer): Promise<any> => {
   return request.post<any, any>('/v1/consumers', payload);
 };

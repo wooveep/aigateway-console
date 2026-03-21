@@ -5,6 +5,11 @@ export interface McpServerPageQuery extends PageQuery {
   type?: string;
 }
 
+export interface McpPresetTemplate {
+  id: string;
+  name: string;
+}
+
 export interface McpServer {
   name: string;
   type: string; // OPEN_API/DATABASE/REDIRECT_ROUTE

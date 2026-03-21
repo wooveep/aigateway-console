@@ -1,12 +1,18 @@
-import { CredentialType } from '@/interfaces/consumer';
+import { Consumer, CredentialType } from '@/interfaces/consumer';
 import { MinusCircleOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
-import { Button, Form, Input, Select, Tabs } from 'antd';
+import { AutoComplete, Button, Form, Input, Select, Tabs } from 'antd';
 import React, { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const ConsumerForm: React.FC = forwardRef((props, ref) => {
+interface Props {
+  value?: Consumer | null;
+  departments?: string[];
+  presetDepartment?: string;
+}
+
+const ConsumerForm: React.FC<Props> = forwardRef((props, ref) => {
   const { t } = useTranslation();
-  const { value } = props;
+  const { value, departments = [], presetDepartment } = props;
   const [form] = Form.useForm();
   const [activeTabKey, setActiveTabKey] = useState('');
   const [keyAuthCredentialSource, setKeyAuthCredentialSource] = useState();
@@ -25,12 +31,15 @@ const ConsumerForm: React.FC = forwardRef((props, ref) => {
           activeTabKey_ = activeTabKey_ || credential.type;
         }
       }
-      formValues = Object.assign({}, value, { credentials });
+      formValues = Object.assign({ department: undefined }, value, { credentials });
     }
     formValues ? form.setFieldsValue(formValues) : form.resetFields();
+    if (!value && presetDepartment) {
+      form.setFieldValue('department', presetDepartment);
+    }
     setActiveTabKey(activeTabKey_ || CredentialType.KEY_AUTH.key);
     setKeyAuthCredentialSource(form.getFieldValue(['credentials', CredentialType.KEY_AUTH.key, 'source']) || 'BEARER');
-  }, [value]);
+  }, [form, presetDepartment, value]);
 
   useImperativeHandle(ref, () => ({
     reset: () => {
@@ -76,6 +85,22 @@ const ConsumerForm: React.FC = forwardRef((props, ref) => {
       layout="vertical"
     >
       <Form.Item
+        label={t('consumer.consumerForm.department')}
+        name="department"
+      >
+        <AutoComplete
+          options={departments.map((department) => ({ value: department }))}
+          filterOption={(inputValue, option) => (option?.value || '').toUpperCase().includes(inputValue.toUpperCase())}
+        >
+          <Input
+            showCount
+            allowClear
+            maxLength={63}
+            placeholder={t('consumer.consumerForm.departmentPlaceholder') || ''}
+          />
+        </AutoComplete>
+      </Form.Item>
+      <Form.Item
         label={t('consumer.consumerForm.name')}
         required
         name="name"
@@ -90,6 +115,7 @@ const ConsumerForm: React.FC = forwardRef((props, ref) => {
           showCount
           allowClear
           maxLength={63}
+          placeholder={t('consumer.consumerForm.namePlaceholder') || ''}
           disabled={value}
         />
       </Form.Item>

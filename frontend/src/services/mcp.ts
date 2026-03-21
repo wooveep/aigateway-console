@@ -4,9 +4,11 @@ import {
   McpServerPageQuery,
   McpServerConsumers,
   McpServerConsumerDetail,
+  McpPresetTemplate,
 } from '@/interfaces/mcp';
 
 const BASE_URL = '/v1/mcpServer';
+const MCP_TEMPLATE_BASE_URL = '/mcp-templates';
 
 export const listMcpServers = (query: McpServerPageQuery): Promise<McpServer[]> => {
   return request.get<any, McpServer[]>(BASE_URL, { params: query });
@@ -44,4 +46,24 @@ export const listMcpConsumers = (
 
 export const swaggerToMcpConfig = (payload: { content: string }): Promise<any> => {
   return request.post<any, any>(`${BASE_URL}/swaggerToMcpConfig`, payload);
+};
+
+export const listMcpPresetTemplates = async (): Promise<McpPresetTemplate[]> => {
+  const response = await fetch(`${MCP_TEMPLATE_BASE_URL}/index.json?ts=${Date.now()}`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch MCP preset templates: ${response.status}`);
+  }
+  const templateIds: string[] = await response.json();
+  return templateIds.map((id) => ({
+    id,
+    name: id,
+  }));
+};
+
+export const getMcpPresetTemplate = async (templateId: string): Promise<string> => {
+  const response = await fetch(`${MCP_TEMPLATE_BASE_URL}/${templateId}.yaml?ts=${Date.now()}`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch MCP preset template ${templateId}: ${response.status}`);
+  }
+  return response.text();
 };

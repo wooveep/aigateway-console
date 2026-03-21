@@ -141,7 +141,10 @@ pvc:
   __placeholder__: true
 
 pluginServer:
-  urlPattern: "http://aigateway-plugin-server.aigateway-system.svc/plugins/${name}/${version}/plugin.wasm"
+  serviceName: aigateway-plugin-server
+  # -- Custom URL pattern for the plugin server. When empty, Helm will default to the
+  # current release namespace with the serviceName above.
+  urlPattern: ""
   # -- Plugin image registry for built-in plugins. If set, will override the default registry in plugins.properties.
   # Example: "my-registry.example.com"
   imageRegistry: ""

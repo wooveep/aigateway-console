@@ -47,6 +47,7 @@ import com.google.common.net.HttpHeaders;
 class KeyAuthCredentialHandler implements CredentialHandler {
 
     private static final String BEARER_TOKEN_PREFIX = "Bearer ";
+    private static final String CONSUMER_DEPARTMENT = "department";
 
     @Override
     public String getType() {
@@ -202,6 +203,11 @@ class KeyAuthCredentialHandler implements CredentialHandler {
                 throw new IllegalArgumentException(
                     "Unsupported key auth credential source: " + keyAuthCredential.getSource());
         }
+        if (StringUtils.isBlank(consumer.getDepartment())) {
+            consumerConfig.remove(CONSUMER_DEPARTMENT);
+        } else {
+            consumerConfig.put(CONSUMER_DEPARTMENT, consumer.getDepartment().trim());
+        }
         consumerConfig.put(KEYS, Lists.newArrayList(key));
         consumerConfig.put(CONSUMER_CREDENTIALS, credentials);
         consumerConfig.remove(CONSUMER_CREDENTIAL);
@@ -309,6 +315,7 @@ class KeyAuthCredentialHandler implements CredentialHandler {
 
         Consumer consumer = new Consumer();
         consumer.setName(name);
+        consumer.setDepartment(StringUtils.trimToNull(MapUtils.getString(consumerMap, CONSUMER_DEPARTMENT)));
         consumer.setCredentials(Lists.newArrayList(credential));
         return consumer;
     }

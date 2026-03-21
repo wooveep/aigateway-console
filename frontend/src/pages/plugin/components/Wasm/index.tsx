@@ -147,28 +147,34 @@ const WasmForm = forwardRef((props: { editData?: WasmPluginData }, ref) => {
         <Form.Item label={t('plugins.custom.description')} name="description">
           <Input.TextArea disabled={builtIn} placeholder={t('plugins.custom.descriptionPlaceholder') || ''} />
         </Form.Item>
-        <Form.Item
-          label={t('plugins.custom.imageUrl')}
-          name="imageUrl"
-          rules={[{ required: true }]}
-          tooltip={t('plugins.custom.imageUrlTooltip')}
-        >
-          <Input
-            placeholder={t('plugins.custom.imageUrlPlaceholder') || ''}
-          />
-        </Form.Item>
+        {!builtIn && (
+          <Form.Item
+            label={t('plugins.custom.imageUrl')}
+            name="imageUrl"
+            rules={[{ required: true }]}
+            tooltip={t('plugins.custom.imageUrlTooltip')}
+          >
+            <Input
+              placeholder={t('plugins.custom.imageUrlPlaceholder') || ''}
+            />
+          </Form.Item>
+        )}
         <Form.Item label={t('plugins.custom.phase')} name="phase" rules={[{ required: true }]}>
           <Select options={phaseOptions} placeholder={t('plugins.custom.phasePlaceholder')} />
         </Form.Item>
         <Form.Item label={t('plugins.custom.priority')} name="priority" rules={[{ required: true }]}>
           <InputNumber max={1000} min={1} style={{ width: '100%' }} placeholder={t('plugins.custom.priorityPlaceholder') || ''} />
         </Form.Item>
-        <Form.Item label={t('plugins.custom.imagePullPolicy')} name="imagePullPolicy" rules={[{ required: true }]}>
-          <Select options={imagePullPolicyOptions} />
-        </Form.Item>
-        <Form.Item label={t('plugins.custom.imagePullSecret')} name="imagePullSecret">
-          <Input placeholder={t('plugins.custom.imagePullSecretPlaceholder') || ''} />
-        </Form.Item>
+        {!builtIn && (
+          <Form.Item label={t('plugins.custom.imagePullPolicy')} name="imagePullPolicy" rules={[{ required: true }]}>
+            <Select options={imagePullPolicyOptions} />
+          </Form.Item>
+        )}
+        {!builtIn && (
+          <Form.Item label={t('plugins.custom.imagePullSecret')} name="imagePullSecret">
+            <Input placeholder={t('plugins.custom.imagePullSecretPlaceholder') || ''} />
+          </Form.Item>
+        )}
       </Form>
     </div>
   );

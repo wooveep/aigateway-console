@@ -95,3 +95,14 @@ Create a default fully qualified app name for loki
 {{- $consoleName := include "higress-console.name" . }}
 {{- printf "%s-loki" ($consoleName | trunc 52) }}
 {{- end }}
+
+{{/*
+Create the default plugin server URL pattern.
+*/}}
+{{- define "higress-console.pluginServer.urlPattern" -}}
+{{- if .Values.pluginServer.urlPattern -}}
+{{- .Values.pluginServer.urlPattern -}}
+{{- else -}}
+{{- printf "http://%s.%s.svc/plugins/${name}/${version}/plugin.wasm" (.Values.pluginServer.serviceName | default "aigateway-plugin-server") .Release.Namespace -}}
+{{- end -}}
+{{- end }}

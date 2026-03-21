@@ -1,6 +1,9 @@
 export interface Consumer {
   name: string;
+  department?: string;
   credentials: Credential[];
+  version?: number;
+  key?: string;
 }
 
 export interface Credential {
