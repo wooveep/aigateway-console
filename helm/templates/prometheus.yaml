@@ -105,6 +105,8 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   replicas: {{ $config.replicas }}
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: {{ $appName }}

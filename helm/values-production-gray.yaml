@@ -34,3 +34,6 @@ certmanager:
   image:
     repository: aigateway
     tag: v1.11.0
+
+portalDatabase:
+  enabled: false

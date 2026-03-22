@@ -1,6 +1,9 @@
 {{- $o11y := merge (dict) .Values.o11y .Values.global.o11y }}
 {{- $pluginImageRegistry := .Values.pluginServer.imageRegistry | default .Values.global.hub }}
 {{- $pluginImageNamespace := .Values.pluginServer.imageNamespace | default .Values.global.pluginNamespace }}
+{{- $portalDB := .Values.portalDatabase }}
+{{- $portalDBHost := $portalDB.host | default (printf "%s-aigateway-core-mysql" .Release.Name) }}
+{{- $portalDBSecretName := $portalDB.secretName | default (printf "%s-aigateway-core-db" .Release.Name) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -56,6 +59,20 @@ spec:
               value: {{ include "higress-console.controller.jwtPolicy" . }}
             - name: CLUSTER_DOMAIN_SUFFIX
               value: {{ .Values.global.proxy.clusterDomain }}
+            {{- if $portalDB.enabled }}
+            - name: HIGRESS_PORTAL_DB_URL
+              value: "jdbc:mysql://{{ $portalDBHost }}:{{ $portalDB.port }}/{{ $portalDB.database }}?{{ $portalDB.jdbcParams }}"
+            - name: HIGRESS_PORTAL_DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $portalDBSecretName }}
+                  key: {{ $portalDB.usernameKey }}
+            - name: HIGRESS_PORTAL_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $portalDBSecretName }}
+                  key: {{ $portalDB.passwordKey }}
+            {{- end }}
             {{- if $o11y.enabled }}
             - name: HIGRESS_CONSOLE_DASHBOARD_BASE_URL
               value: http://{{ include "higress-console-grafana.name" . }}.{{ .Release.Namespace }}:{{ $o11y.grafana.port }}{{ include "higress-console-grafana.path" . }}

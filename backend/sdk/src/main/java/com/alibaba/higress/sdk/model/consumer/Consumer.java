@@ -38,6 +38,18 @@ public class Consumer {
     private String department;
     @Schema(description = "Consumer credentials")
     private List<Credential> credentials;
+    @Schema(description = "Portal user status")
+    private String portalStatus;
+    @Schema(description = "Portal user display name")
+    private String portalDisplayName;
+    @Schema(description = "Portal user email")
+    private String portalEmail;
+    @Schema(description = "Portal user source")
+    private String portalUserSource;
+    @Schema(description = "Portal user temporary password, only returned once when created from console")
+    private String portalTempPassword;
+    @Schema(description = "Portal user password used in creation/update from console")
+    private String portalPassword;
 
     public Consumer(String name, List<Credential> credentials) {
         this.name = name;

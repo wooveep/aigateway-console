@@ -119,6 +119,27 @@ const ConsumerForm: React.FC<Props> = forwardRef((props, ref) => {
           disabled={value}
         />
       </Form.Item>
+      <Form.Item label="Portal显示名" name="portalDisplayName">
+        <Input
+          showCount
+          allowClear
+          maxLength={63}
+          placeholder="可选，默认与用户名一致"
+        />
+      </Form.Item>
+      <Form.Item label="Portal邮箱" name="portalEmail">
+        <Input
+          showCount
+          allowClear
+          maxLength={128}
+          placeholder="可选"
+        />
+      </Form.Item>
+      <Form.Item label="Portal密码" name="portalPassword">
+        <Input.Password
+          placeholder={value ? '留空则不修改密码' : '留空将由系统生成临时密码'}
+        />
+      </Form.Item>
       <div>{t("consumer.columns.authMethods")}</div>
       <Tabs
         activeKey={activeTabKey}

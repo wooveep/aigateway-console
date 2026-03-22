@@ -151,3 +151,15 @@ pluginServer:
   # -- Plugin image namespace for built-in plugins. If set, will override the default namespace in plugins.properties.
   # Default namespace is "plugins". Example: "my-plugins"
   imageNamespace: ""
+
+portalDatabase:
+  enabled: false
+  # Default host is "<release>-aigateway-core-mysql" when empty.
+  host: ""
+  port: 3306
+  database: aigateway_portal
+  jdbcParams: "useUnicode=true&characterEncoding=UTF-8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai"
+  # Default secret is "<release>-aigateway-core-db" when empty.
+  secretName: ""
+  usernameKey: username
+  passwordKey: password

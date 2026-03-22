@@ -8,6 +8,7 @@ import {
   getConsumerDepartments,
   getConsumers,
   updateConsumer,
+  updateConsumerStatus,
 } from '@/services/consumer';
 import { ApartmentOutlined, ExclamationCircleOutlined, RedoOutlined, UserOutlined } from '@ant-design/icons';
 import { PageContainer } from '@ant-design/pro-layout';
@@ -107,6 +108,25 @@ const ConsumerList: React.FC = () => {
       },
     },
     {
+      title: 'Portal状态',
+      dataIndex: 'portalStatus',
+      key: 'portalStatus',
+      width: 120,
+      render: (_, record: OrganizationRow) => {
+        if (record.rowType === 'department') {
+          return '-';
+        }
+        const status = record.consumer?.portalStatus || 'pending';
+        if (status === 'active') {
+          return <Tag color="success">启用</Tag>;
+        }
+        if (status === 'disabled') {
+          return <Tag color="error">禁用</Tag>;
+        }
+        return <Tag color="default">待激活</Tag>;
+      },
+    },
+    {
       title: t('misc.actions'),
       dataIndex: 'action',
       key: 'action',
@@ -123,6 +143,11 @@ const ConsumerList: React.FC = () => {
         return (
           <Space size="small">
             <a onClick={() => onEditDrawer(record.consumer)}>{t('misc.edit')}</a>
+            {
+              record.consumer?.portalStatus === 'active'
+                ? <a onClick={() => onToggleConsumerStatus(record.consumer, 'disabled')}>禁用</a>
+                : <a onClick={() => onToggleConsumerStatus(record.consumer, 'active')}>启用</a>
+            }
             <a onClick={() => onShowModal(record.consumer)}>{t('misc.delete')}</a>
           </Space>
         );
@@ -193,8 +218,16 @@ const ConsumerList: React.FC = () => {
     try {
       if (currentConsumer) {
         await updateConsumer({ version: currentConsumer.version, ...values } as Consumer);
+        message.success('用户更新成功');
       } else {
-        await addConsumer({ ...values, version: 0 } as Consumer);
+        const created = await addConsumer({ ...values, version: 0 } as Consumer);
+        message.success('用户创建成功');
+        if (created?.portalTempPassword) {
+          Modal.info({
+            title: 'Portal 临时密码',
+            content: `用户 ${created.name} 的临时密码：${created.portalTempPassword}`,
+          });
+        }
       }
       setOpenDrawer(false);
       formRef.current && formRef.current.reset();
@@ -216,6 +249,20 @@ const ConsumerList: React.FC = () => {
   const onShowModal = (consumer: Consumer) => {
     setCurrentConsumer(consumer);
     setOpenModal(true);
+  };
+
+  const onToggleConsumerStatus = async (consumer: Consumer, status: 'active' | 'disabled') => {
+    if (!consumer?.name) {
+      return;
+    }
+    try {
+      await updateConsumerStatus(consumer.name, status);
+      message.success(status === 'active' ? '用户已启用' : '用户已禁用');
+      refresh();
+      loadDepartments();
+    } catch (error) {
+      message.error('状态更新失败');
+    }
   };
 
   const handleModalOk = async () => {

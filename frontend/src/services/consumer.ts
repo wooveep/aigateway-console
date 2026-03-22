@@ -24,3 +24,7 @@ export const deleteConsumer = (name: string): Promise<any> => {
 export const updateConsumer = (payload: Consumer): Promise<any> => {
   return request.put<any, any>(`/v1/consumers/${payload.name}`, payload);
 };
+
+export const updateConsumerStatus = (name: string, status: 'active' | 'disabled' | 'pending'): Promise<any> => {
+  return request.patch<any, any>(`/v1/consumers/${name}/status`, { status });
+};

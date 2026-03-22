@@ -2,6 +2,12 @@ export interface Consumer {
   name: string;
   department?: string;
   credentials: Credential[];
+  portalStatus?: 'active' | 'disabled' | 'pending' | string;
+  portalDisplayName?: string;
+  portalEmail?: string;
+  portalUserSource?: string;
+  portalTempPassword?: string;
+  portalPassword?: string;
   version?: number;
   key?: string;
 }
