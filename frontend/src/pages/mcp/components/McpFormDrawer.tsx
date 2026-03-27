@@ -11,6 +11,11 @@ import { useWatch } from 'antd/es/form/Form';
 import React, { useEffect, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { getServiceTypeMap, SERVICE_TYPE, SERVICE_TYPES, DB_TYPE_OPTIONS } from '../constant';
+import {
+  expandConsumersByAllowedLevels,
+  normalizeUserLevels,
+  USER_LEVELS,
+} from '@/utils/consumer-level';
 import YamlUtil from './yamlUtil';
 
 interface McpFormDrawerProps {
@@ -39,6 +44,7 @@ const McpFormDrawer: React.FC<McpFormDrawerProps> = ({ visible, mode, name, onCl
   const [allDomainList, setAllDomainList] = useState<string[]>([]);
   const [allBackendServiceList, setAllBackendServiceList] = useState<any[]>([]);
   const [consumerList, setConsumerList] = useState<any[]>([]);
+  const allowedConsumerLevelOptions = USER_LEVELS;
   const [presetTemplates, setPresetTemplates] = useState<any[]>([]);
   const [presetTemplatesLoading, setPresetTemplatesLoading] = useState(false);
   const [selectedTemplateContent, setSelectedTemplateContent] = useState('');
@@ -76,7 +82,7 @@ const McpFormDrawer: React.FC<McpFormDrawerProps> = ({ visible, mode, name, onCl
           service: record?.services?.[0]?.name,
           consumerAuth: record?.consumerAuthInfo?.enable || false,
           domains: record?.domains?.[0],
-          allowedConsumers: record?.consumerAuthInfo?.allowedConsumers || [],
+          allowedConsumerLevels: normalizeUserLevels(record?.consumerAuthInfo?.allowedConsumerLevels),
         };
 
         // DB 类型数据回填
@@ -254,6 +260,8 @@ const McpFormDrawer: React.FC<McpFormDrawerProps> = ({ visible, mode, name, onCl
     if (!service) {
       return;
     }
+    const normalizedLevels = normalizeUserLevels(values.allowedConsumerLevels);
+    const expandedConsumers = expandConsumersByAllowedLevels(normalizedLevels, consumerList);
 
     const submitData: any = {
       ...record,
@@ -272,7 +280,8 @@ const McpFormDrawer: React.FC<McpFormDrawerProps> = ({ visible, mode, name, onCl
         enable: values.consumerAuth,
         type: CredentialType.KEY_AUTH.key,
         strategyConfigId: values.consumerAuthInfo?.strategyConfigId,
-        allowedConsumers: values.allowedConsumers || [],
+        allowedConsumerLevels: normalizedLevels,
+        allowedConsumers: expandedConsumers,
       },
       domains: (() => {
         if (Array.isArray(values.domains)) {
@@ -366,7 +375,7 @@ const McpFormDrawer: React.FC<McpFormDrawerProps> = ({ visible, mode, name, onCl
           rules={[
             { required: true, message: t('mcp.form.nameRequired')! },
             {
-              pattern: /^(?![-.])[A-Za-z0-9.-]{1,63}[A-Za-z0-9]$/,
+              pattern: /^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$/,
               message: t('mcp.form.namePattern')!,
             },
           ]}
@@ -684,24 +693,21 @@ const McpFormDrawer: React.FC<McpFormDrawerProps> = ({ visible, mode, name, onCl
             }
           </Select>
         </Form.Item>
-        <Form.Item
-          label={t('mcp.form.allowedConsumers')}
-          extra={(<HistoryButton text={t('consumer.create')} path={"/consumer"} />)}
-        >
+        <Form.Item label={t('mcp.form.allowedConsumerLevels')} extra={(<HistoryButton text={t('consumer.create')} path={"/consumer"} />)}>
           <div style={{ display: 'flex', alignItems: 'center' }}>
             <Form.Item
-              name="allowedConsumers"
+              name="allowedConsumerLevels"
               noStyle
             >
               <Select
                 mode="multiple"
                 allowClear
-                placeholder={t('mcp.form.allowedConsumersPlaceholder')}
+                placeholder={t('mcp.form.allowedConsumerLevelsPlaceholder')}
                 style={{ flex: 1 }}
               >
-                {consumerList.map((item) => (
-                  <Select.Option key={item.name} value={item.name}>
-                    {item.name}
+                {allowedConsumerLevelOptions.map((level) => (
+                  <Select.Option key={level} value={level}>
+                    {t(`consumer.userLevel.${level}`)}
                   </Select.Option>
                 ))}
               </Select>

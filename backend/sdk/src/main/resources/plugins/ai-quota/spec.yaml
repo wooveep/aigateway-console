@@ -22,15 +22,63 @@ spec:
     openAPIV3Schema:
       type: object
       properties:
+        quota_unit:
+          type: string
+          title: 配额模式
+          x-title-i18n:
+            en-US: Quota Mode
+          description: 配额模式，支持 token 或 amount
+          x-description-i18n:
+            en-US: Quota mode, either token or amount
+          enum:
+            - token
+            - amount
+          default: "amount"
         redis_key_prefix:
           type: string
           title: Quota Redis Key前缀
           x-title-i18n:
             en-US: Quota Redis Key Prefix
-          description: qutoa redis key 前缀
+          description: token 模式下的 quota redis key 前缀
           x-description-i18n:
-            en-US: Quota redis key prefix
+            en-US: Quota redis key prefix in token mode
           default: "chat_quota:"
+        balance_key_prefix:
+          type: string
+          title: 余额 Redis Key前缀
+          x-title-i18n:
+            en-US: Balance Redis Key Prefix
+          description: amount 模式下的余额 redis key 前缀
+          x-description-i18n:
+            en-US: Balance redis key prefix in amount mode
+          default: "billing:balance:"
+        price_key_prefix:
+          type: string
+          title: 模型价格 Redis Key前缀
+          x-title-i18n:
+            en-US: Model Price Redis Key Prefix
+          description: amount 模式下的模型价格 redis key 前缀
+          x-description-i18n:
+            en-US: Model price redis key prefix in amount mode
+          default: "billing:model-price:"
+        usage_event_stream:
+          type: string
+          title: 消费事件 Stream
+          x-title-i18n:
+            en-US: Usage Event Stream
+          description: amount 模式下写入消费事件的 Redis Stream 名称
+          x-description-i18n:
+            en-US: Redis stream name used to emit usage events in amount mode
+          default: "billing:usage:stream"
+        usage_event_dedup_prefix:
+          type: string
+          title: 消费事件去重 Key前缀
+          x-title-i18n:
+            en-US: Usage Event Dedup Prefix
+          description: amount 模式下消费事件去重 key 前缀
+          x-description-i18n:
+            en-US: Usage event dedup key prefix in amount mode
+          default: "billing:usage:event:"
         admin_consumer:
           type: string
           title: 管理身份Consumer
@@ -102,7 +150,11 @@ spec:
               default: 1000
       required: [admin_consumer, redis]
       example:
-        redis_key_prefix: "chat_quota:"
+        quota_unit: amount
+        balance_key_prefix: "billing:balance:"
+        price_key_prefix: "billing:model-price:"
+        usage_event_stream: "billing:usage:stream"
+        usage_event_dedup_prefix: "billing:usage:event:"
         admin_consumer: consumer3
         admin_path: /quota
         redis:
@@ -113,15 +165,63 @@ spec:
     openAPIV3Schema:
       type: object
       properties:
+        quota_unit:
+          type: string
+          title: 配额模式
+          x-title-i18n:
+            en-US: Quota Mode
+          description: 配额模式，支持 token 或 amount
+          x-description-i18n:
+            en-US: Quota mode, either token or amount
+          enum:
+            - token
+            - amount
+          default: "amount"
         redis_key_prefix:
           type: string
           title: Quota Redis Key前缀
           x-title-i18n:
             en-US: Quota Redis Key Prefix
-          description: qutoa redis key 前缀
+          description: token 模式下的 quota redis key 前缀
           x-description-i18n:
-            en-US: Quota redis key prefix
+            en-US: Quota redis key prefix in token mode
           default: "chat_quota:"
+        balance_key_prefix:
+          type: string
+          title: 余额 Redis Key前缀
+          x-title-i18n:
+            en-US: Balance Redis Key Prefix
+          description: amount 模式下的余额 redis key 前缀
+          x-description-i18n:
+            en-US: Balance redis key prefix in amount mode
+          default: "billing:balance:"
+        price_key_prefix:
+          type: string
+          title: 模型价格 Redis Key前缀
+          x-title-i18n:
+            en-US: Model Price Redis Key Prefix
+          description: amount 模式下的模型价格 redis key 前缀
+          x-description-i18n:
+            en-US: Model price redis key prefix in amount mode
+          default: "billing:model-price:"
+        usage_event_stream:
+          type: string
+          title: 消费事件 Stream
+          x-title-i18n:
+            en-US: Usage Event Stream
+          description: amount 模式下写入消费事件的 Redis Stream 名称
+          x-description-i18n:
+            en-US: Redis stream name used to emit usage events in amount mode
+          default: "billing:usage:stream"
+        usage_event_dedup_prefix:
+          type: string
+          title: 消费事件去重 Key前缀
+          x-title-i18n:
+            en-US: Usage Event Dedup Prefix
+          description: amount 模式下消费事件去重 key 前缀
+          x-description-i18n:
+            en-US: Usage event dedup key prefix in amount mode
+          default: "billing:usage:event:"
         admin_consumer:
           type: string
           title: 管理身份Consumer
@@ -193,7 +293,11 @@ spec:
               default: 1000
       required: [admin_consumer, redis]
       example:
-        redis_key_prefix: "chat_quota:"
+        quota_unit: amount
+        balance_key_prefix: "billing:balance:"
+        price_key_prefix: "billing:model-price:"
+        usage_event_stream: "billing:usage:stream"
+        usage_event_dedup_prefix: "billing:usage:event:"
         admin_consumer: consumer3
         admin_path: /quota
         redis:

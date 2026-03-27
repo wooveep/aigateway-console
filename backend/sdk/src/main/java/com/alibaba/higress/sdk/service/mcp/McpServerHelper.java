@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 import javax.annotation.PostConstruct;
 
@@ -32,6 +33,7 @@ import com.alibaba.higress.sdk.constant.CommonKey;
 import com.alibaba.higress.sdk.constant.HigressConstants;
 import com.alibaba.higress.sdk.constant.McpConstants;
 import com.alibaba.higress.sdk.exception.BusinessException;
+import com.alibaba.higress.sdk.exception.ValidationException;
 import com.alibaba.higress.sdk.model.Route;
 import com.alibaba.higress.sdk.model.RouteAuthConfig;
 import com.alibaba.higress.sdk.model.mcp.ConsumerAuthInfo;
@@ -46,6 +48,9 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 public class McpServerHelper {
+
+    private static final Pattern RFC1123_SUBDOMAIN_PATTERN = Pattern.compile(
+        "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$");
 
     @PostConstruct
     public void init() {
@@ -174,6 +179,16 @@ public class McpServerHelper {
             .replace(HigressConstants.INTERNAL_RESOURCE_NAME_SUFFIX, StringUtils.EMPTY);
     }
 
+    public static void validateMcpServerName(String name) {
+        if (StringUtils.isBlank(name)) {
+            throw new ValidationException("MCP server name cannot be blank.");
+        }
+        if (!RFC1123_SUBDOMAIN_PATTERN.matcher(name).matches()) {
+            throw new ValidationException(
+                "Invalid MCP server name. Only lowercase RFC1123 subdomain is allowed (a-z, 0-9, '-' and '.').");
+        }
+    }
+
     public static McpServer routeToMcpServer(Route route) {
         if (Objects.isNull(route)) {
             return null;
@@ -209,6 +224,7 @@ public class McpServerHelper {
                 consumerAuthInfo.setType(allowedCredentialTypes.get(0));
             }
             consumerAuthInfo.setAllowedConsumers(routeAuthConfig.getAllowedConsumers());
+            consumerAuthInfo.setAllowedConsumerLevels(routeAuthConfig.getAllowedConsumerLevels());
             consumerAuthInfo.setEnable(routeAuthConfig.getEnabled());
             result.setConsumerAuthInfo(consumerAuthInfo);
         }

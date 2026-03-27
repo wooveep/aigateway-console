@@ -13,8 +13,10 @@
 package com.alibaba.higress.console.controller.ai;
 
 import javax.annotation.Resource;
-import javax.validation.ValidationException;
 import javax.validation.constraints.NotBlank;
+
+import java.util.List;
+import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.http.ResponseEntity;
@@ -32,6 +34,8 @@ import org.springframework.web.bind.annotation.RestController;
 import com.alibaba.higress.console.controller.dto.PaginatedResponse;
 import com.alibaba.higress.console.controller.dto.Response;
 import com.alibaba.higress.console.controller.util.ControllerUtil;
+import com.alibaba.higress.console.service.portal.PortalModelPricingJdbcService;
+import com.alibaba.higress.sdk.exception.ValidationException;
 import com.alibaba.higress.sdk.model.CommonPageQuery;
 import com.alibaba.higress.sdk.model.PaginatedResult;
 import com.alibaba.higress.sdk.model.ai.LlmProvider;
@@ -41,18 +45,29 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @RestController("LlmProvidersController")
 @RequestMapping("/v1/ai/providers")
 @Validated
 @Tag(name = "LLM Provider APIs")
 public class LlmProvidersController {
 
+    private static final String PORTAL_MODEL_META_KEY = "portalModelMeta";
+    private static final String CURRENCY_CNY = "CNY";
+
     private LlmProviderService llmProviderService;
+    private PortalModelPricingJdbcService portalModelPricingJdbcService;
 
     @Resource
     public void setLlmProviderService(LlmProviderService llmProviderService) {
         this.llmProviderService = llmProviderService;
+    }
+
+    @Resource
+    public void setPortalModelPricingJdbcService(PortalModelPricingJdbcService portalModelPricingJdbcService) {
+        this.portalModelPricingJdbcService = portalModelPricingJdbcService;
     }
 
     @GetMapping
@@ -72,7 +87,8 @@ public class LlmProvidersController {
         @ApiResponse(responseCode = "500", description = "Internal server error")})
     public ResponseEntity<Response<LlmProvider>> add(@RequestBody LlmProvider provider) {
         provider.validate(false);
-        LlmProvider newProvider = llmProviderService.addOrUpdate(provider);
+        validatePortalModelMeta(provider);
+        LlmProvider newProvider = addOrUpdateWithPortalSync(provider);
         return ControllerUtil.buildResponseEntity(newProvider);
     }
 
@@ -100,7 +116,8 @@ public class LlmProvidersController {
             throw new ValidationException("Provider name in the URL doesn't match the one in the body.");
         }
         provider.validate(false);
-        LlmProvider updatedProvider = llmProviderService.addOrUpdate(provider);
+        validatePortalModelMeta(provider);
+        LlmProvider updatedProvider = addOrUpdateWithPortalSync(provider);
         return ControllerUtil.buildResponseEntity(updatedProvider);
     }
 
@@ -109,7 +126,178 @@ public class LlmProvidersController {
     @ApiResponses(value = {@ApiResponse(responseCode = "204", description = "Provider deleted successfully"),
         @ApiResponse(responseCode = "500", description = "Internal server error")})
     public ResponseEntity<Response<LlmProvider>> delete(@PathVariable("name") @NotBlank String name) {
-        llmProviderService.delete(name);
+        deleteWithPortalSync(name);
         return ResponseEntity.noContent().build();
+    }
+
+    private void validatePortalModelMeta(LlmProvider provider) {
+        if (provider == null || provider.getRawConfigs() == null || provider.getRawConfigs().isEmpty()) {
+            throw new ValidationException("rawConfigs.portalModelMeta is required.");
+        }
+        Object metaObj = provider.getRawConfigs().get(PORTAL_MODEL_META_KEY);
+        if (metaObj == null) {
+            throw new ValidationException("rawConfigs.portalModelMeta is required.");
+        }
+        if (!(metaObj instanceof Map)) {
+            throw new ValidationException("rawConfigs.portalModelMeta must be an object.");
+        }
+        @SuppressWarnings("unchecked")
+        Map<String, Object> portalModelMeta = (Map<String, Object>)metaObj;
+        validateStringField(portalModelMeta, "intro");
+        validateStringListField(portalModelMeta, "tags");
+
+        Object capabilitiesObj = portalModelMeta.get("capabilities");
+        if (capabilitiesObj != null) {
+            Map<String, Object> capabilities = requireMap(capabilitiesObj, "rawConfigs.portalModelMeta.capabilities");
+            validateStringListField(capabilities, "modalities", "rawConfigs.portalModelMeta.capabilities");
+            validateStringListField(capabilities, "features", "rawConfigs.portalModelMeta.capabilities");
+        }
+
+        Object pricingObj = portalModelMeta.get("pricing");
+        if (pricingObj == null) {
+            throw new ValidationException("rawConfigs.portalModelMeta.pricing is required.");
+        }
+        Map<String, Object> pricing = requireMap(pricingObj, "rawConfigs.portalModelMeta.pricing");
+        validateStringField(pricing, "currency", "rawConfigs.portalModelMeta.pricing");
+        String currency = StringUtils.trimToEmpty((String)pricing.get("currency"));
+        if (StringUtils.isNotBlank(currency) && !StringUtils.equalsIgnoreCase(currency, CURRENCY_CNY)) {
+            throw new ValidationException("rawConfigs.portalModelMeta.pricing.currency must be CNY.");
+        }
+        requireNumberField(pricing, "inputPer1K", "rawConfigs.portalModelMeta.pricing", false);
+        requireNumberField(pricing, "outputPer1K", "rawConfigs.portalModelMeta.pricing", false);
+        pricing.put("currency", CURRENCY_CNY);
+
+        Object limitsObj = portalModelMeta.get("limits");
+        if (limitsObj != null) {
+            Map<String, Object> limits = requireMap(limitsObj, "rawConfigs.portalModelMeta.limits");
+            validateNumberField(limits, "rpm", "rawConfigs.portalModelMeta.limits", true);
+            validateNumberField(limits, "tpm", "rawConfigs.portalModelMeta.limits", true);
+            validateNumberField(limits, "contextWindow", "rawConfigs.portalModelMeta.limits", true);
+        }
+    }
+
+    private Map<String, Object> requireMap(Object value, String path) {
+        if (!(value instanceof Map)) {
+            throw new ValidationException(path + " must be an object.");
+        }
+        @SuppressWarnings("unchecked")
+        Map<String, Object> result = (Map<String, Object>)value;
+        return result;
+    }
+
+    private void validateStringField(Map<String, Object> container, String fieldName) {
+        validateStringField(container, fieldName, "rawConfigs.portalModelMeta");
+    }
+
+    private void validateStringField(Map<String, Object> container, String fieldName, String parentPath) {
+        Object value = container.get(fieldName);
+        if (value == null) {
+            return;
+        }
+        if (!(value instanceof String)) {
+            throw new ValidationException(parentPath + "." + fieldName + " must be a string.");
+        }
+    }
+
+    private void validateStringListField(Map<String, Object> container, String fieldName) {
+        validateStringListField(container, fieldName, "rawConfigs.portalModelMeta");
+    }
+
+    private void validateStringListField(Map<String, Object> container, String fieldName, String parentPath) {
+        Object value = container.get(fieldName);
+        if (value == null) {
+            return;
+        }
+        if (!(value instanceof List)) {
+            throw new ValidationException(parentPath + "." + fieldName + " must be an array.");
+        }
+        @SuppressWarnings("unchecked")
+        List<Object> values = (List<Object>)value;
+        for (Object item : values) {
+            if (!(item instanceof String)) {
+                throw new ValidationException(parentPath + "." + fieldName + " items must be strings.");
+            }
+        }
+    }
+
+    private void validateNumberField(Map<String, Object> container, String fieldName, String parentPath,
+        boolean requireInteger) {
+        Object value = container.get(fieldName);
+        if (value == null) {
+            return;
+        }
+        Double numberValue = parseNumber(value);
+        if (numberValue == null) {
+            throw new ValidationException(parentPath + "." + fieldName + " must be a number.");
+        }
+        if (numberValue < 0) {
+            throw new ValidationException(parentPath + "." + fieldName + " cannot be negative.");
+        }
+        if (requireInteger && numberValue % 1 != 0) {
+            throw new ValidationException(parentPath + "." + fieldName + " must be an integer.");
+        }
+    }
+
+    private void requireNumberField(Map<String, Object> container, String fieldName, String parentPath,
+        boolean requireInteger) {
+        Object value = container.get(fieldName);
+        if (value == null) {
+            throw new ValidationException(parentPath + "." + fieldName + " is required.");
+        }
+        validateNumberField(container, fieldName, parentPath, requireInteger);
+    }
+
+    private Double parseNumber(Object value) {
+        if (value instanceof Number) {
+            return ((Number)value).doubleValue();
+        }
+        if (value instanceof String) {
+            String text = StringUtils.trimToNull((String)value);
+            if (text == null) {
+                return null;
+            }
+            try {
+                return Double.parseDouble(text);
+            } catch (NumberFormatException ex) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private LlmProvider addOrUpdateWithPortalSync(LlmProvider provider) {
+        LlmProvider existedProvider = llmProviderService.query(provider.getName());
+        LlmProvider savedProvider = llmProviderService.addOrUpdate(provider);
+        try {
+            portalModelPricingJdbcService.upsertProvider(savedProvider);
+            return savedProvider;
+        } catch (RuntimeException ex) {
+            rollbackProviderMutation(savedProvider.getName(), existedProvider);
+            throw ex;
+        }
+    }
+
+    private void deleteWithPortalSync(String providerName) {
+        LlmProvider existedProvider = llmProviderService.query(providerName);
+        llmProviderService.delete(providerName);
+        try {
+            portalModelPricingJdbcService.disableProvider(providerName);
+        } catch (RuntimeException ex) {
+            rollbackProviderMutation(providerName, existedProvider);
+            throw ex;
+        }
+    }
+
+    private void rollbackProviderMutation(String providerName, LlmProvider existedProvider) {
+        try {
+            if (existedProvider == null) {
+                llmProviderService.delete(providerName);
+            } else {
+                llmProviderService.addOrUpdate(existedProvider);
+            }
+        } catch (RuntimeException rollbackEx) {
+            log.error("Failed to rollback provider mutation for {} after Portal pricing sync failed.", providerName,
+                rollbackEx);
+        }
     }
 }

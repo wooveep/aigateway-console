@@ -2,7 +2,6 @@ import request from '@/services/request';
 import {
   McpServer,
   McpServerPageQuery,
-  McpServerConsumers,
   McpServerConsumerDetail,
   McpPresetTemplate,
 } from '@/interfaces/mcp';
@@ -26,14 +25,6 @@ export const createOrUpdateMcpServer = (payload: McpServer): Promise<McpServer> 
 
 export const deleteMcpServer = (name: string): Promise<any> => {
   return request.delete<any, any>(`${BASE_URL}/${name}`);
-};
-
-export const addMcpConsumers = (payload: { consumers: undefined[]; mcpServerName: string }): Promise<any> => {
-  return request.put<any, any>(`${BASE_URL}/consumers`, payload);
-};
-
-export const removeMcpConsumers = (payload: McpServerConsumers): Promise<any> => {
-  return request.delete<any, any>(`${BASE_URL}/consumers`, { data: payload });
 };
 
 export const listMcpConsumers = (

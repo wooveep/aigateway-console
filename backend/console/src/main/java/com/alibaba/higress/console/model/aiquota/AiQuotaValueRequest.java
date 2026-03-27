@@ -12,5 +12,5 @@ import lombok.NoArgsConstructor;
 public class AiQuotaValueRequest {
 
     @Schema(description = "Quota value")
-    private Integer value;
+    private Long value;
 }

@@ -69,7 +69,8 @@ image:
 imagePullSecrets: []
 name: "aigateway-console"
 
-podEnvs: {}
+podEnvs:
+  HIGRESS_PORTAL_CONSUMER_PROJECTION_WRITE_ENABLED: "false"
 
 podAnnotations: {}
 

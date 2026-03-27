@@ -1,5 +1,5 @@
 import request from './request';
-import { Consumer } from '@/interfaces/consumer';
+import { Consumer, InviteCodeRecord, ResetPasswordResponse } from '@/interfaces/consumer';
 
 export const getConsumers = (): Promise<Consumer[]> => {
   return request.get<any, Consumer[]>('/v1/consumers');
@@ -27,4 +27,32 @@ export const updateConsumer = (payload: Consumer): Promise<any> => {
 
 export const updateConsumerStatus = (name: string, status: 'active' | 'disabled' | 'pending'): Promise<any> => {
   return request.patch<any, any>(`/v1/consumers/${name}/status`, { status });
+};
+
+export const resetConsumerPassword = (name: string): Promise<ResetPasswordResponse> => {
+  return request.post<any, ResetPasswordResponse>(`/v1/consumers/${name}/password/reset`);
+};
+
+export const createInviteCode = (expiresInDays?: number): Promise<InviteCodeRecord> => {
+  return request.post<any, InviteCodeRecord>('/v1/portal/invite-codes', { expiresInDays });
+};
+
+export const listInviteCodes = (params?: {
+  pageNum?: number;
+  pageSize?: number;
+  status?: string;
+}): Promise<InviteCodeRecord[]> => {
+  return request.get<any, InviteCodeRecord[]>('/v1/portal/invite-codes', { params });
+};
+
+export const updateInviteCodeStatus = (inviteCode: string, status: 'active' | 'disabled'): Promise<InviteCodeRecord> => {
+  return request.patch<any, InviteCodeRecord>(`/v1/portal/invite-codes/${inviteCode}`, { status });
+};
+
+export const disableInviteCode = (inviteCode: string): Promise<InviteCodeRecord> => {
+  return updateInviteCodeStatus(inviteCode, 'disabled');
+};
+
+export const enableInviteCode = (inviteCode: string): Promise<InviteCodeRecord> => {
+  return updateInviteCodeStatus(inviteCode, 'active');
 };

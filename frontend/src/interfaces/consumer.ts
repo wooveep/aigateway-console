@@ -1,15 +1,31 @@
 export interface Consumer {
   name: string;
   department?: string;
-  credentials: Credential[];
+  credentials?: Credential[];
   portalStatus?: 'active' | 'disabled' | 'pending' | string;
   portalDisplayName?: string;
   portalEmail?: string;
   portalUserSource?: string;
+  portalUserLevel?: 'normal' | 'plus' | 'pro' | 'ultra' | string;
   portalTempPassword?: string;
   portalPassword?: string;
   version?: number;
   key?: string;
+}
+
+export interface ResetPasswordResponse {
+  consumerName: string;
+  tempPassword: string;
+  updatedAt: string;
+}
+
+export interface InviteCodeRecord {
+  inviteCode: string;
+  status: 'active' | 'disabled' | 'used' | string;
+  expiresAt?: string;
+  usedByConsumer?: string;
+  usedAt?: string;
+  createdAt?: string;
 }
 
 export interface Credential {

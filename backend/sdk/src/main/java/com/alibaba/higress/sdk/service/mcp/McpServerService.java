@@ -15,7 +15,6 @@ package com.alibaba.higress.sdk.service.mcp;
 import com.alibaba.higress.sdk.model.PaginatedResult;
 import com.alibaba.higress.sdk.model.mcp.McpServer;
 import com.alibaba.higress.sdk.model.mcp.McpServerConsumerDetail;
-import com.alibaba.higress.sdk.model.mcp.McpServerConsumers;
 import com.alibaba.higress.sdk.model.mcp.McpServerConsumersPageQuery;
 import com.alibaba.higress.sdk.model.mcp.McpServerPageQuery;
 
@@ -62,20 +61,6 @@ public interface McpServerService {
      * @param name mcp server name
      */
     void delete(String name);
-
-    /**
-     * add allow consumers
-     *
-     * @param consumers mcp server consumers
-     */
-    void addAllowConsumers(McpServerConsumers consumers);
-
-    /**
-     * delete allow consumers
-     *
-     * @param consumers mcp server consumers
-     */
-    void deleteAllowConsumers(McpServerConsumers consumers);
 
     /**
      * list allow consumers

@@ -12,6 +12,11 @@ import { Button, Checkbox, Empty, Form, Input, InputNumber, Select, Space, Switc
 import { uniqueId } from "lodash";
 import React, { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import {
+  expandConsumersByAllowedLevels,
+  normalizeUserLevels,
+  USER_LEVELS,
+} from '@/utils/consumer-level';
 import { aiModelProviders } from '../../configs';
 import { HistoryButton, ModelMappingEditor, RedoOutlinedBtn } from './Components';
 import { modelMapping2String, string2ModelMapping } from './util';
@@ -111,7 +116,7 @@ const AiRouteForm: React.FC = forwardRef((props: { value: any }, ref) => {
       urlParamPredicates,
       upstreams,
       authConfig_enabled: _authConfig_enabled,
-      authConfig_allowedConsumers: value?.authConfig?.allowedConsumers || [],
+      authConfig_allowedConsumerLevels: normalizeUserLevels(value?.authConfig?.allowedConsumerLevels),
       ...fallbackInitValues,
     };
 
@@ -164,11 +169,13 @@ const AiRouteForm: React.FC = forwardRef((props: { value: any }, ref) => {
         headerPredicates,
         urlParamPredicates,
         fallbackConfig_upstreams = '',
-        authConfig_allowedConsumers = [],
+        authConfig_allowedConsumerLevels = [],
         fallbackConfig_modelNames = '',
         fallbackConfig_responseCodes = [],
         modelPredicates = [],
       } = values;
+      const normalizedLevels = normalizeUserLevels(authConfig_allowedConsumerLevels);
+      const expandedConsumers = expandConsumersByAllowedLevels(normalizedLevels, consumerList);
 
       const payload = {
         name,
@@ -199,8 +206,8 @@ const AiRouteForm: React.FC = forwardRef((props: { value: any }, ref) => {
         payload['fallbackConfig']['strategy'] = "SEQ";
         payload['fallbackConfig']['responseCodes'] = fallbackConfig_responseCodes;
       }
-      payload['authConfig']['allowedConsumers'] = authConfig_allowedConsumers && !Array.isArray(authConfig_allowedConsumers)
-        ? [authConfig_allowedConsumers] : authConfig_allowedConsumers;
+      payload['authConfig']['allowedConsumerLevels'] = normalizedLevels;
+      payload['authConfig']['allowedConsumers'] = expandedConsumers;
       return payload;
     },
   }));
@@ -572,22 +579,22 @@ const AiRouteForm: React.FC = forwardRef((props: { value: any }, ref) => {
         </Select>
       </Form.Item>
       <Form.Item
-        label={t('aiRoute.routeForm.label.authConfigList')}
+        label={t('aiRoute.routeForm.label.authConfigLevelList')}
         extra={(<HistoryButton text={t('consumer.create')} path={"/consumer"} />)}
       >
         <div style={{ display: 'flex', alignItems: 'center' }}>
           <Form.Item
-            name="authConfig_allowedConsumers"
+            name="authConfig_allowedConsumerLevels"
             noStyle
           >
             <Select
               allowClear
               mode="multiple"
-              placeholder={t('aiRoute.routeForm.label.authConfigList')}
+              placeholder={t('aiRoute.routeForm.label.authConfigLevelList')}
               style={{ flex: 1 }}
             >
-              {consumerList.map((item) => (
-                <Select.Option key={String(item.name)} value={item.name}>{item.name}</Select.Option>
+              {USER_LEVELS.map((level) => (
+                <Select.Option key={level} value={level}>{t(`consumer.userLevel.${level}`)}</Select.Option>
               ))}
             </Select>
           </Form.Item>

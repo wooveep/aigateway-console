@@ -1,22 +1,15 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle, useRef } from 'react';
-import { Table, Button, Space, message, Input, Form, Row, Col } from 'antd';
-import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
+import { Table, message, Input, Form, Row, Col } from 'antd';
 import { useTranslation } from 'react-i18next';
-import { listMcpConsumers, removeMcpConsumers } from '@/services/mcp';
-import HighSearch from '@/components/HighSearch';
+import { listMcpConsumers } from '@/services/mcp';
 import { useSearchParams } from 'ice';
-import DeleteConfirm from './DeleteConfirm';
-import AddConsumerAuth from './AddConsumerAuth';
 
-const ConsumerTable = forwardRef<any, { children?: React.ReactNode; authEnabled?: boolean }>(({ children, authEnabled = false }, ref) => {
+const ConsumerTable = forwardRef<any>((_, ref) => {
   const { t } = useTranslation();
   const [consumers, setConsumers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchParams] = useSearchParams();
   const name = searchParams.get('name');
-  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
-  const [currentRecord, setCurrentRecord] = useState<any>(null);
-  const [addConsumerAuthVisible, setAddConsumerAuthVisible] = useState(false);
 
   const [form] = Form.useForm();
   const debounceRef = useRef<any | null>(null);
@@ -40,42 +33,11 @@ const ConsumerTable = forwardRef<any, { children?: React.ReactNode; authEnabled?
     fetchConsumers('');
   }, []);
 
-  const handleDelete = async (id: string) => {
-    try {
-      await removeMcpConsumers({
-        mcpServerName: name,
-        consumers: [id],
-      });
-      message.success(t('mcp.detail.deleteSuccess'));
-      fetchConsumers();
-    } catch (error) {
-      message.error(t('mcp.detail.deleteError'));
-    }
-  };
-
-  const handleDeleteClick = (record: any) => {
-    setCurrentRecord(record);
-    setDeleteModalVisible(true);
-  };
-
   const columns = [
     {
       title: t('mcp.detail.consumerName'),
       dataIndex: 'consumerName',
       key: 'consumerName',
-    },
-    {
-      title: t('misc.action'),
-      key: 'action',
-      render: (_: any, record: any) => (
-        <div key={`action-${record.consumerName}`} style={{ textAlign: 'left' }}>
-          <a
-            onClick={() => handleDeleteClick(record)}
-          >
-            {t('mcp.detail.delete')}
-          </a>
-        </div>
-      ),
     },
   ];
 
@@ -99,9 +61,6 @@ const ConsumerTable = forwardRef<any, { children?: React.ReactNode; authEnabled?
         form={form}
       >
         <Row gutter={24}>
-          <Col span={3}>
-            {children}
-          </Col>
           <Col span={12}>
             <Form.Item name="consumerName" label={t('mcp.detail.consumerName')}>
               <Input
@@ -120,23 +79,6 @@ const ConsumerTable = forwardRef<any, { children?: React.ReactNode; authEnabled?
         rowKey="key"
         pagination={false}
         locale={{ emptyText: t('mcp.detail.noData') }}
-      />
-      <DeleteConfirm
-        open={deleteModalVisible}
-        onOk={() => {
-          handleDelete(currentRecord?.consumerName);
-          setDeleteModalVisible(false);
-        }}
-        onCancel={() => setDeleteModalVisible(false)}
-        recordName={currentRecord?.consumerName}
-        i18nKey="mcp.detail.deleteConsumerConfirm"
-      />
-      <AddConsumerAuth
-        visible={addConsumerAuthVisible}
-        onClose={() => setAddConsumerAuthVisible(false)}
-        onSuccess={fetchConsumers}
-        mcpName={name}
-        strategyConfigId=""
       />
     </div>
   );

@@ -7,6 +7,8 @@ import com.alibaba.higress.console.model.aiquota.AiQuotaMenuState;
 import com.alibaba.higress.console.model.aiquota.AiQuotaRouteSummary;
 import com.alibaba.higress.console.model.aiquota.AiQuotaScheduleRule;
 import com.alibaba.higress.console.model.aiquota.AiQuotaScheduleRuleRequest;
+import com.alibaba.higress.console.model.aiquota.AiQuotaUserPolicy;
+import com.alibaba.higress.console.model.aiquota.AiQuotaUserPolicyRequest;
 
 public interface AiQuotaService {
 
@@ -16,9 +18,13 @@ public interface AiQuotaService {
 
     List<AiQuotaConsumerQuota> listConsumerQuotas(String routeName);
 
-    AiQuotaConsumerQuota refreshQuota(String routeName, String consumerName, int quota);
+    AiQuotaConsumerQuota refreshQuota(String routeName, String consumerName, long quota);
 
-    AiQuotaConsumerQuota deltaQuota(String routeName, String consumerName, int delta);
+    AiQuotaConsumerQuota deltaQuota(String routeName, String consumerName, long delta);
+
+    AiQuotaUserPolicy getUserPolicy(String routeName, String consumerName);
+
+    AiQuotaUserPolicy saveUserPolicy(String routeName, String consumerName, AiQuotaUserPolicyRequest request);
 
     List<AiQuotaScheduleRule> listScheduleRules(String routeName, String consumerName);
 

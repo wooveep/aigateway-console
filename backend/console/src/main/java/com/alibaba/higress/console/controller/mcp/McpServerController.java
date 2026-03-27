@@ -33,9 +33,9 @@ import org.springframework.web.bind.annotation.RestController;
 import com.alibaba.higress.console.controller.dto.PaginatedResponse;
 import com.alibaba.higress.console.controller.dto.Response;
 import com.alibaba.higress.console.controller.util.ControllerUtil;
+import com.alibaba.higress.console.service.portal.PortalConsumerLevelAuthService;
 import com.alibaba.higress.sdk.model.mcp.McpServer;
 import com.alibaba.higress.sdk.model.mcp.McpServerConsumerDetail;
-import com.alibaba.higress.sdk.model.mcp.McpServerConsumers;
 import com.alibaba.higress.sdk.model.mcp.McpServerConsumersPageQuery;
 import com.alibaba.higress.sdk.model.mcp.McpServerPageQuery;
 import com.alibaba.higress.sdk.model.mcp.SwaggerContent;
@@ -62,6 +62,9 @@ public class McpServerController {
     @Resource
     private McpServerHelper mcpServerHelper;
 
+    @Resource
+    private PortalConsumerLevelAuthService portalConsumerLevelAuthService;
+
     @PostMapping("/swaggerToMcpConfig")
     @Operation(summary = "swagger to mcp config")
     @ApiResponses(value = {@ApiResponse(responseCode = "200", description = "swagger convert successfully"),
@@ -75,6 +78,7 @@ public class McpServerController {
     @ApiResponses(value = {@ApiResponse(responseCode = "200", description = "Instances saved successfully"),
         @ApiResponse(responseCode = "500", description = "Internal server error")})
     public ResponseEntity<Response<McpServer>> addOrUpdateMcpInstance(@RequestBody McpServer instance) {
+        portalConsumerLevelAuthService.resolveMcpConsumerAuth(instance);
         instance = mcpServerService.addOrUpdateWithAuthorization(instance);
         return ControllerUtil.buildResponseEntity(instance);
     }
@@ -101,26 +105,6 @@ public class McpServerController {
         @ApiResponse(responseCode = "500", description = "Internal server error")})
     public ResponseEntity<Void> delete(@PathVariable("name") @NotBlank String name) {
         mcpServerService.delete(name);
-        return ResponseEntity.noContent().build();
-    }
-
-    @PutMapping("/consumers")
-    @Operation(summary = "Add mcp server allow consumers")
-    @ApiResponses(
-        value = {@ApiResponse(responseCode = "204", description = "Add mcp server allow consumers successfully"),
-            @ApiResponse(responseCode = "500", description = "Internal server error")})
-    public ResponseEntity<Void> addAllowConsumers(@RequestBody McpServerConsumers consumers) {
-        mcpServerService.addAllowConsumers(consumers);
-        return ResponseEntity.noContent().build();
-    }
-
-    @DeleteMapping("/consumers")
-    @Operation(summary = "Delete mcp server allow consumers")
-    @ApiResponses(
-        value = {@ApiResponse(responseCode = "204", description = "Delete mcp server allow consumers successfully"),
-            @ApiResponse(responseCode = "500", description = "Internal server error")})
-    public ResponseEntity<Void> deleteAllowConsumers(@RequestBody McpServerConsumers consumers) {
-        mcpServerService.deleteAllowConsumers(consumers);
         return ResponseEntity.noContent().build();
     }
 

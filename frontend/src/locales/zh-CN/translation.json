@@ -66,8 +66,9 @@
     "routeForm": {
       "label": {
         "authConfig": "是否启用请求认证",
-        "authConfigExtra": "启用后，只有包含指定用户认证信息的请求可以请求本路由。",
+        "authConfigExtra": "启用后，只有包含指定用户等级认证信息的请求可以请求本路由。",
         "authConfigList": "允许请求本路由的用户名称列表",
+        "authConfigLevelList": "允许请求本路由的用户等级",
         "domain": "域名",
         "targetModel": "目标模型",
         "fallbackConfig": "降级配置",
@@ -124,14 +125,24 @@
     "search": "用户搜索",
     "searchPlaceholder": "请输入用户名称",
     "empty": "当前没有启用 AI Quota 的 AI 路由",
+    "mode": {
+      "amountTitle": "金额余额管理",
+      "amountDescription": "当前路由已启用金额模式。页面展示的是用户钱包余额，表单输入单位为 RMB，提交后会换算为 micro_yuan 并同步到 Portal 钱包和 Redis 运行态缓存。",
+      "tokenTitle": "Token 配额管理",
+      "tokenDescription": "当前路由仍处于 token 模式。页面展示的是 Redis 中的运行时 token 配额。"
+    },
     "columns": {
       "consumer": "用户",
       "quota": "当前配额",
+      "balance": "当前余额",
       "actions": "操作"
     },
     "actions": {
       "refresh": "刷新配额",
       "delta": "增减配额",
+      "refreshBalance": "设置余额",
+      "deltaBalance": "调整余额",
+      "policy": "用户策略",
       "schedule": "定时规则"
     },
     "summary": {
@@ -139,27 +150,41 @@
       "path": "路径",
       "domains": "域名",
       "redisKeyPrefix": "Redis Key前缀",
+      "balanceKeyPrefix": "余额Key前缀",
       "adminConsumer": "管理用户",
-      "adminPath": "管理路径"
+      "adminPath": "管理路径",
+      "quotaUnit": "配额单位",
+      "scheduleRuleCount": "定时规则数"
     },
     "modals": {
       "refreshTitle": "刷新用户配额",
       "deltaTitle": "增减用户配额",
       "refreshValue": "目标配额",
-      "deltaValue": "变更值"
+      "deltaValue": "变更值",
+      "refreshBalanceTitle": "设置用户余额",
+      "deltaBalanceTitle": "调整用户余额",
+      "refreshBalanceValue": "目标余额",
+      "deltaBalanceValue": "调整金额"
+    },
+    "form": {
+      "amountValueHelp": "页面按 RMB 输入，提交时会自动转换为 micro_yuan。"
     },
     "schedule": {
       "title": "定时配额规则",
+      "balanceTitle": "定时余额规则",
       "actions": {
         "refresh": "定时刷新",
-        "delta": "定时增减"
+        "delta": "定时增减",
+        "refreshBalance": "定时设置余额",
+        "deltaBalance": "定时调整余额"
       },
       "form": {
         "action": "规则类型",
         "cron": "Cron表达式",
         "cronHelp": "使用 Spring Cron 格式，例如每天零点执行可填写 0 0 0 * * *",
         "value": "执行值",
-        "enabled": "是否启用"
+        "enabled": "是否启用",
+        "amountValueHelp": "金额模式下按 RMB 输入，执行时会换算为 micro_yuan 写入钱包。"
       },
       "columns": {
         "action": "规则类型",
@@ -170,18 +195,50 @@
         "lastError": "最近错误"
       }
     },
+    "policy": {
+      "title": "用户金额限额策略",
+      "description": "这里配置的是 User 级金额限额策略，适用于当前用户在所有 API Key 上的总额、5小时、日、周、月窗口控制。金额按 RMB 输入，保存时会转换为 micro_yuan。",
+      "actions": {
+        "setResetNow": "将软重置起点设为当前时间",
+        "clearResetAt": "清空软重置起点"
+      },
+      "form": {
+        "dailyResetMode": "日限额模式",
+        "fixedResetMode": "固定日界线（一期）",
+        "limitTotal": "总额上限",
+        "limit5h": "5小时上限",
+        "limitDaily": "日上限",
+        "dailyResetTime": "日重置时间",
+        "dailyResetTimeHelp": "一期仅支持固定日界线，格式为 HH:mm。",
+        "limitWeekly": "周上限",
+        "limitMonthly": "月上限",
+        "costResetAt": "软重置起点",
+        "costResetAtHelp": "留空表示不变。可填写 RFC3339 时间，或使用 yyyy-MM-ddTHH:mm，例如 2026-03-27T10:30。",
+        "amountHelp": "页面按 RMB 输入，保存时会自动转换为 micro_yuan。"
+      }
+    },
     "validation": {
       "refreshValueRequired": "请输入目标配额",
       "deltaValueRequired": "请输入变更值",
       "scheduleActionRequired": "请选择规则类型",
       "scheduleCronRequired": "请输入 Cron 表达式",
-      "scheduleValueRequired": "请输入执行值"
+      "scheduleValueRequired": "请输入执行值",
+      "policyLimitRequired": "请输入限额值",
+      "policyDailyResetTimeRequired": "请输入日重置时间",
+      "policyDailyResetTimeInvalid": "日重置时间格式必须为 HH:mm"
     },
     "messages": {
       "refreshSuccess": "配额刷新成功",
       "deltaSuccess": "配额变更成功",
+      "refreshBalanceSuccess": "余额设置成功",
+      "deltaBalanceSuccess": "余额调整成功",
+      "policySaved": "用户策略保存成功",
       "scheduleSaved": "定时规则保存成功",
       "scheduleDeleted": "定时规则删除成功"
+    },
+    "units": {
+      "token": "Token",
+      "amount": "RMB"
     }
   },
   "consumer": {
@@ -190,7 +247,9 @@
       "department": "部门",
       "name": "用户名称",
       "type": "类型",
-      "authMethods": "认证方式"
+      "authMethods": "认证方式",
+      "portalStatus": "Portal状态",
+      "userLevel": "用户等级"
     },
     "type": {
       "department": "部门",
@@ -214,10 +273,19 @@
       "name": "用户名称",
       "namePlaceholder": "请输入用户名称",
       "nameRequired": "请输入用户名称",
+      "portalUserLevel": "Portal 用户等级",
+      "portalUserLevelRequired": "请选择 Portal 用户等级",
+      "portalUserLevelPlaceholder": "请选择 Portal 用户等级",
       "tokenSourceRequired": "请选择令牌来源",
       "authTokenRequired": "请输入认证令牌",
       "headerNameRequired": "请输入Header名称",
       "paramNameRequired": "请输入参数名称"
+    },
+    "userLevel": {
+      "normal": "Normal",
+      "plus": "Plus",
+      "pro": "Pro",
+      "ultra": "Ultra"
     },
     "selectBEARER": "Authorization: Bearer ${value}",
     "selectHEADER": "自定义 HTTP Header",
@@ -227,7 +295,49 @@
     "randomGeneration": "随机生成",
     "headerName": "Header 名称",
     "paramName": "参数名称",
+    "systemBuiltin": "系统内置",
     "deleteSuccess": "删除成功",
+    "enable": "启用",
+    "disable": "禁用",
+    "enableSuccess": "用户已启用",
+    "disableSuccess": "用户已禁用",
+    "statusUpdateFailed": "状态更新失败",
+    "portalStatus": {
+      "pending": "待激活"
+    },
+    "resetPassword": "重置密码",
+    "resetPasswordTitle": "临时密码",
+    "resetPasswordHint": "用户 {{name}} 的临时密码如下（请妥善保存）：",
+    "resetPasswordSuccess": "密码已重置",
+    "resetPasswordFailed": "密码重置失败",
+    "noActiveKeys": "无可用 API Key",
+    "keyCount": "Key {{count}} 个",
+    "inviteCode": {
+      "manage": "邀请码管理",
+      "create": "生成邀请码",
+      "createSuccess": "邀请码生成成功",
+      "createFailed": "邀请码生成失败",
+      "enable": "启用",
+      "enableSuccess": "邀请码已启用",
+      "enableFailed": "邀请码启用失败",
+      "disable": "禁用",
+      "disableSuccess": "邀请码已禁用",
+      "disableFailed": "邀请码禁用失败",
+      "codeGeneratedTitle": "邀请码已生成",
+      "codeGeneratedHint": "邀请码如下（可多次使用）：",
+      "statusFilterPlaceholder": "按状态筛选",
+      "status": {
+        "used": "已使用"
+      },
+      "columns": {
+        "code": "邀请码",
+        "status": "状态",
+        "expiresAt": "过期时间",
+        "usedBy": "最近使用人",
+        "usedAt": "最近使用时间",
+        "createdAt": "创建时间"
+      }
+    },
     "search": "查询",
     "key": "密钥"
   },
@@ -420,8 +530,33 @@
       "zhipuai": "智谱AI"
     },
     "providerForm": {
+      "sections": {
+        "portalModelMeta": "模型元数据（Portal 展示）",
+        "modelPricing": "模型定价"
+      },
+      "actions": {
+        "addTag": "添加标签",
+        "addModality": "添加模态",
+        "addFeature": "添加功能特性"
+      },
+      "help": {
+        "pricingCurrency": "一期计费统一使用人民币，Portal 会按 RMB 金额和 token 单价扣费。",
+        "inputPer1K": "填写该模型每 1K 输入 tokens 的 RMB 单价，保存后会同步到 Portal 账务表。",
+        "outputPer1K": "填写该模型每 1K 输出 tokens 的 RMB 单价，保存后会同步到 Portal 账务表。"
+      },
+      "fixedCurrencyValue": "CNY（RMB）",
       "label": {
         "type": "大模型供应商",
+        "pricingCurrency": "计费币种",
+        "inputPer1K": "输入价格（每 1K tokens，RMB）",
+        "outputPer1K": "输出价格（每 1K tokens，RMB）",
+        "modelIntro": "模型介绍",
+        "modelTags": "模型标签",
+        "modelModalities": "模型能力 - 模态",
+        "modelFeatures": "模型能力 - 功能特性",
+        "modelRpm": "RPM 限制",
+        "modelTpm": "TPM 限制",
+        "modelContextWindow": "上下文窗口",
         "failoverEnabled": "令牌降级",
         "failoverEnabledExtra": "启用后，若某一认证令牌返回异常响应的数量超出网值，Aigateway 将暂停使用该令牌发起请求，直至后续健康检测请求连续收到一定数量的正常响应。",
         "failureThreshold": "令牌不可用时需满足的最小连续请求失败次数",
@@ -463,6 +598,8 @@
       "rules": {
         "tokenRequired": "请输入凭证",
         "typeRequired": "请选择大模型供应商",
+        "inputPer1KRequired": "请输入输入价格（每 1K tokens 的 RMB 单价）",
+        "outputPer1KRequired": "请输入输出价格（每 1K tokens 的 RMB 单价）",
         "serviceNameRequired": "请输入服务名称",
         "serviceNameNoSlash": "服务名称不能包含斜杠（/）",
         "failureThresholdRequired": "请输入最小连续请求失败次数",
@@ -505,6 +642,10 @@
         "claudeCodeModeTooltip": "启用 Claude Code 模式以使用 OAuth 令牌认证（而非 API Key）。运行 'claude setup-token' 获取 OAuth 令牌。"
       },
       "placeholder": {
+        "modelIntro": "介绍该模型的定位、适用场景等",
+        "modelTag": "例如：中文优化",
+        "modelModality": "例如：text",
+        "modelFeature": "例如：function-calling",
         "azureServiceUrlPlaceholder": "需包含“/chat/completions”路径和“api-version”查询参数",
         "ollamaServerHostPlaceholder": "请填写机器名、域名或 IP 地址",
         "openaiCustomUrlPlaceholder": "示例：https://api.openai.com/v1",
@@ -641,8 +782,8 @@
         "edit": "编辑插件"
       },
       "name": "插件名称",
-      "namePattern": "包含大小写字母，数字以及特殊字符（- .），且不能以特殊字符开头和结尾",
-      "namePlaceholder": "包含大小写字母，数字以及特殊字符（- .），且不能以特殊字符开头和结尾",
+      "namePattern": "仅支持小写字母、数字、- 和 .，且必须以字母或数字开头和结尾",
+      "namePlaceholder": "仅支持小写字母、数字、- 和 .，且必须以字母或数字开头和结尾",
       "description": "插件描述",
       "descriptionPlaceholder": "请输入插件描述",
       "imageUrl": "镜像地址",
@@ -1007,7 +1148,7 @@
       "reset": "重置"
     },
     "form": {
-      "namePattern": "包含大小写字母，数字以及特殊字符（- .），且不能以特殊字符开头和结尾",
+      "namePattern": "仅支持小写字母、数字、- 和 .，且必须以字母或数字开头和结尾",
       "create": "创建MCP服务",
       "edit": "编辑MCP服务",
       "name": "服务名称",
@@ -1051,6 +1192,9 @@
       "allowedConsumers": "允许访问的用户",
       "allowedConsumersRequired": "请选择允许访问的用户",
       "allowedConsumersPlaceholder": "请选择允许访问的用户",
+      "allowedConsumerLevels": "允许访问的用户等级",
+      "allowedConsumerLevelsRequired": "请选择允许访问的用户等级",
+      "allowedConsumerLevelsPlaceholder": "请选择允许访问的用户等级",
       "ok": "确定",
       "upstreamPathPrefixLabel": "后端服务前缀匹配路径",
       "serviceName": "服务名称",

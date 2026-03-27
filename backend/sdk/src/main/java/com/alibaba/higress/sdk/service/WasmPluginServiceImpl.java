@@ -182,19 +182,34 @@ class WasmPluginServiceImpl implements WasmPluginService {
         this.builtInPlugins = plugins;
     }
 
-    private static String formatImageUrl(String pattern, PluginInfo pluginInfo) {
+    private static String formatImageUrl(String pattern, PluginInfo pluginInfo, String version) {
         if (StringUtils.isEmpty(pattern)) {
             return pattern;
         }
         return pattern.replace(NAME_PLACEHOLDER, pluginInfo.getName())
-            .replace(VERSION_PLACEHOLDER, pluginInfo.getVersion());
+            .replace(VERSION_PLACEHOLDER, version);
+    }
+
+    private static String resolveCustomImageUrlVersion(String defaultUrl, PluginInfo pluginInfo) {
+        if (pluginInfo == null) {
+            return StringUtils.EMPTY;
+        }
+        String version = pluginInfo.getVersion();
+        if (StringUtils.isBlank(defaultUrl)) {
+            return version;
+        }
+        ImageUrl imageUrl = ImageUrl.parse(defaultUrl);
+        if (StringUtils.isNotBlank(imageUrl.getTag())) {
+            return imageUrl.getTag();
+        }
+        return version;
     }
 
     private static String buildPluginImageUrl(String defaultUrl, String customPattern, String registry,
         String namespace, PluginInfo pluginInfo) {
         // Priority: customPattern > registry/namespace > defaultUrl
         if (StringUtils.isNotBlank(customPattern)) {
-            return formatImageUrl(customPattern, pluginInfo);
+            return formatImageUrl(customPattern, pluginInfo, resolveCustomImageUrlVersion(defaultUrl, pluginInfo));
         }
 
         if (StringUtils.isBlank(registry) && StringUtils.isBlank(namespace)) {

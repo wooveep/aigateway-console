@@ -1,19 +1,24 @@
 /* eslint-disable */
 // @ts-nocheck
-import { Consumer, CredentialType } from '@/interfaces/consumer';
+import { Consumer, CredentialType, InviteCodeRecord } from '@/interfaces/consumer';
 import {
   addConsumer,
   addConsumerDepartment,
+  createInviteCode,
+  disableInviteCode,
+  enableInviteCode,
   deleteConsumer,
   getConsumerDepartments,
   getConsumers,
+  listInviteCodes,
+  resetConsumerPassword,
   updateConsumer,
   updateConsumerStatus,
 } from '@/services/consumer';
 import { ApartmentOutlined, ExclamationCircleOutlined, RedoOutlined, UserOutlined } from '@ant-design/icons';
 import { PageContainer } from '@ant-design/pro-layout';
 import { useRequest } from 'ahooks';
-import { Button, Drawer, Form, Input, message, Modal, Space, Table, Tag, Typography } from 'antd';
+import { Button, Drawer, Form, Input, message, Modal, Select, Space, Table, Tag, Typography } from 'antd';
 import React, { useEffect, useRef, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import ConsumerForm from './components/ConsumerForm';
@@ -36,8 +41,122 @@ interface OrganizationRow {
   children?: OrganizationRow[];
 }
 
+const BUILTIN_ADMIN_CONSUMER = 'administrator';
+const USER_LEVEL_ORDER: Record<string, number> = {
+  normal: 1,
+  plus: 2,
+  pro: 3,
+  ultra: 4,
+};
+
 const ConsumerList: React.FC = () => {
   const { t } = useTranslation();
+  const [inviteCodes, setInviteCodes] = useState<InviteCodeRecord[]>([]);
+  const [inviteCodeLoading, setInviteCodeLoading] = useState(false);
+  const [openInviteCodeModal, setOpenInviteCodeModal] = useState(false);
+  const [inviteStatusFilter, setInviteStatusFilter] = useState<string | undefined>(undefined);
+
+  const parseDateValue = (value: any): Date | null => {
+    if (!value) {
+      return null;
+    }
+    if (value instanceof Date) {
+      return Number.isNaN(value.getTime()) ? null : value;
+    }
+    if (Array.isArray(value)) {
+      const [year, month, day, hour = 0, minute = 0, second = 0, nano = 0] = value;
+      if ([year, month, day].every((item) => typeof item === 'number')) {
+        const date = new Date(year, month - 1, day, hour, minute, second, Math.floor((nano || 0) / 1_000_000));
+        return Number.isNaN(date.getTime()) ? null : date;
+      }
+      return null;
+    }
+    if (typeof value === 'object') {
+      const year = value.year;
+      const month = value.monthValue ?? value.month;
+      const day = value.dayOfMonth ?? value.day;
+      if ([year, month, day].every((item) => typeof item === 'number')) {
+        const hour = value.hour || 0;
+        const minute = value.minute || 0;
+        const second = value.second || 0;
+        const nano = value.nano || 0;
+        const date = new Date(year, month - 1, day, hour, minute, second, Math.floor(nano / 1_000_000));
+        return Number.isNaN(date.getTime()) ? null : date;
+      }
+    }
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  };
+
+  const formatDateTime = (value?: any) => {
+    if (!value) {
+      return '-';
+    }
+    const date = parseDateValue(value);
+    if (!date) {
+      return '-';
+    }
+    return date.toLocaleString();
+  };
+
+  const renderInviteStatus = (status?: string) => {
+    const normalizedStatus = (status || '').toLowerCase();
+    if (normalizedStatus === 'active') {
+      return <Tag color="success">{t('misc.enabled')}</Tag>;
+    }
+    if (normalizedStatus === 'disabled') {
+      return <Tag color="error">{t('misc.disabled')}</Tag>;
+    }
+    if (normalizedStatus === 'used') {
+      return <Tag color="processing">{t('consumer.inviteCode.status.used')}</Tag>;
+    }
+    return <Tag>{status || '-'}</Tag>;
+  };
+
+  const renderUserLevel = (level?: string) => {
+    const normalized = (level || 'normal').toLowerCase();
+    if (normalized === 'ultra') {
+      return <Tag color="gold">{t('consumer.userLevel.ultra')}</Tag>;
+    }
+    if (normalized === 'pro') {
+      return <Tag color="purple">{t('consumer.userLevel.pro')}</Tag>;
+    }
+    if (normalized === 'plus') {
+      return <Tag color="blue">{t('consumer.userLevel.plus')}</Tag>;
+    }
+    return <Tag>{t('consumer.userLevel.normal')}</Tag>;
+  };
+
+  const extractMaskedKeys = (credentials?: any[]): string[] => {
+    if (!Array.isArray(credentials)) {
+      return [];
+    }
+    const result: string[] = [];
+    credentials.forEach((credential) => {
+      if (credential?.type !== 'key-auth' || !Array.isArray(credential?.values)) {
+        return;
+      }
+      credential.values.forEach((value: string) => {
+        if (typeof value === 'string' && value.trim()) {
+          result.push(value.trim());
+        }
+      });
+    });
+    return result;
+  };
+
+  const isBuiltinAdministrator = (consumer?: Consumer | null): boolean => {
+    if (!consumer?.name) {
+      return false;
+    }
+    const normalizedName = consumer.name.trim().toLowerCase();
+    const normalizedSource = (consumer.portalUserSource || '').trim().toLowerCase();
+    if (normalizedName !== BUILTIN_ADMIN_CONSUMER) {
+      return false;
+    }
+    return normalizedSource === 'system' || normalizedSource === '';
+  };
+
   const columns = [
     {
       title: t('consumer.columns.organization'),
@@ -57,6 +176,7 @@ const ConsumerList: React.FC = () => {
           <Space>
             <UserOutlined />
             <span>{record.name}</span>
+            {isBuiltinAdministrator(record.consumer) ? <Tag color="gold">{t('consumer.systemBuiltin')}</Tag> : null}
           </Space>
         );
       },
@@ -81,34 +201,23 @@ const ConsumerList: React.FC = () => {
         if (record.rowType === 'department') {
           return <Text type="secondary">{t('consumer.departmentSummary', { count: record.memberCount || 0 })}</Text>;
         }
-        if (!Array.isArray(value) || !value.length) {
-          return '-';
+        const maskedKeys = extractMaskedKeys(value);
+        if (!maskedKeys.length) {
+          return <Text type="secondary">{t('consumer.noActiveKeys')}</Text>;
         }
-        const supportedCredentialTypes = [];
-        value.forEach(function (credential) {
-          if (credential.type && supportedCredentialTypes.indexOf(credential.type) === -1) {
-            supportedCredentialTypes.push(credential.type);
-          }
-        });
-        if (supportedCredentialTypes.length === 0) {
-          return '-';
-        }
-        supportedCredentialTypes.sort();
+        const summaryText = `${maskedKeys.slice(0, 2).join(', ')}${maskedKeys.length > 2 ? ` +${maskedKeys.length - 2}` : ''}`;
         return (
-          <>
-            {
-              supportedCredentialTypes.map(function (type) {
-                const credentialType = Object.values(CredentialType).find(t => t.enabled && t.key === type)
-                  || { key: type, displayName: type, displayColor: 'black' };
-                return (<Tag color={credentialType.displayColor} key={credentialType.key}>{credentialType.displayName}</Tag>);
-              })
-            }
-          </>
+          <Space size={8}>
+            <Tag color={CredentialType.KEY_AUTH.displayColor}>
+              {t('consumer.keyCount', { count: maskedKeys.length })}
+            </Tag>
+            <Text type="secondary">{summaryText}</Text>
+          </Space>
         );
       },
     },
     {
-      title: 'Portal状态',
+      title: t('consumer.columns.portalStatus'),
       dataIndex: 'portalStatus',
       key: 'portalStatus',
       width: 120,
@@ -116,21 +225,38 @@ const ConsumerList: React.FC = () => {
         if (record.rowType === 'department') {
           return '-';
         }
-        const status = record.consumer?.portalStatus || 'pending';
+        const status = (record.consumer?.portalStatus || 'pending').toLowerCase();
         if (status === 'active') {
-          return <Tag color="success">启用</Tag>;
+          return <Tag color="success">{t('misc.enabled')}</Tag>;
         }
         if (status === 'disabled') {
-          return <Tag color="error">禁用</Tag>;
+          return <Tag color="error">{t('misc.disabled')}</Tag>;
         }
-        return <Tag color="default">待激活</Tag>;
+        return <Tag color="default">{t('consumer.portalStatus.pending')}</Tag>;
+      },
+    },
+    {
+      title: t('consumer.columns.userLevel'),
+      dataIndex: 'portalUserLevel',
+      key: 'portalUserLevel',
+      width: 130,
+      render: (_, record: OrganizationRow) => {
+        if (record.rowType === 'department') {
+          return '-';
+        }
+        return renderUserLevel(record.consumer?.portalUserLevel);
+      },
+      sorter: (a: OrganizationRow, b: OrganizationRow) => {
+        const left = USER_LEVEL_ORDER[(a.consumer?.portalUserLevel || 'normal').toLowerCase()] || 1;
+        const right = USER_LEVEL_ORDER[(b.consumer?.portalUserLevel || 'normal').toLowerCase()] || 1;
+        return left - right;
       },
     },
     {
       title: t('misc.actions'),
       dataIndex: 'action',
       key: 'action',
-      width: 140,
+      width: 220,
       align: 'center',
       render: (_, record: OrganizationRow) => {
         if (record.rowType === 'department') {
@@ -142,13 +268,27 @@ const ConsumerList: React.FC = () => {
         }
         return (
           <Space size="small">
+            {
+              isBuiltinAdministrator(record.consumer)
+                ? <Tag color="gold">{t('consumer.systemBuiltin')}</Tag>
+                : null
+            }
+            {
+              isBuiltinAdministrator(record.consumer)
+                ? null
+                : (
+                  <>
             <a onClick={() => onEditDrawer(record.consumer)}>{t('misc.edit')}</a>
             {
-              record.consumer?.portalStatus === 'active'
-                ? <a onClick={() => onToggleConsumerStatus(record.consumer, 'disabled')}>禁用</a>
-                : <a onClick={() => onToggleConsumerStatus(record.consumer, 'active')}>启用</a>
+              (record.consumer?.portalStatus || '').toLowerCase() === 'active'
+                ? <a onClick={() => onToggleConsumerStatus(record.consumer, 'disabled')}>{t('consumer.disable')}</a>
+                : <a onClick={() => onToggleConsumerStatus(record.consumer, 'active')}>{t('consumer.enable')}</a>
             }
+            <a onClick={() => onResetConsumerPassword(record.consumer)}>{t('consumer.resetPassword')}</a>
             <a onClick={() => onShowModal(record.consumer)}>{t('misc.delete')}</a>
+                  </>
+                )
+            }
           </Space>
         );
       },
@@ -257,11 +397,92 @@ const ConsumerList: React.FC = () => {
     }
     try {
       await updateConsumerStatus(consumer.name, status);
-      message.success(status === 'active' ? '用户已启用' : '用户已禁用');
+      message.success(status === 'active' ? t('consumer.enableSuccess') : t('consumer.disableSuccess'));
       refresh();
       loadDepartments();
     } catch (error) {
-      message.error('状态更新失败');
+      message.error(t('consumer.statusUpdateFailed'));
+    }
+  };
+
+  const onResetConsumerPassword = async (consumer: Consumer) => {
+    if (!consumer?.name) {
+      return;
+    }
+    try {
+      const result = await resetConsumerPassword(consumer.name);
+      message.success(t('consumer.resetPasswordSuccess'));
+      Modal.info({
+        title: t('consumer.resetPasswordTitle'),
+        content: (
+          <Space direction="vertical" size={8}>
+            <span>{t('consumer.resetPasswordHint', { name: consumer.name })}</span>
+            <Text copyable>{result?.tempPassword || '-'}</Text>
+          </Space>
+        ),
+      });
+    } catch (error) {
+      message.error(t('consumer.resetPasswordFailed'));
+    }
+  };
+
+  const loadInviteCodeList = async (status?: string) => {
+    try {
+      setInviteCodeLoading(true);
+      const list = await listInviteCodes({ pageNum: 1, pageSize: 200, status });
+      setInviteCodes(list || []);
+    } finally {
+      setInviteCodeLoading(false);
+    }
+  };
+
+  const onOpenInviteCodeManager = () => {
+    setOpenInviteCodeModal(true);
+    loadInviteCodeList(inviteStatusFilter);
+  };
+
+  const onCreateInviteCode = async () => {
+    try {
+      const created = await createInviteCode(7);
+      message.success(t('consumer.inviteCode.createSuccess'));
+      Modal.info({
+        title: t('consumer.inviteCode.codeGeneratedTitle'),
+        content: (
+          <Space direction="vertical" size={8}>
+            <span>{t('consumer.inviteCode.codeGeneratedHint')}</span>
+            <Text copyable>{created?.inviteCode || '-'}</Text>
+          </Space>
+        ),
+      });
+      await loadInviteCodeList(inviteStatusFilter);
+    } catch (error) {
+      message.error(t('consumer.inviteCode.createFailed'));
+    }
+  };
+
+  const onDisableInviteCode = async (code?: string) => {
+    if (!code) {
+      return;
+    }
+    try {
+      await disableInviteCode(code);
+      message.success(t('consumer.inviteCode.disableSuccess'));
+      await loadInviteCodeList(inviteStatusFilter);
+    } catch (error) {
+      message.error(t('consumer.inviteCode.disableFailed'));
+    }
+  };
+
+  const onEnableInviteCode = async (code?: string) => {
+    if (!code) {
+      return;
+    }
+    try {
+      await enableInviteCode(code);
+      message.success(t('consumer.inviteCode.enableSuccess'));
+      await loadInviteCodeList(inviteStatusFilter);
+    } catch (error) {
+      message.error(t('consumer.inviteCode.enableFailed'));
     }
   };
 
@@ -345,8 +566,8 @@ const ConsumerList: React.FC = () => {
             if (normalizedKeyword && !item.name.toLowerCase().includes(normalizedKeyword)) {
               return false;
             }
-            if (normalizedKeySearch
-              && !item.credentials?.some(c => JSON.stringify(c).toLowerCase().includes(normalizedKeySearch))) {
+            const keySearchText = extractMaskedKeys(item.credentials).join(' ').toLowerCase();
+            if (normalizedKeySearch && !keySearchText.includes(normalizedKeySearch)) {
               return false;
             }
             return true;
@@ -423,6 +644,7 @@ const ConsumerList: React.FC = () => {
             </Form.Item>
           </Space>
           <Space>
+            <Button onClick={onOpenInviteCodeManager}>{t('consumer.inviteCode.manage')}</Button>
             <Button
               onClick={() => setOpenDepartmentModal(true)}
             >
@@ -513,6 +735,102 @@ const ConsumerList: React.FC = () => {
             />
           </Form.Item>
         </Form>
+      </Modal>
+      <Modal
+        title={t('consumer.inviteCode.manage')}
+        open={openInviteCodeModal}
+        onCancel={() => setOpenInviteCodeModal(false)}
+        footer={null}
+        width={920}
+      >
+        <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 12 }} wrap>
+          <Space>
+            <Select
+              allowClear
+              style={{ width: 220 }}
+              placeholder={t('consumer.inviteCode.statusFilterPlaceholder') || ''}
+              value={inviteStatusFilter}
+              onChange={(value) => {
+                setInviteStatusFilter(value);
+                loadInviteCodeList(value);
+              }}
+              options={[
+                { value: 'active', label: t('misc.enabled') },
+                { value: 'disabled', label: t('misc.disabled') },
+              ]}
+            />
+            <Button icon={<RedoOutlined />} onClick={() => loadInviteCodeList(inviteStatusFilter)} />
+          </Space>
+          <Button type="primary" onClick={onCreateInviteCode}>
+            {t('consumer.inviteCode.create')}
+          </Button>
+        </Space>
+        <Table
+          rowKey="inviteCode"
+          loading={inviteCodeLoading}
+          dataSource={inviteCodes}
+          pagination={false}
+          locale={{ emptyText: t('mcp.detail.noData') }}
+          columns={[
+            {
+              title: t('consumer.inviteCode.columns.code'),
+              dataIndex: 'inviteCode',
+              key: 'inviteCode',
+              render: (value: string) => <Text copyable>{value}</Text>,
+            },
+            {
+              title: t('consumer.inviteCode.columns.status'),
+              dataIndex: 'status',
+              key: 'status',
+              width: 120,
+              render: (value: string) => renderInviteStatus(value),
+            },
+            {
+              title: t('consumer.inviteCode.columns.expiresAt'),
+              dataIndex: 'expiresAt',
+              key: 'expiresAt',
+              width: 180,
+              render: (value: string) => formatDateTime(value),
+            },
+            {
+              title: t('consumer.inviteCode.columns.usedBy'),
+              dataIndex: 'usedByConsumer',
+              key: 'usedByConsumer',
+              width: 140,
+              render: (value: string) => value || '-',
+            },
+            {
+              title: t('consumer.inviteCode.columns.usedAt'),
+              dataIndex: 'usedAt',
+              key: 'usedAt',
+              width: 180,
+              render: (value: string) => formatDateTime(value),
+            },
+            {
+              title: t('consumer.inviteCode.columns.createdAt'),
+              dataIndex: 'createdAt',
+              key: 'createdAt',
+              width: 180,
+              render: (value: string) => formatDateTime(value),
+            },
+            {
+              title: t('misc.actions'),
+              dataIndex: 'action',
+              key: 'action',
+              width: 100,
+              render: (_, record: InviteCodeRecord) => {
+                const status = (record.status || '').toLowerCase();
+                if (status === 'active') {
+                  return <a onClick={() => onDisableInviteCode(record.inviteCode)}>{t('consumer.inviteCode.disable')}</a>;
+                }
+                if (status === 'disabled') {
+                  return <a onClick={() => onEnableInviteCode(record.inviteCode)}>{t('consumer.inviteCode.enable')}</a>;
+                }
+                return '-';
+              },
+            },
+          ]}
+        />
       </Modal>
     </PageContainer>
   );

@@ -120,9 +120,6 @@ spec:
           ports:
             - name: http
               containerPort: 8080
-              {{- if or .Values.global.local .Values.global.kind }}
-              hostPort: 8080
-              {{- end }}
               protocol: TCP
           readinessProbe:
             httpGet:

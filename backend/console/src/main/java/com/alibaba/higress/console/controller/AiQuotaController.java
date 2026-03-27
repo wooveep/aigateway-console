@@ -23,6 +23,8 @@ import com.alibaba.higress.console.model.aiquota.AiQuotaMenuState;
 import com.alibaba.higress.console.model.aiquota.AiQuotaRouteSummary;
 import com.alibaba.higress.console.model.aiquota.AiQuotaScheduleRule;
 import com.alibaba.higress.console.model.aiquota.AiQuotaScheduleRuleRequest;
+import com.alibaba.higress.console.model.aiquota.AiQuotaUserPolicy;
+import com.alibaba.higress.console.model.aiquota.AiQuotaUserPolicyRequest;
 import com.alibaba.higress.console.model.aiquota.AiQuotaValueRequest;
 import com.alibaba.higress.console.service.AiQuotaService;
 
@@ -91,6 +93,28 @@ public class AiQuotaController {
             throw new IllegalArgumentException("delta value cannot be null.");
         }
         return ResponseEntity.ok(Response.success(aiQuotaService.deltaQuota(routeName, consumerName, request.getValue())));
+    }
+
+    @GetMapping("/routes/{routeName}/consumers/{consumerName}/policy")
+    @Operation(summary = "Get user-level quota policy for a consumer")
+    @ApiResponses(value = {@ApiResponse(responseCode = "200", description = "User quota policy retrieved successfully")})
+    public ResponseEntity<Response<AiQuotaUserPolicy>> getUserPolicy(
+        @PathVariable("routeName") @NotBlank String routeName,
+        @PathVariable("consumerName") @NotBlank String consumerName) {
+        return ResponseEntity.ok(Response.success(aiQuotaService.getUserPolicy(routeName, consumerName)));
+    }
+
+    @PutMapping("/routes/{routeName}/consumers/{consumerName}/policy")
+    @Operation(summary = "Create or update user-level quota policy for a consumer")
+    @ApiResponses(value = {@ApiResponse(responseCode = "200", description = "User quota policy saved successfully")})
+    public ResponseEntity<Response<AiQuotaUserPolicy>> saveUserPolicy(
+        @PathVariable("routeName") @NotBlank String routeName,
+        @PathVariable("consumerName") @NotBlank String consumerName,
+        @RequestBody AiQuotaUserPolicyRequest request) {
+        if (request == null) {
+            throw new IllegalArgumentException("user quota policy request cannot be null.");
+        }
+        return ResponseEntity.ok(Response.success(aiQuotaService.saveUserPolicy(routeName, consumerName, request)));
     }
 
     @GetMapping("/routes/{routeName}/schedules")

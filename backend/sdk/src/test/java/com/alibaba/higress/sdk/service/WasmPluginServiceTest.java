@@ -25,7 +25,9 @@ import static org.mockito.Mockito.when;
 import java.io.InputStream;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Properties;
+import java.util.stream.Collectors;
 import java.util.Set;
 
 import org.apache.commons.collections4.CollectionUtils;
@@ -111,10 +113,11 @@ public class WasmPluginServiceTest {
 
         listPluginsTest();
 
+        Map<String, String> pluginVersionMap = loadPluginVersionMap();
         PaginatedResult<WasmPlugin> plugins = service.list(null);
         for (WasmPlugin plugin : plugins.getData()) {
-            String expectedUrl =
-                "http://foo.bar.com/plugins/" + plugin.getName() + "/" + plugin.getPluginVersion() + ".wasm";
+            String expectedUrl = "http://foo.bar.com/plugins/" + plugin.getName() + "/"
+                + pluginVersionMap.get(plugin.getName()) + ".wasm";
             Assertions.assertEquals(expectedUrl, plugin.getImageRepository());
             Assertions.assertNull(null, plugin.getImageVersion());
         }
@@ -386,5 +389,17 @@ public class WasmPluginServiceTest {
             .category("TEST").icon("http://dummy-icon").phase(PluginPhase.UNSPECIFIED.name()).priority(1000)
             .imageRepository("oci://docker.io/" + name).build();
         return kubernetesModelConverter.wasmPluginToCr(plugin, internal);
+    }
+
+    private Map<String, String> loadPluginVersionMap() throws Exception {
+        Properties properties = new Properties();
+        try (InputStream stream = getClass().getClassLoader().getResourceAsStream("plugins/plugins.properties")) {
+            properties.load(stream);
+        }
+        return properties.stringPropertyNames().stream().collect(Collectors.toMap(name -> name, name -> {
+            String imageUrl = properties.getProperty(name);
+            int colonIndex = imageUrl.lastIndexOf(Separators.COLON);
+            return colonIndex >= 0 ? imageUrl.substring(colonIndex + 1) : DEFAULT_VERSION;
+        }));
     }
 }

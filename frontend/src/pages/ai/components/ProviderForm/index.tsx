@@ -4,7 +4,7 @@ import { Service, serviceToString } from '@/interfaces/service';
 import { getGatewayServices } from '@/services';
 import { getProxyServers } from '@/services/proxy-server';
 import { MinusCircleOutlined, PlusOutlined, QuestionCircleOutlined } from '@ant-design/icons';
-import { AutoComplete, Button, Empty, Form, Input, InputNumber, Modal, Select, Switch, Tooltip, Typography } from 'antd';
+import { AutoComplete, Button, Divider, Empty, Form, Input, InputNumber, Modal, Select, Switch, Tooltip, Typography } from 'antd';
 import { useRequest } from 'ice';
 import React, { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -66,6 +66,13 @@ const ProviderForm: React.FC = forwardRef((props: { value: any }, ref) => {
     form.setFieldsValue({
       tokens: [""],
       proxyName: '',
+      rawConfigs: {
+        portalModelMeta: {
+          pricing: {
+            currency: 'CNY',
+          },
+        },
+      },
     });
     setFailoverEnabled(false);
     setProviderType(null);
@@ -174,8 +181,19 @@ const ProviderForm: React.FC = forwardRef((props: { value: any }, ref) => {
         healthCheckTimeout: healthCheckTimeout || 10000,
         healthCheckModel,
         proxyName: proxyName || '',
-        rawConfigs,
+        rawConfigs: {
+          ...rawConfigs,
+          portalModelMeta: {
+            ...rawConfigs.portalModelMeta,
+            pricing: {
+              ...rawConfigs.portalModelMeta?.pricing,
+              currency: 'CNY',
+            },
+          },
+        },
       });
+    } else {
+      form.setFieldValue(["rawConfigs", "portalModelMeta", "pricing", "currency"], 'CNY');
     }
 
     return () => {
@@ -198,6 +216,7 @@ const ProviderForm: React.FC = forwardRef((props: { value: any }, ref) => {
       if (providerConfig && typeof providerConfig.normalizeRawConfigs === 'function' && values.rawConfigs) {
         providerConfig.normalizeRawConfigs(values.rawConfigs);
       }
+      normalizePortalModelMeta(values.rawConfigs);
 
       const result = {
         type: values.type,
@@ -245,6 +264,97 @@ const ProviderForm: React.FC = forwardRef((props: { value: any }, ref) => {
 
   function getProviderConfigByType(type: string | null) {
     return aiModelProviders.find(p => p.value === type) || null;
+  }
+
+  function normalizePortalModelMeta(rawConfigs: any) {
+    if (!rawConfigs || typeof rawConfigs !== 'object') {
+      return;
+    }
+    const meta = rawConfigs.portalModelMeta;
+    if (!meta || typeof meta !== 'object') {
+      return;
+    }
+
+    const normalizeStringArray = (value: any): string[] => {
+      if (!Array.isArray(value)) {
+        return [];
+      }
+      return value
+        .map((item) => (typeof item === 'string' ? item.trim() : ''))
+        .filter((item) => !!item);
+    };
+    const hasNumber = (value: any): boolean => typeof value === 'number' && Number.isFinite(value);
+
+    if (typeof meta.intro === 'string') {
+      meta.intro = meta.intro.trim();
+    }
+    if (!meta.intro) {
+      delete meta.intro;
+    }
+
+    const tags = normalizeStringArray(meta.tags);
+    if (tags.length > 0) {
+      meta.tags = tags;
+    } else {
+      delete meta.tags;
+    }
+
+    if (!meta.capabilities || typeof meta.capabilities !== 'object') {
+      delete meta.capabilities;
+    } else {
+      const modalities = normalizeStringArray(meta.capabilities.modalities);
+      const features = normalizeStringArray(meta.capabilities.features);
+      if (modalities.length > 0) {
+        meta.capabilities.modalities = modalities;
+      } else {
+        delete meta.capabilities.modalities;
+      }
+      if (features.length > 0) {
+        meta.capabilities.features = features;
+      } else {
+        delete meta.capabilities.features;
+      }
+      if (!meta.capabilities.modalities && !meta.capabilities.features) {
+        delete meta.capabilities;
+      }
+    }
+
+    if (!meta.pricing || typeof meta.pricing !== 'object') {
+      delete meta.pricing;
+    } else {
+      const hasPricing = hasNumber(meta.pricing.inputPer1K) || hasNumber(meta.pricing.outputPer1K);
+      meta.pricing.currency = hasPricing ? 'CNY' : undefined;
+      if (!hasNumber(meta.pricing.inputPer1K)) {
+        delete meta.pricing.inputPer1K;
+      }
+      if (!hasNumber(meta.pricing.outputPer1K)) {
+        delete meta.pricing.outputPer1K;
+      }
+      if (!hasNumber(meta.pricing.inputPer1K) && !hasNumber(meta.pricing.outputPer1K)) {
+        delete meta.pricing;
+      }
+    }
+
+    if (!meta.limits || typeof meta.limits !== 'object') {
+      delete meta.limits;
+    } else {
+      if (!hasNumber(meta.limits.rpm)) {
+        delete meta.limits.rpm;
+      }
+      if (!hasNumber(meta.limits.tpm)) {
+        delete meta.limits.tpm;
+      }
+      if (!hasNumber(meta.limits.contextWindow)) {
+        delete meta.limits.contextWindow;
+      }
+      if (!hasNumber(meta.limits.rpm) && !hasNumber(meta.limits.tpm) && !hasNumber(meta.limits.contextWindow)) {
+        delete meta.limits;
+      }
+    }
+
+    if (!meta.intro && !meta.tags && !meta.capabilities && !meta.pricing && !meta.limits) {
+      delete rawConfigs.portalModelMeta;
+    }
   }
 
   function openSecretRefModal() {
@@ -1098,6 +1208,191 @@ const ProviderForm: React.FC = forwardRef((props: { value: any }, ref) => {
           </>
         )
       }
+
+      <Divider orientation="left">{t('llmProvider.providerForm.sections.portalModelMeta')}</Divider>
+
+      <Divider orientation="left">{t('llmProvider.providerForm.sections.modelPricing')}</Divider>
+      <Form.Item
+        name={["rawConfigs", "portalModelMeta", "pricing", "currency"]}
+        initialValue="CNY"
+        hidden
+      >
+        <Input />
+      </Form.Item>
+      <Form.Item
+        label={t('llmProvider.providerForm.label.pricingCurrency')}
+        extra={t('llmProvider.providerForm.help.pricingCurrency')}
+      >
+        <Input value={t('llmProvider.providerForm.fixedCurrencyValue')} disabled />
+      </Form.Item>
+      <Form.Item
+        label={t('llmProvider.providerForm.label.inputPer1K')}
+        name={["rawConfigs", "portalModelMeta", "pricing", "inputPer1K"]}
+        extra={t('llmProvider.providerForm.help.inputPer1K')}
+        rules={[
+          { required: true, message: t('llmProvider.providerForm.rules.inputPer1KRequired') },
+        ]}
+      >
+        <InputNumber min={0} style={{ width: '100%' }} />
+      </Form.Item>
+      <Form.Item
+        label={t('llmProvider.providerForm.label.outputPer1K')}
+        name={["rawConfigs", "portalModelMeta", "pricing", "outputPer1K"]}
+        extra={t('llmProvider.providerForm.help.outputPer1K')}
+        rules={[
+          { required: true, message: t('llmProvider.providerForm.rules.outputPer1KRequired') },
+        ]}
+      >
+        <InputNumber min={0} style={{ width: '100%' }} />
+      </Form.Item>
+
+      <Form.Item
+        label={t('llmProvider.providerForm.label.modelIntro')}
+        name={["rawConfigs", "portalModelMeta", "intro"]}
+      >
+        <TextArea
+          allowClear
+          rows={3}
+          maxLength={1000}
+          placeholder={t('llmProvider.providerForm.placeholder.modelIntro')}
+        />
+      </Form.Item>
+
+      <Form.List name={["rawConfigs", "portalModelMeta", "tags"]} initialValue={[]}>
+        {(fields, { add, remove }, { errors }) => (
+          <>
+            {!fields.length ? <div style={{ marginBottom: '8px' }}>{t('llmProvider.providerForm.label.modelTags')}</div> : null}
+            {fields.map((field, index) => (
+              <Form.Item
+                label={index === 0 ? t('llmProvider.providerForm.label.modelTags') : ''}
+                required={false}
+                key={field.key}
+                style={{ marginBottom: '0.5rem' }}
+              >
+                <Form.Item {...field} noStyle>
+                  <Input
+                    allowClear
+                    style={{ width: '94%' }}
+                    placeholder={t('llmProvider.providerForm.placeholder.modelTag')}
+                    maxLength={64}
+                  />
+                </Form.Item>
+                <div style={{ display: "inline-block", width: '6%', textAlign: 'right' }}>
+                  <Button
+                    type="dashed"
+                    disabled={!(fields.length > 0)}
+                    onClick={() => remove(field.name)}
+                    icon={<MinusCircleOutlined />}
+                  />
+                </div>
+              </Form.Item>
+            ))}
+            <Form.Item>
+              <Button type="dashed" onClick={() => add()} icon={<PlusOutlined />}>
+                {t('llmProvider.providerForm.actions.addTag')}
+              </Button>
+              <Form.ErrorList errors={errors} />
+            </Form.Item>
+          </>
+        )}
+      </Form.List>
+
+      <Form.List name={["rawConfigs", "portalModelMeta", "capabilities", "modalities"]} initialValue={[]}>
+        {(fields, { add, remove }, { errors }) => (
+          <>
+            {!fields.length ? <div style={{ marginBottom: '8px' }}>{t('llmProvider.providerForm.label.modelModalities')}</div> : null}
+            {fields.map((field, index) => (
+              <Form.Item
+                label={index === 0 ? t('llmProvider.providerForm.label.modelModalities') : ''}
+                required={false}
+                key={field.key}
+                style={{ marginBottom: '0.5rem' }}
+              >
+                <Form.Item {...field} noStyle>
+                  <Input
+                    allowClear
+                    style={{ width: '94%' }}
+                    placeholder={t('llmProvider.providerForm.placeholder.modelModality')}
+                    maxLength={64}
+                  />
+                </Form.Item>
+                <div style={{ display: "inline-block", width: '6%', textAlign: 'right' }}>
+                  <Button
+                    type="dashed"
+                    disabled={!(fields.length > 0)}
+                    onClick={() => remove(field.name)}
+                    icon={<MinusCircleOutlined />}
+                  />
+                </div>
+              </Form.Item>
+            ))}
+            <Form.Item>
+              <Button type="dashed" onClick={() => add()} icon={<PlusOutlined />}>
+                {t('llmProvider.providerForm.actions.addModality')}
+              </Button>
+              <Form.ErrorList errors={errors} />
+            </Form.Item>
+          </>
+        )}
+      </Form.List>
+
+      <Form.List name={["rawConfigs", "portalModelMeta", "capabilities", "features"]} initialValue={[]}>
+        {(fields, { add, remove }, { errors }) => (
+          <>
+            {!fields.length ? <div style={{ marginBottom: '8px' }}>{t('llmProvider.providerForm.label.modelFeatures')}</div> : null}
+            {fields.map((field, index) => (
+              <Form.Item
+                label={index === 0 ? t('llmProvider.providerForm.label.modelFeatures') : ''}
+                required={false}
+                key={field.key}
+                style={{ marginBottom: '0.5rem' }}
+              >
+                <Form.Item {...field} noStyle>
+                  <Input
+                    allowClear
+                    style={{ width: '94%' }}
+                    placeholder={t('llmProvider.providerForm.placeholder.modelFeature')}
+                    maxLength={64}
+                  />
+                </Form.Item>
+                <div style={{ display: "inline-block", width: '6%', textAlign: 'right' }}>
+                  <Button
+                    type="dashed"
+                    disabled={!(fields.length > 0)}
+                    onClick={() => remove(field.name)}
+                    icon={<MinusCircleOutlined />}
+                  />
+                </div>
+              </Form.Item>
+            ))}
+            <Form.Item>
+              <Button type="dashed" onClick={() => add()} icon={<PlusOutlined />}>
+                {t('llmProvider.providerForm.actions.addFeature')}
+              </Button>
+              <Form.ErrorList errors={errors} />
+            </Form.Item>
+          </>
+        )}
+      </Form.List>
+
+      <Form.Item
+        label={t('llmProvider.providerForm.label.modelRpm')}
+        name={["rawConfigs", "portalModelMeta", "limits", "rpm"]}
+      >
+        <InputNumber min={0} precision={0} style={{ width: '100%' }} />
+      </Form.Item>
+      <Form.Item
+        label={t('llmProvider.providerForm.label.modelTpm')}
+        name={["rawConfigs", "portalModelMeta", "limits", "tpm"]}
+      >
+        <InputNumber min={0} precision={0} style={{ width: '100%' }} />
+      </Form.Item>
+      <Form.Item
+        label={t('llmProvider.providerForm.label.modelContextWindow')}
+        name={["rawConfigs", "portalModelMeta", "limits", "contextWindow"]}
+      >
+        <InputNumber min={0} precision={0} style={{ width: '100%' }} />
+      </Form.Item>
 
       {/* 令牌降级 */}
       <Form.Item

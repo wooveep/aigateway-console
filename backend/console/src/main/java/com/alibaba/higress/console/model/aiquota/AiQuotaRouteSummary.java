@@ -33,6 +33,9 @@ public class AiQuotaRouteSummary {
     @Schema(description = "Admin path configured on ai-quota")
     private String adminPath;
 
+    @Schema(description = "Quota unit configured on ai-quota, token or amount")
+    private String quotaUnit;
+
     @Schema(description = "Configured schedule rule count")
     private int scheduleRuleCount;
 }

@@ -6,9 +6,12 @@ description: AI 配额管理插件配置参考
 
 ## 功能说明
 
-`ai-qutoa` 插件实现给特定 consumer 根据分配固定的 quota 进行 quota 策略限流，同时支持 quota 管理能力，包括查询 quota 、刷新 quota、增减 quota。
+`ai-quota` 插件支持两种工作模式：
 
-`ai-quota` 插件需要配合 认证插件比如 `key-auth`、`jwt-auth` 等插件获取认证身份的 consumer 名称，同时需要配合 `ai-statistics` 插件获取 AI Token 统计信息。
+- `token`：兼容旧模式，直接对 Redis 中的 token 配额做准入和扣减。
+- `amount`：金额模式。请求开始时校验用户余额和模型价格，请求结束后按真实 token 用量计算金额扣减，并把消费事件写入 Redis Stream。
+
+`ai-quota` 插件需要配合认证插件比如 `key-auth`、`jwt-auth` 等插件获取认证身份的 consumer 名称。在金额模式下不再依赖 `ai-statistics` 作为主账务来源。
 
 ## 运行属性
 
@@ -19,7 +22,12 @@ description: AI 配额管理插件配置参考
 
 | 名称                 | 数据类型            | 填写要求                                 | 默认值 | 描述                                         |
 |--------------------|-----------------|--------------------------------------| ---- |--------------------------------------------|
-| `redis_key_prefix` | string          |  选填                                     |   chat_quota:   | qutoa redis key 前缀                         |
+| `quota_unit`      | string          | 选填                                   | amount | 配额模式，支持 `token` 或 `amount` |
+| `redis_key_prefix` | string          |  选填                                     |   chat_quota:   | token 模式下的 quota redis key 前缀                         |
+| `balance_key_prefix` | string       | 选填                                   | billing:balance: | amount 模式下的余额 redis key 前缀 |
+| `price_key_prefix` | string         | 选填                                   | billing:model-price: | amount 模式下的模型价格 redis key 前缀 |
+| `usage_event_stream` | string       | 选填                                   | billing:usage:stream | amount 模式下消费事件 Redis Stream 名称 |
+| `usage_event_dedup_prefix` | string | 选填                                   | billing:usage:event: | amount 模式下消费事件去重 key 前缀 |
 | `admin_consumer`   | string          | 必填                                   |      | 管理 quota 管理身份的 consumer 名称                 |
 | `admin_path`       | string          | 选填                                   |   /quota   | 管理 quota 请求 path 前缀                        |
 | `redis`            | object          | 是                                    |      | redis相关配置                                  |
@@ -38,9 +46,13 @@ description: AI 配额管理插件配置参考
 
 ## 配置示例
 
-### 识别请求参数 apikey，进行区别限流
+### 金额模式
 ```yaml
-redis_key_prefix: "chat_quota:"
+quota_unit: amount
+balance_key_prefix: "billing:balance:"
+price_key_prefix: "billing:model-price:"
+usage_event_stream: "billing:usage:stream"
+usage_event_dedup_prefix: "billing:usage:event:"
 admin_consumer: consumer3
 admin_path: /quota
 redis:
@@ -50,20 +62,21 @@ redis:
 ```
 
 
-###  刷新 quota
+###  刷新 quota / balance
 
 如果当前请求 url 的后缀符合 admin_path，例如插件在 example.com/v1/chat/completions 这个路由上生效，那么更新 quota 可以通过
 curl https://example.com/v1/chat/completions/quota/refresh -H "Authorization: Bearer credential3" -d "consumer=consumer1&quota=10000" 
 
-Redis 中 key 为 chat_quota:consumer1 的值就会被刷新为 10000
+在 `token` 模式下，Redis 中 key 为 `chat_quota:consumer1` 的值会被刷新为 `10000`。
+
+在 `amount` 模式下，管理接口会直接写 `balance_key_prefix + consumer`，通常由控制面或后端投影器统一维护。
 
 ### 查询 quota
 
 查询特定用户的 quota 可以通过 curl https://example.com/v1/chat/completions/quota?consumer=consumer1 -H "Authorization: Bearer credential3"
 将返回： {"quota": 10000, "consumer": "consumer1"}
 
-### 增减 quota 
+### 增减 quota / balance
 
 增减特定用户的 quota 可以通过 curl https://example.com/v1/chat/completions/quota/delta -d "consumer=consumer1&value=100" -H "Authorization: Bearer credential3"
 这样 Redis 中 Key 为 chat_quota:consumer1 的值就会增加100，可以支持负数，则减去对应值。
-

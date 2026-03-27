@@ -2,6 +2,7 @@
 set -eu
 
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+ROOT_DIR="$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd)"
 IMAGE_NAME="${IMAGE_NAME:-aigateway-console:ai-quota-menu}"
 RELEASE_NAME="${RELEASE_NAME:-aigateway}"
 NAMESPACE="${NAMESPACE:-aigateway-system}"
@@ -10,7 +11,15 @@ IMAGE_PULL_POLICY="${IMAGE_PULL_POLICY:-IfNotPresent}"
 LOAD_IMAGE="${LOAD_IMAGE:-true}"
 LOAD_TOOL="${LOAD_TOOL:-auto}"
 HELM_TIMEOUT="${HELM_TIMEOUT:-10m}"
-HIGRESS_CHART_DIR="${HIGRESS_CHART_DIR:-$SCRIPT_DIR/../../higress/helm/higress}"
+# Keep a single chart source of truth in higress/helm/higress.
+DEFAULT_HIGRESS_CHART_DIR="$ROOT_DIR/higress/helm/higress"
+if [ ! -d "$DEFAULT_HIGRESS_CHART_DIR" ]; then
+    DEFAULT_HIGRESS_CHART_DIR="$ROOT_DIR/helm/higress"
+fi
+HIGRESS_CHART_DIR="${HIGRESS_CHART_DIR:-$DEFAULT_HIGRESS_CHART_DIR}"
+if [ -d "$HIGRESS_CHART_DIR" ]; then
+    HIGRESS_CHART_DIR="$(CDPATH= cd -- "$HIGRESS_CHART_DIR" && pwd -P)"
+fi
 
 load_image() {
     if [ "$LOAD_IMAGE" != "true" ]; then
@@ -97,8 +106,8 @@ helm upgrade "$RELEASE_NAME" "$HIGRESS_CHART_DIR" \
     --namespace "$NAMESPACE" \
     --reuse-values \
     --timeout "$HELM_TIMEOUT" \
-    --set-string higress-console.image.repository="$IMAGE_REPOSITORY" \
-    --set-string higress-console.image.tag="$IMAGE_TAG" \
-    --set-string higress-console.image.pullPolicy="$IMAGE_PULL_POLICY"
+    --set-string aigateway-console.image.repository="$IMAGE_REPOSITORY" \
+    --set-string aigateway-console.image.tag="$IMAGE_TAG" \
+    --set-string aigateway-console.image.pullPolicy="$IMAGE_PULL_POLICY"
 
 kubectl -n "$NAMESPACE" rollout status "deployment/$CONSOLE_DEPLOYMENT_NAME" --timeout=180s

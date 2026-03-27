@@ -4,6 +4,8 @@ import {
   AiQuotaRouteSummary,
   AiQuotaScheduleRule,
   AiQuotaScheduleRuleRequest,
+  AiQuotaUserPolicy,
+  AiQuotaUserPolicyRequest,
 } from '@/interfaces/ai-quota';
 import request from './request';
 
@@ -40,6 +42,26 @@ export const deltaAiQuota = (
   return request.post<any, AiQuotaConsumerQuota>(
     `${BASE_URL}/routes/${routeName}/consumers/${consumerName}/delta`,
     { value },
+  );
+};
+
+export const getAiQuotaUserPolicy = (
+  routeName: string,
+  consumerName: string,
+): Promise<AiQuotaUserPolicy> => {
+  return request.get<any, AiQuotaUserPolicy>(
+    `${BASE_URL}/routes/${routeName}/consumers/${consumerName}/policy`,
+  );
+};
+
+export const saveAiQuotaUserPolicy = (
+  routeName: string,
+  consumerName: string,
+  payload: AiQuotaUserPolicyRequest,
+): Promise<AiQuotaUserPolicy> => {
+  return request.put<any, AiQuotaUserPolicy>(
+    `${BASE_URL}/routes/${routeName}/consumers/${consumerName}/policy`,
+    payload,
   );
 };
 

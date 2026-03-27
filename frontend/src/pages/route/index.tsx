@@ -13,6 +13,7 @@ import { getI18nValue } from "@/pages/plugin/utils";
 import { addGatewayRoute, deleteGatewayRoute, getGatewayRoutes, getWasmPlugins, updateGatewayRoute } from '@/services';
 import store from '@/store';
 import switches from '@/switches';
+import { normalizeUserLevels } from '@/utils/consumer-level';
 import { isInternalResource } from '@/utils';
 import { ExclamationCircleOutlined, RedoOutlined, SearchOutlined } from '@ant-design/icons';
 import { PageContainer } from '@ant-design/pro-layout';
@@ -100,21 +101,22 @@ const RouteList: React.FC = () => {
     },
     {
       title: t('aiRoute.columns.auth'),
-      dataIndex: ['authConfig', 'allowedConsumers'],
-      key: 'authConfig.allowedConsumers',
+      dataIndex: ['authConfig', 'allowedConsumerLevels'],
+      key: 'authConfig.allowedConsumerLevels',
       render: (value, record) => {
         const { authConfig } = record;
         if (!authConfig || !authConfig.enabled) {
           return t('aiRoute.authNotEnabled')
         }
-        if (!Array.isArray(value) || !value.length) {
+        const levels = normalizeUserLevels(value);
+        if (!levels.length) {
           return t('aiRoute.authEnabledWithoutConsumer')
         }
-        return value.map((consumer: string, index: number) => {
+        return levels.map((level: string, index: number) => {
           return (
-            <span key={consumer}>
+            <span key={level}>
               {index !== 0 && (<br />)}
-              {consumer}
+              {t(`consumer.userLevel.${level}`)}
             </span>
           );
         });
@@ -156,14 +158,14 @@ const RouteList: React.FC = () => {
   const [domainSelectedNames, setDomainSelectedNames] = useState<string[]>([]);
   const [selectedPathMatchTypes, setSelectedPathMatchTypes] = useState<string[]>([]);
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
-  const [selectedAllowedConsumers, setSelectedAllowedConsumers] = useState<string[]>([]);
+  const [selectedAllowedConsumerLevels, setSelectedAllowedConsumerLevels] = useState<string[]>([]);
 
   // 使用useRef保持最新状态以便在事件处理器外访问
   const selectedNamesRef = useRef(selectedNames);
   const domainSelectNamesRef = useRef(domainSelectedNames);
   const selectedPathMatchTypesRef = useRef(selectedPathMatchTypes);
   const selectedServicesRef = useRef(selectedServices);
-  const selectedAllowedConsumersRef = useRef(selectedAllowedConsumers);
+  const selectedAllowedConsumerLevelsRef = useRef(selectedAllowedConsumerLevels);
 
 
   const getRouteList = async (factor): Promise<RouteResponse> => getGatewayRoutes(factor);
@@ -382,26 +384,26 @@ const RouteList: React.FC = () => {
     }
 
     // 应用请求授权筛选
-    if (selectedAllowedConsumersRef.current.length > 0) {
+    if (selectedAllowedConsumerLevelsRef.current.length > 0) {
       results = results.filter(item => {
         // 处理“未开启认证”的情况
-        if (selectedAllowedConsumersRef.current.includes("__auth_disabled__")) {
+        if (selectedAllowedConsumerLevelsRef.current.includes("__auth_disabled__")) {
           if (!item.authConfig || !item.authConfig.enabled) {
             return true;
           }
         }
 
         // 处理“未授权任何人访问”的情况
-        if (selectedAllowedConsumersRef.current.includes("__no_consumers__")) {
-          if (item.authConfig?.enabled && (!item.authConfig.allowedConsumers || item.authConfig.allowedConsumers.length === 0)) {
+        if (selectedAllowedConsumerLevelsRef.current.includes("__no_consumers__")) {
+          if (item.authConfig?.enabled && normalizeUserLevels(item.authConfig.allowedConsumerLevels).length === 0) {
             return true;
           }
         }
 
-        // 处理普通消费者的匹配
+        // 处理用户等级的匹配
+        const levels = normalizeUserLevels(item.authConfig?.allowedConsumerLevels);
         return item.authConfig?.enabled &&
-          item.authConfig.allowedConsumers?.some(consumer =>
-            selectedAllowedConsumersRef.current.includes(consumer));
+          levels.some(level => selectedAllowedConsumerLevelsRef.current.includes(level));
       });
     }
 
@@ -449,7 +451,7 @@ const RouteList: React.FC = () => {
                 }}
                 style={{ width: "100%" }}
               >
-                xx{[...new Set(originalDataSource.map(item => item.name))].map(name => (<Option key={name} value={name}>{name}</Option>))}
+                {[...new Set(originalDataSource.map(item => item.name))].map(name => (<Option key={name} value={name}>{name}</Option>))}
               </Select>
             </Form.Item>
           </Col>
@@ -533,25 +535,27 @@ const RouteList: React.FC = () => {
                 mode="multiple"
                 allowClear
                 placeholder={t('route.search.auth') || ''}
-                value={selectedAllowedConsumers}
+                value={selectedAllowedConsumerLevels}
                 onChange={(values) => {
-                  setSelectedAllowedConsumers(values as string[]);
-                  selectedAllowedConsumersRef.current = values;
+                  setSelectedAllowedConsumerLevels(values as string[]);
+                  selectedAllowedConsumerLevelsRef.current = values;
                   applyFilters();
                 }}
                 style={{ width: "100%" }}
               >
                 {/* 手动添加特殊选项 */}
                 <Option key="__no_consumers__" value="__no_consumers__">
-                  {t('aiRoute.authNotEnabled')}
-                </Option>
-                <Option key="__auth_disabled__" value="__auth_disabled__">
                   {t('aiRoute.authEnabledWithoutConsumer')}
                 </Option>
+                <Option key="__auth_disabled__" value="__auth_disabled__">
+                  {t('aiRoute.authNotEnabled')}
+                </Option>
 
-                {/* 提取所有的唯一allowedConsumers值 */}
-                {[...new Set(originalDataSource.flatMap(item =>
-                  item.authConfig?.allowedConsumers || []))].map(consumer => (<Option key={consumer} value={consumer}>{consumer}</Option>
+                {/* 提取所有的唯一用户等级值 */}
+                {[...new Set(
+                  originalDataSource.flatMap((item) => normalizeUserLevels(item.authConfig?.allowedConsumerLevels || [])),
+                )].map((level) => (
+                  <Option key={level} value={level}>{t(`consumer.userLevel.${level}`)}</Option>
                 ))}
               </Select>
             </Form.Item>

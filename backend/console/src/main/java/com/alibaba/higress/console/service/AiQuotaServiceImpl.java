@@ -31,6 +31,13 @@ import com.alibaba.higress.console.model.aiquota.AiQuotaMenuState;
 import com.alibaba.higress.console.model.aiquota.AiQuotaRouteSummary;
 import com.alibaba.higress.console.model.aiquota.AiQuotaScheduleRule;
 import com.alibaba.higress.console.model.aiquota.AiQuotaScheduleRuleRequest;
+import com.alibaba.higress.console.model.aiquota.AiQuotaUserPolicy;
+import com.alibaba.higress.console.model.aiquota.AiQuotaUserPolicyRequest;
+import com.alibaba.higress.console.service.portal.PortalBillingQuotaJdbcService;
+import com.alibaba.higress.console.service.portal.PortalConsumerService;
+import com.alibaba.higress.console.service.portal.PortalUserQuotaPolicyJdbcService;
+import com.alibaba.higress.console.service.portal.PortalUserQuotaPolicyJdbcService.AiQuotaUserPolicyRequestData;
+import com.alibaba.higress.console.service.portal.PortalUserJdbcService;
 import com.alibaba.higress.sdk.constant.CommonKey;
 import com.alibaba.higress.sdk.constant.HigressConstants;
 import com.alibaba.higress.sdk.constant.KubernetesConstants;
@@ -43,7 +50,6 @@ import com.alibaba.higress.sdk.model.ai.AiRoute;
 import com.alibaba.higress.sdk.model.consumer.Consumer;
 import com.alibaba.higress.sdk.service.WasmPluginInstanceService;
 import com.alibaba.higress.sdk.service.ai.AiRouteService;
-import com.alibaba.higress.sdk.service.consumer.ConsumerService;
 import com.alibaba.higress.sdk.service.kubernetes.KubernetesClientService;
 import com.alibaba.higress.sdk.service.kubernetes.KubernetesUtil;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -71,7 +77,13 @@ public class AiQuotaServiceImpl implements AiQuotaService {
     private static final int DEFAULT_TIMEOUT_MILLIS = 1000;
     private static final String DEFAULT_ADMIN_PATH = "/quota";
     private static final String DEFAULT_REDIS_KEY_PREFIX = "chat_quota:";
+    private static final String DEFAULT_BALANCE_KEY_PREFIX = "billing:balance:";
+    private static final String DEFAULT_USER_POLICY_KEY_PREFIX = "billing:quota-policy:user:";
+    private static final String DEFAULT_USER_USAGE_KEY_PREFIX = "billing:quota-usage:user:";
+    private static final String QUOTA_UNIT_TOKEN = "token";
+    private static final String QUOTA_UNIT_AMOUNT = "amount";
     private static final int SCHEDULE_NAME_ROUTE_PART_MAX_LENGTH = 48;
+    private static final int POLICY_CACHE_TTL_SECONDS = 600;
 
     private static final TypeReference<List<AiQuotaScheduleRule>> RULE_LIST_TYPE =
         new TypeReference<List<AiQuotaScheduleRule>>() {
@@ -79,7 +91,9 @@ public class AiQuotaServiceImpl implements AiQuotaService {
 
     private AiRouteService aiRouteService;
     private WasmPluginInstanceService wasmPluginInstanceService;
-    private ConsumerService consumerService;
+    private PortalConsumerService portalConsumerService;
+    private PortalBillingQuotaJdbcService portalBillingQuotaJdbcService;
+    private PortalUserQuotaPolicyJdbcService portalUserQuotaPolicyJdbcService;
     private KubernetesClientService kubernetesClientService;
     private ObjectMapper objectMapper;
 
@@ -94,8 +108,18 @@ public class AiQuotaServiceImpl implements AiQuotaService {
     }
 
     @Resource
-    public void setConsumerService(ConsumerService consumerService) {
-        this.consumerService = consumerService;
+    public void setPortalConsumerService(PortalConsumerService portalConsumerService) {
+        this.portalConsumerService = portalConsumerService;
+    }
+
+    @Resource
+    public void setPortalBillingQuotaJdbcService(PortalBillingQuotaJdbcService portalBillingQuotaJdbcService) {
+        this.portalBillingQuotaJdbcService = portalBillingQuotaJdbcService;
+    }
+
+    @Resource
+    public void setPortalUserQuotaPolicyJdbcService(PortalUserQuotaPolicyJdbcService portalUserQuotaPolicyJdbcService) {
+        this.portalUserQuotaPolicyJdbcService = portalUserQuotaPolicyJdbcService;
     }
 
     @Resource
@@ -123,9 +147,10 @@ public class AiQuotaServiceImpl implements AiQuotaService {
                 .domains(ctx.getAiRoute().getDomains())
                 .path(ctx.getAiRoute().getPathPredicate() != null ? ctx.getAiRoute().getPathPredicate().getMatchValue()
                     : null)
-                .redisKeyPrefix(ctx.getQuotaRouteConfig().getRedisKeyPrefix())
+                .redisKeyPrefix(ctx.getQuotaRouteConfig().getDisplayRedisKeyPrefix())
                 .adminConsumer(ctx.getQuotaRouteConfig().getAdminConsumer())
                 .adminPath(ctx.getQuotaRouteConfig().getAdminPath())
+                .quotaUnit(ctx.getQuotaRouteConfig().getQuotaUnit())
                 .scheduleRuleCount(scheduleCountMap.getOrDefault(ctx.getAiRoute().getName(), 0))
                 .build())
             .sorted(Comparator.comparing(AiQuotaRouteSummary::getRouteName))
@@ -139,6 +164,19 @@ public class AiQuotaServiceImpl implements AiQuotaService {
         if (CollectionUtils.isEmpty(consumers)) {
             return Collections.emptyList();
         }
+        if (QUOTA_UNIT_AMOUNT.equals(routeContext.getQuotaRouteConfig().getQuotaUnit())
+            && portalBillingQuotaJdbcService != null && portalBillingQuotaJdbcService.enabled()) {
+            Map<String, Long> balanceMap = portalBillingQuotaJdbcService.listConsumerBalances(consumers.stream()
+                .map(Consumer::getName)
+                .collect(Collectors.toList()));
+            return consumers.stream()
+                .sorted(Comparator.comparing(Consumer::getName))
+                .map(consumer -> AiQuotaConsumerQuota.builder()
+                    .consumerName(consumer.getName())
+                    .quota(balanceMap.getOrDefault(consumer.getName(), 0L))
+                    .build())
+                .collect(Collectors.toList());
+        }
         return withRedis(routeContext.getQuotaRouteConfig().getRedisConfig(), jedis -> consumers.stream()
             .sorted(Comparator.comparing(Consumer::getName))
             .map(consumer -> AiQuotaConsumerQuota.builder()
@@ -149,32 +187,77 @@ public class AiQuotaServiceImpl implements AiQuotaService {
     }
 
     @Override
-    public AiQuotaConsumerQuota refreshQuota(String routeName, String consumerName, int quota) {
+    public AiQuotaConsumerQuota refreshQuota(String routeName, String consumerName, long quota) {
         validateConsumerExists(consumerName);
         AiQuotaRouteContext routeContext = requireRouteContext(routeName);
+        if (QUOTA_UNIT_AMOUNT.equals(routeContext.getQuotaRouteConfig().getQuotaUnit())
+            && portalBillingQuotaJdbcService != null && portalBillingQuotaJdbcService.enabled()) {
+            long balance = portalBillingQuotaJdbcService.refreshConsumerBalance(consumerName, quota, routeName);
+            syncAmountBalanceToRedis(consumerName, balance);
+            return AiQuotaConsumerQuota.builder().consumerName(consumerName).quota(balance).build();
+        }
         withRedis(routeContext.getQuotaRouteConfig().getRedisConfig(), jedis -> {
-            jedis.set(buildQuotaKey(routeContext.getQuotaRouteConfig(), consumerName), Integer.toString(quota));
+            jedis.set(buildQuotaKey(routeContext.getQuotaRouteConfig(), consumerName), Long.toString(quota));
             return null;
         });
         return AiQuotaConsumerQuota.builder().consumerName(consumerName).quota(quota).build();
     }
 
     @Override
-    public AiQuotaConsumerQuota deltaQuota(String routeName, String consumerName, int delta) {
+    public AiQuotaConsumerQuota deltaQuota(String routeName, String consumerName, long delta) {
         validateConsumerExists(consumerName);
         AiQuotaRouteContext routeContext = requireRouteContext(routeName);
-        int quota = withRedis(routeContext.getQuotaRouteConfig().getRedisConfig(), jedis -> {
-            long result = jedis.incrBy(buildQuotaKey(routeContext.getQuotaRouteConfig(), consumerName), delta);
-            return Math.toIntExact(result);
+        if (QUOTA_UNIT_AMOUNT.equals(routeContext.getQuotaRouteConfig().getQuotaUnit())
+            && portalBillingQuotaJdbcService != null && portalBillingQuotaJdbcService.enabled()) {
+            long balance = portalBillingQuotaJdbcService.deltaConsumerBalance(consumerName, delta, routeName);
+            syncAmountBalanceToRedis(consumerName, balance);
+            return AiQuotaConsumerQuota.builder().consumerName(consumerName).quota(balance).build();
+        }
+        long quota = withRedis(routeContext.getQuotaRouteConfig().getRedisConfig(), jedis -> {
+            return jedis.incrBy(buildQuotaKey(routeContext.getQuotaRouteConfig(), consumerName), delta);
         });
         return AiQuotaConsumerQuota.builder().consumerName(consumerName).quota(quota).build();
     }
 
     @Override
+    public AiQuotaUserPolicy getUserPolicy(String routeName, String consumerName) {
+        validateConsumerExists(consumerName);
+        requireAmountQuotaRoute(routeName);
+        if (portalUserQuotaPolicyJdbcService == null || !portalUserQuotaPolicyJdbcService.enabled()) {
+            throw new IllegalStateException("Portal database is unavailable.");
+        }
+        return portalUserQuotaPolicyJdbcService.getUserPolicy(consumerName);
+    }
+
+    @Override
+    public AiQuotaUserPolicy saveUserPolicy(String routeName, String consumerName, AiQuotaUserPolicyRequest request) {
+        validateConsumerExists(consumerName);
+        requireAmountQuotaRoute(routeName);
+        if (portalUserQuotaPolicyJdbcService == null || !portalUserQuotaPolicyJdbcService.enabled()) {
+            throw new IllegalStateException("Portal database is unavailable.");
+        }
+        AiQuotaUserPolicy before = portalUserQuotaPolicyJdbcService.getUserPolicy(consumerName);
+        AiQuotaUserPolicy saved = portalUserQuotaPolicyJdbcService.saveUserPolicy(consumerName,
+            new AiQuotaUserPolicyRequestData(request.getLimitTotal(), request.getLimit5h(), request.getLimitDaily(),
+                request.getDailyResetMode(), request.getDailyResetTime(), request.getLimitWeekly(),
+                request.getLimitMonthly(), request.getCostResetAt()));
+        syncUserPolicyToRedis(saved);
+        if (StringUtils.isNotBlank(saved.getCostResetAt())
+            && !StringUtils.equals(saved.getCostResetAt(), before.getCostResetAt())) {
+            clearUserQuotaUsageFromRedis(consumerName);
+        }
+        return saved;
+    }
+
+    @Override
     public List<AiQuotaScheduleRule> listScheduleRules(String routeName, String consumerName) {
         requireRouteContext(routeName);
+        if (isBuiltinAdministrator(consumerName)) {
+            throw new IllegalArgumentException("administrator quota cannot be managed.");
+        }
         ScheduleStore store = readScheduleStore(routeName);
         return store.getRules().stream()
+            .filter(rule -> !isBuiltinAdministrator(rule.getConsumerName()))
             .filter(rule -> StringUtils.isBlank(consumerName) || StringUtils.equals(consumerName, rule.getConsumerName()))
             .sorted(Comparator.comparing(AiQuotaScheduleRule::getConsumerName)
                 .thenComparing(AiQuotaScheduleRule::getCreatedAt, Comparator.nullsLast(Long::compareTo)))
@@ -332,6 +415,12 @@ public class AiQuotaServiceImpl implements AiQuotaService {
         }
         String redisKeyPrefix = ObjectUtils.defaultIfNull(MapUtils.getString(configurations, "redis_key_prefix"),
             DEFAULT_REDIS_KEY_PREFIX);
+        String balanceKeyPrefix = MapUtils.getString(configurations, "balance_key_prefix");
+        String quotaUnit = normalizeQuotaUnit(MapUtils.getString(configurations, "quota_unit"), balanceKeyPrefix,
+            MapUtils.getString(configurations, "price_key_prefix"), MapUtils.getString(configurations, "usage_event_stream"));
+        if (StringUtils.isBlank(balanceKeyPrefix) && QUOTA_UNIT_AMOUNT.equals(quotaUnit)) {
+            balanceKeyPrefix = DEFAULT_BALANCE_KEY_PREFIX;
+        }
         String adminConsumer = MapUtils.getString(configurations, "admin_consumer");
         String adminPath = ObjectUtils.defaultIfNull(MapUtils.getString(configurations, "admin_path"), DEFAULT_ADMIN_PATH);
         if (StringUtils.isBlank(adminConsumer)) {
@@ -349,15 +438,15 @@ public class AiQuotaServiceImpl implements AiQuotaService {
         if (StringUtils.isBlank(serviceName)) {
             throw new IllegalArgumentException("ai-quota redis.service_name cannot be empty.");
         }
-        Integer servicePort = toInteger(redisMap.get("service_port"));
+        Integer servicePort = ObjectUtils.defaultIfNull(toLong(redisMap.get("service_port")), 0L).intValue();
         if (servicePort == null || servicePort <= 0) {
             servicePort = serviceName.endsWith(".static") ? DEFAULT_STATIC_SERVICE_REDIS_PORT : DEFAULT_REDIS_PORT;
         }
-        Integer timeout = toInteger(redisMap.get("timeout"));
+        Integer timeout = ObjectUtils.defaultIfNull(toLong(redisMap.get("timeout")), 0L).intValue();
         if (timeout == null || timeout <= 0) {
             timeout = DEFAULT_TIMEOUT_MILLIS;
         }
-        Integer database = ObjectUtils.defaultIfNull(toInteger(redisMap.get("database")), 0);
+        Integer database = ObjectUtils.defaultIfNull(toLong(redisMap.get("database")), 0L).intValue();
 
         RedisConnectionConfig redisConfig = new RedisConnectionConfig();
         redisConfig.setServiceName(serviceName);
@@ -368,7 +457,9 @@ public class AiQuotaServiceImpl implements AiQuotaService {
         redisConfig.setDatabase(database);
 
         AiQuotaRouteConfig routeConfig = new AiQuotaRouteConfig();
+        routeConfig.setQuotaUnit(quotaUnit);
         routeConfig.setRedisKeyPrefix(redisKeyPrefix);
+        routeConfig.setBalanceKeyPrefix(balanceKeyPrefix);
         routeConfig.setAdminConsumer(adminConsumer);
         routeConfig.setAdminPath(adminPath);
         routeConfig.setRedisConfig(redisConfig);
@@ -396,16 +487,32 @@ public class AiQuotaServiceImpl implements AiQuotaService {
         if (StringUtils.isBlank(consumerName)) {
             throw new IllegalArgumentException("consumerName cannot be empty.");
         }
-        Consumer consumer = consumerService.query(consumerName);
+        if (isBuiltinAdministrator(consumerName)) {
+            throw new IllegalArgumentException("administrator quota cannot be managed.");
+        }
+        Consumer consumer = portalConsumerService.query(consumerName);
         if (consumer == null) {
             throw new IllegalArgumentException("Unknown consumer: " + consumerName);
         }
     }
 
     private List<Consumer> listConsumers() {
-        PaginatedResult<Consumer> paginatedResult = consumerService.list(null);
-        return paginatedResult != null && paginatedResult.getData() != null ? paginatedResult.getData()
-            : Collections.emptyList();
+        PaginatedResult<Consumer> paginatedResult = portalConsumerService.list(null);
+        if (paginatedResult == null || paginatedResult.getData() == null) {
+            return Collections.emptyList();
+        }
+        return paginatedResult.getData().stream()
+            .filter(Objects::nonNull)
+            .filter(consumer -> !isBuiltinAdministrator(consumer.getName()))
+            .collect(Collectors.toList());
+    }
+
+    private AiQuotaRouteContext requireAmountQuotaRoute(String routeName) {
+        AiQuotaRouteContext routeContext = requireRouteContext(routeName);
+        if (!QUOTA_UNIT_AMOUNT.equals(routeContext.getQuotaRouteConfig().getQuotaUnit())) {
+            throw new IllegalArgumentException("user quota policy is only available in amount mode.");
+        }
+        return routeContext;
     }
 
     private void validateScheduleRequest(AiQuotaScheduleRuleRequest request) {
@@ -573,36 +680,112 @@ public class AiQuotaServiceImpl implements AiQuotaService {
     }
 
     private String buildQuotaKey(AiQuotaRouteConfig routeConfig, String consumerName) {
-        return routeConfig.getRedisKeyPrefix() + consumerName;
+        return routeConfig.getEffectiveRedisKeyPrefix() + consumerName;
     }
 
-    private int parseQuota(String rawQuota) {
+    private long parseQuota(String rawQuota) {
         if (StringUtils.isBlank(rawQuota)) {
             return 0;
         }
         try {
-            return Integer.parseInt(rawQuota.trim());
+            return Long.parseLong(rawQuota.trim());
         } catch (NumberFormatException ex) {
             return 0;
         }
     }
 
-    private Integer toInteger(Object value) {
+    private void syncAmountBalanceToRedis(String consumerName, long balance) {
+        for (AiQuotaRouteContext routeContext : listEnabledRouteContexts()) {
+            AiQuotaRouteConfig routeConfig = routeContext.getQuotaRouteConfig();
+            if (!QUOTA_UNIT_AMOUNT.equals(routeConfig.getQuotaUnit())) {
+                continue;
+            }
+            withRedis(routeConfig.getRedisConfig(), jedis -> {
+                jedis.set(routeConfig.getEffectiveRedisKeyPrefix() + consumerName, Long.toString(balance));
+                return null;
+            });
+        }
+    }
+
+    private void syncUserPolicyToRedis(AiQuotaUserPolicy policy) {
+        for (AiQuotaRouteContext routeContext : listEnabledRouteContexts()) {
+            AiQuotaRouteConfig routeConfig = routeContext.getQuotaRouteConfig();
+            if (!QUOTA_UNIT_AMOUNT.equals(routeConfig.getQuotaUnit())) {
+                continue;
+            }
+            withRedis(routeConfig.getRedisConfig(), jedis -> {
+                String key = DEFAULT_USER_POLICY_KEY_PREFIX + policy.getConsumerName();
+                Map<String, String> fields = new HashMap<>();
+                fields.put("consumer_name", policy.getConsumerName());
+                fields.put("limit_total_micro_yuan", Long.toString(policy.getLimitTotal()));
+                fields.put("limit_5h_micro_yuan", Long.toString(policy.getLimit5h()));
+                fields.put("limit_daily_micro_yuan", Long.toString(policy.getLimitDaily()));
+                fields.put("daily_reset_mode", StringUtils.defaultIfBlank(policy.getDailyResetMode(), "fixed"));
+                fields.put("daily_reset_time", StringUtils.defaultIfBlank(policy.getDailyResetTime(), "00:00"));
+                fields.put("limit_weekly_micro_yuan", Long.toString(policy.getLimitWeekly()));
+                fields.put("limit_monthly_micro_yuan", Long.toString(policy.getLimitMonthly()));
+                fields.put("cost_reset_at", StringUtils.defaultString(policy.getCostResetAt()));
+                jedis.hset(key, fields);
+                jedis.expire(key, POLICY_CACHE_TTL_SECONDS);
+                return null;
+            });
+        }
+    }
+
+    private void clearUserQuotaUsageFromRedis(String consumerName) {
+        for (AiQuotaRouteContext routeContext : listEnabledRouteContexts()) {
+            AiQuotaRouteConfig routeConfig = routeContext.getQuotaRouteConfig();
+            if (!QUOTA_UNIT_AMOUNT.equals(routeConfig.getQuotaUnit())) {
+                continue;
+            }
+            withRedis(routeConfig.getRedisConfig(), jedis -> {
+                jedis.del(
+                    billingUsageWindowKey(DEFAULT_USER_USAGE_KEY_PREFIX, "total", consumerName),
+                    billingUsageWindowKey(DEFAULT_USER_USAGE_KEY_PREFIX, "5h", consumerName),
+                    billingUsageWindowKey(DEFAULT_USER_USAGE_KEY_PREFIX, "daily", consumerName),
+                    billingUsageWindowKey(DEFAULT_USER_USAGE_KEY_PREFIX, "weekly", consumerName),
+                    billingUsageWindowKey(DEFAULT_USER_USAGE_KEY_PREFIX, "monthly", consumerName));
+                return null;
+            });
+        }
+    }
+
+    private String billingUsageWindowKey(String prefix, String window, String subject) {
+        return prefix + window + ":" + subject;
+    }
+
+    private String normalizeQuotaUnit(String value, String balanceKeyPrefix, String priceKeyPrefix, String usageEventStream) {
+        if (StringUtils.equalsIgnoreCase(value, QUOTA_UNIT_AMOUNT)) {
+            return QUOTA_UNIT_AMOUNT;
+        }
+        if (StringUtils.isBlank(value) && (StringUtils.isNotBlank(balanceKeyPrefix)
+            || StringUtils.isNotBlank(priceKeyPrefix) || StringUtils.isNotBlank(usageEventStream))) {
+            return QUOTA_UNIT_AMOUNT;
+        }
+        return QUOTA_UNIT_TOKEN;
+    }
+
+    private boolean isBuiltinAdministrator(String consumerName) {
+        return StringUtils.equalsIgnoreCase(StringUtils.trimToEmpty(consumerName),
+            PortalUserJdbcService.BUILTIN_ADMIN_CONSUMER);
+    }
+
+    private Long toLong(Object value) {
         if (value == null) {
             return null;
         }
         if (value instanceof Integer) {
-            return (Integer) value;
+            return ((Integer) value).longValue();
         }
         if (value instanceof Long) {
-            return ((Long) value).intValue();
+            return (Long) value;
         }
         if (value instanceof Double) {
-            return ((Double) value).intValue();
+            return ((Double) value).longValue();
         }
         if (value instanceof String) {
             try {
-                return Integer.parseInt(((String) value).trim());
+                return Long.parseLong(((String) value).trim());
             } catch (NumberFormatException ex) {
                 return null;
             }
@@ -634,10 +817,23 @@ public class AiQuotaServiceImpl implements AiQuotaService {
 
     @Data
     private static class AiQuotaRouteConfig {
+        private String quotaUnit;
         private String redisKeyPrefix;
+        private String balanceKeyPrefix;
         private String adminConsumer;
         private String adminPath;
         private RedisConnectionConfig redisConfig;
+
+        private String getEffectiveRedisKeyPrefix() {
+            if (QUOTA_UNIT_AMOUNT.equals(quotaUnit) && StringUtils.isNotBlank(balanceKeyPrefix)) {
+                return balanceKeyPrefix;
+            }
+            return redisKeyPrefix;
+        }
+
+        private String getDisplayRedisKeyPrefix() {
+            return getEffectiveRedisKeyPrefix();
+        }
     }
 
     @Data

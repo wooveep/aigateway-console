@@ -14,6 +14,11 @@ import { useTranslation } from 'react-i18next';
 import FactorGroup from '../FactorGroup';
 import KeyValueGroup from '../KeyValueGroup';
 import { HistoryButton } from '@/pages/ai/components/RouteForm/Components';
+import {
+  expandConsumersByAllowedLevels,
+  normalizeUserLevels,
+  USER_LEVELS,
+} from '@/utils/consumer-level';
 
 const { Option } = Select;
 
@@ -85,7 +90,7 @@ const RouteForm: React.FC = forwardRef((props, ref) => {
         return { uid: uniqueId(), key, value: customConfigs[key] };
       }) : [];
       const _authConfig_enabled = !!authConfig?.enabled;
-      const _authConfig_allowedConsumers = authConfig?.allowedConsumers || [];
+      const _authConfig_allowedConsumerLevels = normalizeUserLevels(authConfig?.allowedConsumerLevels);
       form.setFieldsValue({
         name,
         domains: (Array.isArray(domains) ? domains : [domains]).filter(d => !!d),
@@ -95,13 +100,10 @@ const RouteForm: React.FC = forwardRef((props, ref) => {
         urlParams: urlParams || [],
         services: services ? services.map(upstreamServiceToString) : null,
         authConfig_enabled: _authConfig_enabled,
-        authConfig_allowedConsumers: _authConfig_allowedConsumers,
+        authConfig_allowedConsumerLevels: _authConfig_allowedConsumerLevels,
         customConfigs: customConfigArray,
       });
       setAuthConfigEnabled(_authConfig_enabled);
-      // form.setFieldsValue({
-      //   authConfig_allowedConsumers: _authConfig_allowedConsumers,
-      // })
     }
 
     return () => {
@@ -125,9 +127,12 @@ const RouteForm: React.FC = forwardRef((props, ref) => {
         }
         values.customConfigs = customConfigsObj;
       }
-      const authConfig = { enabled: authConfig_enabled, allowedConsumers: null };
-      const allowdConsumers = values.authConfig_allowedConsumers;
-      authConfig.allowedConsumers = allowdConsumers && !Array.isArray(allowdConsumers) ? [allowdConsumers] : allowdConsumers;
+      const allowedLevels = normalizeUserLevels(values.authConfig_allowedConsumerLevels);
+      const authConfig = {
+        enabled: authConfig_enabled,
+        allowedConsumers: expandConsumersByAllowedLevels(allowedLevels, consumerList),
+        allowedConsumerLevels: allowedLevels,
+      };
       values.authConfig = authConfig;
       return values;
     },
@@ -294,22 +299,22 @@ const RouteForm: React.FC = forwardRef((props, ref) => {
           </Select>
         </Form.Item>
         <Form.Item
-          label={t('aiRoute.routeForm.label.authConfigList')}
+          label={t('aiRoute.routeForm.label.authConfigLevelList')}
           extra={(<HistoryButton text={t('consumer.create')} path={"/consumer"} />)}
         >
           <div style={{ display: 'flex', alignItems: 'center' }}>
             <Form.Item
-              name="authConfig_allowedConsumers"
+              name="authConfig_allowedConsumerLevels"
               noStyle
             >
               <Select
                 allowClear
                 mode="multiple"
-                placeholder={t('aiRoute.routeForm.label.authConfigList')}
+                placeholder={t('aiRoute.routeForm.label.authConfigLevelList')}
                 style={{ flex: 1 }}
               >
-                {consumerList.map((item) => (
-                  <Select.Option key={String(item.name)} value={item.name}>{item.name}</Select.Option>
+                {USER_LEVELS.map((level) => (
+                  <Select.Option key={level} value={level}>{t(`consumer.userLevel.${level}`)}</Select.Option>
                 ))}
               </Select>
             </Form.Item>

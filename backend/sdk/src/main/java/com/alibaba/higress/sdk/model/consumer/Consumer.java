@@ -46,6 +46,8 @@ public class Consumer {
     private String portalEmail;
     @Schema(description = "Portal user source")
     private String portalUserSource;
+    @Schema(description = "Portal user level")
+    private String portalUserLevel;
     @Schema(description = "Portal user temporary password, only returned once when created from console")
     private String portalTempPassword;
     @Schema(description = "Portal user password used in creation/update from console")

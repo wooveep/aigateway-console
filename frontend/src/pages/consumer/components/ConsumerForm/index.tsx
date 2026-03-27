@@ -1,7 +1,6 @@
-import { Consumer, CredentialType } from '@/interfaces/consumer';
-import { MinusCircleOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
-import { AutoComplete, Button, Form, Input, Select, Tabs } from 'antd';
-import React, { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
+import { Consumer } from '@/interfaces/consumer';
+import { AutoComplete, Form, Input, Select } from 'antd';
+import React, { forwardRef, useEffect, useImperativeHandle } from 'react';
 import { useTranslation } from 'react-i18next';
 
 interface Props {
@@ -14,31 +13,23 @@ const ConsumerForm: React.FC<Props> = forwardRef((props, ref) => {
   const { t } = useTranslation();
   const { value, departments = [], presetDepartment } = props;
   const [form] = Form.useForm();
-  const [activeTabKey, setActiveTabKey] = useState('');
-  const [keyAuthCredentialSource, setKeyAuthCredentialSource] = useState();
-
-  const credentialEnabledCheckers = {};
-  credentialEnabledCheckers[CredentialType.KEY_AUTH.key] = () => true;
 
   useEffect(() => {
-    let formValues: object | null = null
-    let activeTabKey_ = '';
     if (value) {
-      const credentials = {};
-      if (value.credentials) {
-        for (const credential of value.credentials) {
-          credentials[credential.type] = credential;
-          activeTabKey_ = activeTabKey_ || credential.type;
-        }
+      form.setFieldsValue({
+        department: value.department,
+        name: value.name,
+        portalDisplayName: value.portalDisplayName,
+        portalEmail: value.portalEmail,
+        portalUserLevel: value.portalUserLevel || 'normal',
+      });
+    } else {
+      form.resetFields();
+      form.setFieldValue('portalUserLevel', 'normal');
+      if (presetDepartment) {
+        form.setFieldValue('department', presetDepartment);
       }
-      formValues = Object.assign({ department: undefined }, value, { credentials });
     }
-    formValues ? form.setFieldsValue(formValues) : form.resetFields();
-    if (!value && presetDepartment) {
-      form.setFieldValue('department', presetDepartment);
-    }
-    setActiveTabKey(activeTabKey_ || CredentialType.KEY_AUTH.key);
-    setKeyAuthCredentialSource(form.getFieldValue(['credentials', CredentialType.KEY_AUTH.key, 'source']) || 'BEARER');
   }, [form, presetDepartment, value]);
 
   useImperativeHandle(ref, () => ({
@@ -47,50 +38,21 @@ const ConsumerForm: React.FC<Props> = forwardRef((props, ref) => {
     },
     handleSubmit: async () => {
       const values = await form.validateFields();
-      const credentials: any[] = [];
-      for (const { key } of Object.values(CredentialType)) {
-        const credential = values.credentials[key];
-        if (!credential) {
-          continue;
-        }
-        credential.type = key;
-        const checker = credentialEnabledCheckers[key];
-        if (!checker || checker(credential)) {
-          credentials.push(credential);
-        }
-      }
-      values.credentials = credentials;
-      return values;
+      return {
+        ...values,
+        credentials: [],
+      };
     },
   }));
 
-  const generateUUID = () => {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-      /* jslint bitwise: true */
-      const r = Math.random() * 16 | 0;
-      /* jslint bitwise: true */
-      const v = c === 'x' ? r : (r & 0x3 | 0x8);
-      return v.toString(16);
-    });
-  };
-
-  const randomizeKeyAuthToken = (i) => {
-    const uuid = generateUUID();
-    form.setFieldValue(['credentials', CredentialType.KEY_AUTH.key, 'values', i], uuid);
-  }
-
   return (
-    <Form
-      form={form}
-      layout="vertical"
-    >
-      <Form.Item
-        label={t('consumer.consumerForm.department')}
-        name="department"
-      >
+    <Form form={form} layout="vertical">
+      <Form.Item label={t('consumer.consumerForm.department')} name="department">
         <AutoComplete
           options={departments.map((department) => ({ value: department }))}
-          filterOption={(inputValue, option) => (option?.value || '').toUpperCase().includes(inputValue.toUpperCase())}
+          filterOption={(inputValue, option) =>
+            (option?.value || '').toUpperCase().includes(inputValue.toUpperCase())
+          }
         >
           <Input
             showCount
@@ -116,156 +78,30 @@ const ConsumerForm: React.FC<Props> = forwardRef((props, ref) => {
           allowClear
           maxLength={63}
           placeholder={t('consumer.consumerForm.namePlaceholder') || ''}
-          disabled={value}
+          disabled={!!value}
         />
       </Form.Item>
       <Form.Item label="Portal显示名" name="portalDisplayName">
-        <Input
-          showCount
-          allowClear
-          maxLength={63}
-          placeholder="可选，默认与用户名一致"
-        />
+        <Input showCount allowClear maxLength={63} placeholder="可选，默认与用户名一致" />
       </Form.Item>
       <Form.Item label="Portal邮箱" name="portalEmail">
-        <Input
-          showCount
-          allowClear
-          maxLength={128}
-          placeholder="可选"
-        />
+        <Input showCount allowClear maxLength={128} placeholder="可选" />
+      </Form.Item>
+      <Form.Item
+        label={t('consumer.consumerForm.portalUserLevel')}
+        name="portalUserLevel"
+        rules={[{ required: true, message: t('consumer.consumerForm.portalUserLevelRequired') || '' }]}
+      >
+        <Select placeholder={t('consumer.consumerForm.portalUserLevelPlaceholder') || ''}>
+          <Select.Option value="normal">{t('consumer.userLevel.normal')}</Select.Option>
+          <Select.Option value="plus">{t('consumer.userLevel.plus')}</Select.Option>
+          <Select.Option value="pro">{t('consumer.userLevel.pro')}</Select.Option>
+          <Select.Option value="ultra">{t('consumer.userLevel.ultra')}</Select.Option>
+        </Select>
       </Form.Item>
       <Form.Item label="Portal密码" name="portalPassword">
-        <Input.Password
-          placeholder={value ? '留空则不修改密码' : '留空将由系统生成临时密码'}
-        />
+        <Input.Password placeholder={value ? '留空则不修改密码' : '留空将由系统生成临时密码'} />
       </Form.Item>
-      <div>{t("consumer.columns.authMethods")}</div>
-      <Tabs
-        activeKey={activeTabKey}
-        onChange={key => setActiveTabKey(key)}
-        size="small"
-        items={[
-          {
-            label: CredentialType.KEY_AUTH.displayName,
-            key: CredentialType.KEY_AUTH.key,
-            children: (
-              <>
-                <Form.List
-                  name={['credentials', CredentialType.KEY_AUTH.key, 'values']}
-                  initialValue={[null]}
-                >
-                  {(fields, { add, remove }, { errors }) => (
-                    <>
-                      {fields.map((field, index) => (
-                        <Form.Item
-                          required={false}
-                          key={index}
-                          style={{ marginBottom: '0.5rem' }}
-                        >
-                          <Form.Item
-                            {...field}
-                            validateTrigger={['onChange', 'onBlur']}
-                            rules={[{ required: true, message: t("consumer.consumerForm.authTokenRequired") || '' }]}
-                            noStyle
-                          >
-                            <Input style={{ width: '85%' }} />
-                          </Form.Item>
-                          <div style={{ display: "inline-block", width: '15%', textAlign: 'right' }}>
-                            <Button
-                              onClick={() => randomizeKeyAuthToken(index)}
-                              title={t("consumer.randomGeneration") || ''}
-                              icon={<ReloadOutlined />}
-                              style={{ marginRight: '0.5rem' }}
-                            />
-                            <Button
-                              type="dashed"
-                              disabled={!(fields.length > 1)}
-                              onClick={() => remove(field.name)}
-                              icon={<MinusCircleOutlined />}
-                            />
-                          </div>
-                        </Form.Item>
-                      ))}
-
-                      {/* 添加按钮 */}
-                      <Form.Item>
-                        <Button
-                          type="dashed"
-                          onClick={() => add()}
-                          icon={<PlusOutlined />}
-                        />
-                        <Form.ErrorList errors={errors} />
-                      </Form.Item>
-                    </>
-                  )}
-                </Form.List>
-
-                {/* 令牌来源 */}
-                <Form.Item
-                  label={t("consumer.tokenSource")}
-                  name={['credentials', CredentialType.KEY_AUTH.key, 'source']}
-                  rules={[{ required: true, message: t("consumer.consumerForm.tokenSourceRequired") || '' }]}
-                >
-                  <Select
-                    onChange={e => { setKeyAuthCredentialSource(e); }}
-                  >
-                    {
-                      [
-                        { name: "BEARER", label: t("consumer.selectBEARER") }, // 对应 HTTP Header “Authorization: Bearer ${value}” 的传递方式
-                        { name: "HEADER", label: t("consumer.selectHEADER") }, // HEADER：使用自定义 HTTP Header 来传递。Header 名称使用 key 来配置
-                        { name: "QUERY", label: t("consumer.selectQUERY") }, // 使用查询参数来传递。参数名称使用 key 来配置
-                      ].map((item) => (<Select.Option key={item.name} value={item.name}>{item.label} </Select.Option>))
-                    }
-                  </Select>
-                </Form.Item>
-
-                {
-                  keyAuthCredentialSource === "HEADER" ?
-                    // Header 名称
-                    <Form.Item
-                      key="HEADER_key"
-                      label={t("consumer.headerName")}
-                      name={['credentials', CredentialType.KEY_AUTH.key, 'key']}
-                      rules={[{ required: true, message: t("consumer.consumerForm.headerNameRequired") || '' }]}
-                    >
-                      <Input.TextArea rows={1} style={{ width: "100%" }} />
-                    </Form.Item>
-                    : null
-                }
-
-                {
-                  // 参数名称
-                  keyAuthCredentialSource === "QUERY" ?
-                    <Form.Item
-                      key="QUERY_key"
-                      label={t("consumer.paramName")}
-                      name={['credentials', CredentialType.KEY_AUTH.key, 'key']}
-                      rules={[{ required: true, message: t("consumer.consumerForm.paramNameRequired") || '' }]}
-                    >
-                      <Input.TextArea rows={1} style={{ width: "100%" }} />
-                    </Form.Item>
-                    : null
-                }
-              </>
-            ),
-          },
-          {
-            label: CredentialType.OAUTH2.displayName,
-            key: CredentialType.OAUTH2.key,
-            children: (
-              <>{t("misc.tbd")}</>
-            ),
-          },
-          {
-            label: CredentialType.JWT_AUTH.displayName,
-            key: CredentialType.JWT_AUTH.key,
-            children: (
-              <>{t("misc.tbd")}</>
-            ),
-          },
-        ]}
-      />
     </Form>
   );
 });

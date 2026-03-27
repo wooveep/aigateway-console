@@ -2,7 +2,7 @@
 import { CredentialType } from '@/interfaces/consumer';
 import { getGatewayDomains } from '@/services/domain';
 import { createOrUpdateMcpServer, deleteMcpServer, getMcpServer } from '@/services/mcp';
-import { DeleteOutlined, EditOutlined, PlusOutlined, QuestionCircleOutlined } from '@ant-design/icons';
+import { DeleteOutlined, EditOutlined, QuestionCircleOutlined } from '@ant-design/icons';
 import { PageContainer } from '@ant-design/pro-layout';
 import MonacoEditor, { loader } from '@monaco-editor/react';
 import { Button, Card, Descriptions, Empty, message, Modal, Space, Table, Tabs, Tooltip } from 'antd';
@@ -10,7 +10,6 @@ import { useNavigate, useSearchParams } from 'ice';
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.api.js';
 import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import AddConsumerAuth from './components/AddConsumerAuth';
 import ConsumerTable from './components/ConsumerTable';
 import DeleteConfirm from './components/DeleteConfirm';
 import EditToolDrawer from './components/EditToolDrawer';
@@ -37,7 +36,6 @@ const MCPDetailPage: React.FC = () => {
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [httpJson, setHttpJson] = useState('');
   const [sseJson, setSseJson] = useState('');
-  const [addConsumerAuthVisible, setAddConsumerAuthVisible] = useState(false);
   const consumerTableRef = useRef<any>(null);
 
   const fetchMcpData = async () => {
@@ -87,7 +85,8 @@ const MCPDetailPage: React.FC = () => {
         consumerAuthInfo: {
           enable: checked,
           type: CredentialType.KEY_AUTH.key,
-          allowedConsumers: mcpData.consumerAuthInfo?.allowedConsumers || [],
+          allowedConsumerLevels: mcpData.consumerAuthInfo?.allowedConsumerLevels || [],
+          allowedConsumers: [],
         },
       });
       message.success(`${t('mcp.detail.authUpdateSuccess')}`);
@@ -487,11 +486,7 @@ const MCPDetailPage: React.FC = () => {
                   </Descriptions>
                 </Card>
                 <Card title={t('mcp.detail.authorizedConsumers')} bordered style={{ marginTop: 16 }}>
-                  <ConsumerTable ref={consumerTableRef} authEnabled={authEnabled}>
-                    <Button type="primary" icon={<PlusOutlined />} onClick={() => setAddConsumerAuthVisible(true)}>
-                      {t('mcp.detail.add')}
-                    </Button>
-                  </ConsumerTable>
+                  <ConsumerTable ref={consumerTableRef} />
                 </Card>
               </>
             ),
@@ -521,17 +516,6 @@ const MCPDetailPage: React.FC = () => {
         onCancel={handleDeleteCancel}
         recordName={name}
         i18nKey="mcp.deleteConfirm"
-      />
-
-      <AddConsumerAuth
-        visible={addConsumerAuthVisible}
-        onClose={() => setAddConsumerAuthVisible(false)}
-        onSuccess={() => {
-          fetchMcpData();
-          consumerTableRef.current?.fetchConsumers();
-        }}
-        mcpName={name}
-        strategyConfigId={mcpData?.consumerAuthInfo?.strategyConfigId}
       />
     </PageContainer>
   );

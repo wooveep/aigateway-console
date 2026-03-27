@@ -47,7 +47,6 @@ import com.alibaba.higress.sdk.model.mcp.ConsumerAuthInfo;
 import com.alibaba.higress.sdk.model.mcp.McpServer;
 import com.alibaba.higress.sdk.model.mcp.McpServerConfigMap;
 import com.alibaba.higress.sdk.model.mcp.McpServerConstants;
-import com.alibaba.higress.sdk.model.mcp.McpServerConsumers;
 import com.alibaba.higress.sdk.model.mcp.McpServerTypeEnum;
 import com.alibaba.higress.sdk.model.route.RoutePredicate;
 import com.alibaba.higress.sdk.model.route.RoutePredicateTypeEnum;
@@ -316,97 +315,6 @@ public class McpServerServiceTest {
         Assertions.assertNotNull(mcpConfig);
         Assertions.assertEquals(0, mcpConfig.getMatchList().size());
         Assertions.assertEquals(0, mcpConfig.getServers().size());
-    }
-
-    @Test
-    public void addConsumerTest() throws Exception {
-        final String mcpServerName = "test";
-        final boolean routeEnabled = true;
-        final McpServerTypeEnum mcpServerType = McpServerTypeEnum.OPEN_API;
-        final List<String> allowConsumers = Arrays.asList("consumerA", "consumerB");
-        final Map<String, Object> keyAuthPluginConfig = MapUtil.of("allow", allowConsumers);
-
-        String routeName = McpServerHelper.mcpServerName2RouteName(mcpServerName);
-
-        V1alpha1WasmPlugin keyAuthPluginCr = buildWasmPluginResource(TEST_KEY_AUTH_PLUGIN_NAME, true, true);
-        kubernetesModelConverter.setWasmPluginInstanceToCr(keyAuthPluginCr,
-            WasmPluginInstance.builder().targets(MapUtil.of(WasmPluginInstanceScope.ROUTE, routeName))
-                .enabled(routeEnabled).configurations(keyAuthPluginConfig).build());
-        List<V1alpha1WasmPlugin> keyAuthPlugins = Collections.singletonList(keyAuthPluginCr);
-        when(kubernetesClientService.listWasmPlugin(eq(TEST_KEY_AUTH_PLUGIN_NAME))).thenReturn(keyAuthPlugins);
-        when(kubernetesClientService.listWasmPlugin(eq(TEST_KEY_AUTH_PLUGIN_NAME), any())).thenReturn(keyAuthPlugins);
-        when(kubernetesClientService.listWasmPlugin(eq(TEST_KEY_AUTH_PLUGIN_NAME), any(), any()))
-            .thenReturn(keyAuthPlugins);
-
-        V1Ingress ingress = buildIngressResource(routeName, "", mcpServerType);
-        when(kubernetesClientService.readIngress(eq(routeName))).thenReturn(ingress);
-
-        McpServerConsumers newConsumers = new McpServerConsumers();
-        newConsumers.setMcpServerName(mcpServerName);
-        ArrayList<String> consumersToAdd = new ArrayList<String>() {
-            {
-                add("consumerC");
-            }
-        };
-        newConsumers.setConsumers(consumersToAdd);
-        mcpServerService.addAllowConsumers(newConsumers);
-
-        ArgumentCaptor<V1alpha1WasmPlugin> pluginCaptor = ArgumentCaptor.forClass(V1alpha1WasmPlugin.class);
-        verify(kubernetesClientService, times(1)).replaceWasmPlugin(pluginCaptor.capture());
-        V1alpha1WasmPlugin capturedValue = pluginCaptor.getValue();
-        Assertions.assertNotNull(capturedValue);
-        Assertions.assertNotNull(capturedValue.getSpec().getMatchRules());
-        Object allowObj = capturedValue.getSpec().getMatchRules().get(0).getConfig().get("allow");
-        Assertions.assertInstanceOf(List.class, allowObj);
-        List<?> allowList = (List<?>)allowObj;
-        Assertions.assertEquals(3, allowList.size());
-        Assertions.assertTrue(allowList.contains("consumerA"));
-        Assertions.assertTrue(allowList.contains("consumerB"));
-        Assertions.assertTrue(allowList.contains("consumerC"));
-    }
-
-    @Test
-    public void deleteConsumerTest() throws Exception {
-        final String mcpServerName = "test";
-        final boolean routeEnabled = true;
-        final McpServerTypeEnum mcpServerType = McpServerTypeEnum.OPEN_API;
-        final List<String> allowConsumers = Arrays.asList("consumerA", "consumerB");
-        final Map<String, Object> keyAuthPluginConfig = MapUtil.of("allow", allowConsumers);
-        String routeName = McpServerHelper.mcpServerName2RouteName(mcpServerName);
-
-        V1alpha1WasmPlugin keyAuthPluginCr = buildWasmPluginResource(TEST_KEY_AUTH_PLUGIN_NAME, true, true);
-        kubernetesModelConverter.setWasmPluginInstanceToCr(keyAuthPluginCr,
-            WasmPluginInstance.builder().targets(MapUtil.of(WasmPluginInstanceScope.ROUTE, routeName))
-                .enabled(routeEnabled).configurations(keyAuthPluginConfig).build());
-        List<V1alpha1WasmPlugin> keyAuthPlugins = Collections.singletonList(keyAuthPluginCr);
-        when(kubernetesClientService.listWasmPlugin(eq(TEST_KEY_AUTH_PLUGIN_NAME))).thenReturn(keyAuthPlugins);
-        when(kubernetesClientService.listWasmPlugin(eq(TEST_KEY_AUTH_PLUGIN_NAME), any())).thenReturn(keyAuthPlugins);
-        when(kubernetesClientService.listWasmPlugin(eq(TEST_KEY_AUTH_PLUGIN_NAME), any(), any()))
-            .thenReturn(keyAuthPlugins);
-
-        V1Ingress ingress = buildIngressResource(routeName, "", mcpServerType);
-        when(kubernetesClientService.readIngress(eq(routeName))).thenReturn(ingress);
-
-        McpServerConsumers newConsumers = new McpServerConsumers();
-        newConsumers.setMcpServerName(mcpServerName);
-        ArrayList<String> consumersToDelete = new ArrayList<String>() {
-            {
-                add("consumerA");
-            }
-        };
-        newConsumers.setConsumers(consumersToDelete);
-        mcpServerService.deleteAllowConsumers(newConsumers);
-
-        ArgumentCaptor<V1alpha1WasmPlugin> pluginCaptor = ArgumentCaptor.forClass(V1alpha1WasmPlugin.class);
-        verify(kubernetesClientService, times(1)).replaceWasmPlugin(pluginCaptor.capture());
-        V1alpha1WasmPlugin capturedValue = pluginCaptor.getValue();
-        Assertions.assertNotNull(capturedValue);
-        Assertions.assertNotNull(capturedValue.getSpec().getMatchRules());
-        Object allowObj = capturedValue.getSpec().getMatchRules().get(0).getConfig().get("allow");
-        Assertions.assertInstanceOf(List.class, allowObj);
-        List<?> allowList = (List<?>)allowObj;
-        Assertions.assertEquals(1, allowList.size());
-        Assertions.assertTrue(allowList.contains("consumerB"));
     }
 
     private V1alpha1WasmPlugin buildWasmPluginResource(String name, boolean builtIn, boolean internal) {

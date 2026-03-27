@@ -17,6 +17,7 @@ public class PortalUserRecord {
     private String displayName;
     private String email;
     private String department;
+    private String userLevel;
     private String status;
     private String source;
     private LocalDateTime lastLoginAt;

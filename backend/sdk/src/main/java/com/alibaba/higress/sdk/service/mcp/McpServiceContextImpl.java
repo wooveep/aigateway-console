@@ -34,13 +34,9 @@ import com.alibaba.higress.sdk.exception.BusinessException;
 import com.alibaba.higress.sdk.exception.NotFoundException;
 import com.alibaba.higress.sdk.model.PaginatedResult;
 import com.alibaba.higress.sdk.model.Route;
-import com.alibaba.higress.sdk.model.WasmPluginInstanceScope;
-import com.alibaba.higress.sdk.model.consumer.AllowList;
-import com.alibaba.higress.sdk.model.consumer.AllowListOperation;
 import com.alibaba.higress.sdk.model.mcp.McpServer;
 import com.alibaba.higress.sdk.model.mcp.McpServerConstants;
 import com.alibaba.higress.sdk.model.mcp.McpServerConsumerDetail;
-import com.alibaba.higress.sdk.model.mcp.McpServerConsumers;
 import com.alibaba.higress.sdk.model.mcp.McpServerConsumersPageQuery;
 import com.alibaba.higress.sdk.model.mcp.McpServerPageQuery;
 import com.alibaba.higress.sdk.model.mcp.McpServerTypeEnum;
@@ -135,22 +131,6 @@ public class McpServiceContextImpl implements McpServerService {
         routeService.delete(name);
         deleteMatchRulePath(name);
         deleteServersConfig(name);
-    }
-
-    @Override
-    public void addAllowConsumers(McpServerConsumers consumers) {
-        Route route = getMcpServerBoundRoute(consumers.getMcpServerName());
-        AllowList allowList = AllowList.forTarget(WasmPluginInstanceScope.ROUTE, route.getName())
-            .consumerNames(consumers.getConsumers()).build();
-        consumerService.updateAllowList(AllowListOperation.ADD, allowList);
-    }
-
-    @Override
-    public void deleteAllowConsumers(McpServerConsumers consumers) {
-        Route route = getMcpServerBoundRoute(consumers.getMcpServerName());
-        AllowList allowList = AllowList.forTarget(WasmPluginInstanceScope.ROUTE, route.getName())
-            .consumerNames(consumers.getConsumers()).build();
-        consumerService.updateAllowList(AllowListOperation.REMOVE, allowList);
     }
 
     @Override

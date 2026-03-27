@@ -66,8 +66,9 @@
     "routeForm": {
       "label": {
         "authConfig": "Request Authentication",
-        "authConfigExtra": "If enabled, only requests containing the auth info of a selected user are allowed to use this route.",
+        "authConfigExtra": "If enabled, only requests containing auth info of the configured user levels are allowed to use this route.",
         "authConfigList": "Allowed Users",
+        "authConfigLevelList": "Allowed User Levels",
         "domain": "Domain",
         "targetModel": "Target Model",
         "fallbackConfig": "Token Fallback",
@@ -124,14 +125,24 @@
     "search": "User Search",
     "searchPlaceholder": "Please input user name",
     "empty": "No AI routes have ai-quota enabled yet",
+    "mode": {
+      "amountTitle": "Wallet Balance Management",
+      "amountDescription": "This route is running in amount mode. The page shows user wallet balances, the form accepts RMB, and values are converted to micro_yuan before syncing to the Portal wallet and Redis runtime cache.",
+      "tokenTitle": "Token Quota Management",
+      "tokenDescription": "This route is still in token mode. The page shows runtime token quotas stored in Redis."
+    },
     "columns": {
       "consumer": "User",
       "quota": "Current Quota",
+      "balance": "Current Balance",
       "actions": "Actions"
     },
     "actions": {
       "refresh": "Refresh Quota",
       "delta": "Adjust Quota",
+      "refreshBalance": "Set Balance",
+      "deltaBalance": "Adjust Balance",
+      "policy": "User Policy",
       "schedule": "Schedule"
     },
     "summary": {
@@ -139,27 +150,41 @@
       "path": "Path",
       "domains": "Domains",
       "redisKeyPrefix": "Redis Key Prefix",
+      "balanceKeyPrefix": "Balance Key Prefix",
       "adminConsumer": "Admin User",
-      "adminPath": "Admin Path"
+      "adminPath": "Admin Path",
+      "quotaUnit": "Quota Unit",
+      "scheduleRuleCount": "Scheduled Rules"
     },
     "modals": {
       "refreshTitle": "Refresh User Quota",
       "deltaTitle": "Adjust User Quota",
       "refreshValue": "Target Quota",
-      "deltaValue": "Delta Value"
+      "deltaValue": "Delta Value",
+      "refreshBalanceTitle": "Set User Balance",
+      "deltaBalanceTitle": "Adjust User Balance",
+      "refreshBalanceValue": "Target Balance",
+      "deltaBalanceValue": "Adjustment Amount"
+    },
+    "form": {
+      "amountValueHelp": "The form accepts RMB and converts it to micro_yuan before submission."
     },
     "schedule": {
       "title": "Scheduled Quota Rules",
+      "balanceTitle": "Scheduled Balance Rules",
       "actions": {
         "refresh": "Scheduled Refresh",
-        "delta": "Scheduled Delta"
+        "delta": "Scheduled Delta",
+        "refreshBalance": "Scheduled Balance Reset",
+        "deltaBalance": "Scheduled Balance Adjustment"
       },
       "form": {
         "action": "Rule Type",
         "cron": "Cron Expression",
         "cronHelp": "Use Spring cron format, for example 0 0 0 * * * runs at midnight every day.",
         "value": "Execution Value",
-        "enabled": "Enabled"
+        "enabled": "Enabled",
+        "amountValueHelp": "In amount mode, the value is entered in RMB and converted to micro_yuan when executed."
       },
       "columns": {
         "action": "Rule Type",
@@ -170,18 +195,50 @@
         "lastError": "Last Error"
       }
     },
+    "policy": {
+      "title": "User Amount Limit Policy",
+      "description": "This drawer configures the user-level amount policy shared by all API keys of the selected user, including total, 5-hour, daily, weekly and monthly windows. Values are entered in RMB and converted to micro_yuan on save.",
+      "actions": {
+        "setResetNow": "Set soft reset to now",
+        "clearResetAt": "Clear soft reset time"
+      },
+      "form": {
+        "dailyResetMode": "Daily Reset Mode",
+        "fixedResetMode": "Fixed daily boundary (phase 1)",
+        "limitTotal": "Total Limit",
+        "limit5h": "5-hour Limit",
+        "limitDaily": "Daily Limit",
+        "dailyResetTime": "Daily Reset Time",
+        "dailyResetTimeHelp": "Phase 1 only supports a fixed daily boundary in HH:mm format.",
+        "limitWeekly": "Weekly Limit",
+        "limitMonthly": "Monthly Limit",
+        "costResetAt": "Soft Reset Start",
+        "costResetAtHelp": "Leave empty to keep the current value. Supports RFC3339 or yyyy-MM-ddTHH:mm, for example 2026-03-27T10:30.",
+        "amountHelp": "The form accepts RMB and converts it to micro_yuan before submission."
+      }
+    },
     "validation": {
       "refreshValueRequired": "Please input the target quota",
       "deltaValueRequired": "Please input the delta value",
       "scheduleActionRequired": "Please select a rule type",
       "scheduleCronRequired": "Please input a cron expression",
-      "scheduleValueRequired": "Please input the execution value"
+      "scheduleValueRequired": "Please input the execution value",
+      "policyLimitRequired": "Please input a limit value",
+      "policyDailyResetTimeRequired": "Please input the daily reset time",
+      "policyDailyResetTimeInvalid": "The daily reset time must match HH:mm"
     },
     "messages": {
       "refreshSuccess": "Quota refreshed successfully",
       "deltaSuccess": "Quota adjusted successfully",
+      "refreshBalanceSuccess": "Balance updated successfully",
+      "deltaBalanceSuccess": "Balance adjusted successfully",
+      "policySaved": "User policy saved successfully",
       "scheduleSaved": "Scheduled rule saved successfully",
       "scheduleDeleted": "Scheduled rule deleted successfully"
+    },
+    "units": {
+      "token": "Token",
+      "amount": "RMB"
     }
   },
   "consumer": {
@@ -190,7 +247,9 @@
       "department": "Department",
       "name": "User Name",
       "type": "Type",
-      "authMethods": "Auth Methods"
+      "authMethods": "Auth Methods",
+      "portalStatus": "Portal Status",
+      "userLevel": "User Level"
     },
     "type": {
       "department": "Department",
@@ -214,10 +273,19 @@
       "name": "User Name",
       "namePlaceholder": "Please input user name",
       "nameRequired": "Please input user name",
+      "portalUserLevel": "Portal User Level",
+      "portalUserLevelRequired": "Please select portal user level",
+      "portalUserLevelPlaceholder": "Please select portal user level",
       "tokenSourceRequired": "Please choose a token source",
       "authTokenRequired": "Please input auth token",
       "headerNameRequired": "Please input header name",
       "paramNameRequired": "Please input parameter key"
+    },
+    "userLevel": {
+      "normal": "Normal",
+      "plus": "Plus",
+      "pro": "Pro",
+      "ultra": "Ultra"
     },
     "selectBEARER": "Authorization: Bearer ${value}",
     "selectHEADER": "Custom HTTP Header",
@@ -227,7 +295,49 @@
     "randomGeneration": "Generate",
     "headerName": "Header Name",
     "paramName": "Param Name",
+    "systemBuiltin": "System Built-in",
     "deleteSuccess": "Deleted successfully.",
+    "enable": "Enable",
+    "disable": "Disable",
+    "enableSuccess": "User enabled successfully.",
+    "disableSuccess": "User disabled successfully.",
+    "statusUpdateFailed": "Failed to update status.",
+    "portalStatus": {
+      "pending": "Pending Activation"
+    },
+    "resetPassword": "Reset Password",
+    "resetPasswordTitle": "Temporary Password",
+    "resetPasswordHint": "Temporary password for user {{name}} (store it safely):",
+    "resetPasswordSuccess": "Password reset successfully.",
+    "resetPasswordFailed": "Failed to reset password.",
+    "noActiveKeys": "No active API keys",
+    "keyCount": "{{count}} key(s)",
+    "inviteCode": {
+      "manage": "Invite Codes",
+      "create": "Generate Invite Code",
+      "createSuccess": "Invite code generated successfully.",
+      "createFailed": "Failed to generate invite code.",
+      "enable": "Enable",
+      "enableSuccess": "Invite code enabled successfully.",
+      "enableFailed": "Failed to enable invite code.",
+      "disable": "Disable",
+      "disableSuccess": "Invite code disabled successfully.",
+      "disableFailed": "Failed to disable invite code.",
+      "codeGeneratedTitle": "Invite Code Generated",
+      "codeGeneratedHint": "Invite code (can be reused):",
+      "statusFilterPlaceholder": "Filter by status",
+      "status": {
+        "used": "Used"
+      },
+      "columns": {
+        "code": "Invite Code",
+        "status": "Status",
+        "expiresAt": "Expires At",
+        "usedBy": "Last Used By",
+        "usedAt": "Last Used At",
+        "createdAt": "Created At"
+      }
+    },
     "search": "Search",
     "key": "Key"
   },
@@ -420,8 +530,33 @@
       "zhipuai": "Zhipu AI"
     },
     "providerForm": {
+      "sections": {
+        "portalModelMeta": "Model Metadata (Portal Display)",
+        "modelPricing": "Model Pricing"
+      },
+      "actions": {
+        "addTag": "Add Tag",
+        "addModality": "Add Modality",
+        "addFeature": "Add Feature"
+      },
+      "help": {
+        "pricingCurrency": "Phase 1 billing uses RMB only. Portal deducts balances by RMB amount and token pricing.",
+        "inputPer1K": "Enter the RMB unit price for every 1K input tokens. The value is synced into Portal billing tables after save.",
+        "outputPer1K": "Enter the RMB unit price for every 1K output tokens. The value is synced into Portal billing tables after save."
+      },
+      "fixedCurrencyValue": "CNY (RMB)",
       "label": {
         "type": "LLM Provider",
+        "pricingCurrency": "Billing Currency",
+        "inputPer1K": "Input Price (per 1K tokens, RMB)",
+        "outputPer1K": "Output Price (per 1K tokens, RMB)",
+        "modelIntro": "Model Intro",
+        "modelTags": "Model Tags",
+        "modelModalities": "Model Capabilities - Modalities",
+        "modelFeatures": "Model Capabilities - Features",
+        "modelRpm": "RPM Limit",
+        "modelTpm": "TPM Limit",
+        "modelContextWindow": "Context Window",
         "failoverEnabled": "Token Failover",
         "failoverEnabledExtra": "If enabled, when the count of failed requests with a certain auth token exceeds the threshold, Aigateway will stop sending requests with it until following health check requests get a certain number of successes.",
         "failureThreshold": "Min Consecuitive Failures to Mark Down a Token",
@@ -463,6 +598,8 @@
       "rules": {
         "tokenRequired": "Please input auth token",
         "typeRequired": "Please select a LLM provider",
+        "inputPer1KRequired": "Please input the RMB unit price for every 1K input tokens",
+        "outputPer1KRequired": "Please input the RMB unit price for every 1K output tokens",
         "serviceNameRequired": "Please input service name",
         "serviceNameNoSlash": "Slashes (/) are not allowed in name",
         "failureThresholdRequired": "Please input min consecuitive failures to mark down a token",
@@ -505,6 +642,10 @@
         "claudeCodeModeTooltip": "Enable Claude Code mode to use OAuth token authentication instead of API key. Run 'claude setup-token' to get your OAuth token."
       },
       "placeholder": {
+        "modelIntro": "Describe the positioning, target workload, and recommended scenarios of this model",
+        "modelTag": "Example: Chinese optimized",
+        "modelModality": "Example: text",
+        "modelFeature": "Example: function-calling",
         "azureServiceUrlPlaceholder": "It shall contain \"/chat/completions\" in the path and \"api-version\" in the query string",
         "ollamaServerHostPlaceholder": "Please input a hostname, domain name or IP address",
         "openaiCustomUrlPlaceholder": "Sample: https://api.openai.com/v1",
@@ -641,8 +782,8 @@
         "edit": "Edit Plugin"
       },
       "name": "Plugin Name",
-      "namePattern": "Shall only contain upper-and lower-case letters, digits, dashes (-) and dots (.). And cannot end with a dash (-) or dot (.).",
-      "namePlaceholder": "Shall only contain upper-and lower-case letters, digits, dashes (-) and dots (.). And cannot end with a dash (-) or dot (.).",
+      "namePattern": "Only lowercase letters, digits, dashes (-), and dots (.) are allowed, and it must start and end with a letter or digit.",
+      "namePlaceholder": "Only lowercase letters, digits, dashes (-), and dots (.) are allowed, and it must start and end with a letter or digit.",
       "description": "Plugin Description",
       "descriptionPlaceholder": "Please input plugin description",
       "imageUrl": "Image URL",
@@ -1007,7 +1148,7 @@
       "reset": "Reset"
     },
     "form": {
-      "namePattern": "Shall only contain upper-and lower-case letters, digits, dashes (-) and dots (.). And cannot end with a dash (-) or dot (.).",
+      "namePattern": "Only lowercase letters, digits, dashes (-), and dots (.) are allowed, and it must start and end with a letter or digit.",
       "create": "Create MCP Service",
       "edit": "Edit MCP Service",
       "name": "Service Name",
@@ -1051,6 +1192,9 @@
       "allowedConsumers": "Allowed Users",
       "allowedConsumersRequired": "Please select allowed users",
       "allowedConsumersPlaceholder": "Please select allowed users",
+      "allowedConsumerLevels": "Allowed User Levels",
+      "allowedConsumerLevelsRequired": "Please select allowed user levels",
+      "allowedConsumerLevelsPlaceholder": "Please select allowed user levels",
       "ok": "OK",
       "upstreamPathPrefixLabel": "Backend Service Path Prefix",
       "serviceName": "Service Name",

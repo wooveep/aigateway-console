@@ -23,11 +23,6 @@ export interface McpServer {
   consumerAuthInfo?: ConsumerAuthInfo;
 }
 
-export interface McpServerConsumers {
-  mcpServerName: string;
-  consumers: string[];
-}
-
 export interface McpServerConsumerDetail {
   mcpServerName: string;
   consumerName: string;
@@ -47,4 +42,5 @@ interface ConsumerAuthInfo {
   type: string;
   enable: boolean;
   allowedConsumers: string[];
+  allowedConsumerLevels?: Array<'normal' | 'plus' | 'pro' | 'ultra' | string>;
 }

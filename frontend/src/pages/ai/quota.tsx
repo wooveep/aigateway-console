@@ -4,6 +4,8 @@ import {
   AiQuotaScheduleAction,
   AiQuotaScheduleRule,
   AiQuotaScheduleRuleRequest,
+  AiQuotaUserPolicy,
+  AiQuotaUserPolicyRequest,
 } from '@/interfaces/ai-quota';
 import {
   deleteAiQuotaScheduleRule,
@@ -11,13 +13,16 @@ import {
   getAiQuotaConsumers,
   getAiQuotaRoutes,
   getAiQuotaScheduleRules,
+  getAiQuotaUserPolicy,
   refreshAiQuota,
+  saveAiQuotaUserPolicy,
   saveAiQuotaScheduleRule,
 } from '@/services/ai-quota';
 import { RedoOutlined } from '@ant-design/icons';
 import { PageContainer } from '@ant-design/pro-layout';
 import { useRequest } from 'ahooks';
 import {
+  Alert,
   Button,
   Descriptions,
   Drawer,
@@ -38,8 +43,36 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const { Text } = Typography;
+const BUILTIN_ADMIN_CONSUMER = 'administrator';
+const MICRO_YUAN_PER_RMB = 1_000_000;
 
 type QuotaModalType = 'refresh' | 'delta' | null;
+
+const isAmountQuotaUnit = (quotaUnit?: string) => quotaUnit === 'amount';
+
+const toDisplayQuota = (value: number, quotaUnit?: string) => {
+  if (!isAmountQuotaUnit(quotaUnit)) {
+    return `${value ?? 0}`;
+  }
+  return `${(value / MICRO_YUAN_PER_RMB).toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 6,
+  })} RMB`;
+};
+
+const toFormQuotaValue = (value: number, quotaUnit?: string) => {
+  if (!isAmountQuotaUnit(quotaUnit)) {
+    return value ?? 0;
+  }
+  return (value ?? 0) / MICRO_YUAN_PER_RMB;
+};
+
+const toStoredQuotaValue = (value: number, quotaUnit?: string) => {
+  if (!isAmountQuotaUnit(quotaUnit)) {
+    return Math.round(value ?? 0);
+  }
+  return Math.round((value ?? 0) * MICRO_YUAN_PER_RMB);
+};
 
 const AiQuotaPage: React.FC = () => {
   const { t } = useTranslation();
@@ -53,14 +86,70 @@ const AiQuotaPage: React.FC = () => {
   const [scheduleRules, setScheduleRules] = useState<AiQuotaScheduleRule[]>([]);
   const [scheduleConsumer, setScheduleConsumer] = useState<AiQuotaConsumerQuota | null>(null);
   const [editingScheduleRule, setEditingScheduleRule] = useState<AiQuotaScheduleRule | null>(null);
+  const [policyDrawerOpen, setPolicyDrawerOpen] = useState(false);
+  const [policyConsumer, setPolicyConsumer] = useState<AiQuotaConsumerQuota | null>(null);
+  const [policyLoading, setPolicyLoading] = useState(false);
+  const [policySubmitting, setPolicySubmitting] = useState(false);
 
   const [quotaForm] = Form.useForm();
   const [scheduleForm] = Form.useForm();
+  const [policyForm] = Form.useForm();
 
   const selectedRoute = useMemo(
     () => routes.find((route) => route.routeName === selectedRouteName),
     [routes, selectedRouteName],
   );
+  const amountMode = isAmountQuotaUnit(selectedRoute?.quotaUnit);
+  const quotaInputPrecision = isAmountQuotaUnit(selectedRoute?.quotaUnit) ? 6 : 0;
+  const quotaInputStep = isAmountQuotaUnit(selectedRoute?.quotaUnit) ? 0.01 : 1;
+  const quotaUnitLabel = amountMode
+    ? t('aiQuota.units.amount')
+    : t('aiQuota.units.token');
+  const quotaColumnTitle = amountMode ? t('aiQuota.columns.balance') : t('aiQuota.columns.quota');
+  const refreshActionLabel = amountMode ? t('aiQuota.actions.refreshBalance') : t('aiQuota.actions.refresh');
+  const deltaActionLabel = amountMode ? t('aiQuota.actions.deltaBalance') : t('aiQuota.actions.delta');
+  const pageModeTitle = amountMode ? t('aiQuota.mode.amountTitle') : t('aiQuota.mode.tokenTitle');
+  const pageModeDescription = amountMode
+    ? t('aiQuota.mode.amountDescription')
+    : t('aiQuota.mode.tokenDescription');
+  const summaryKeyPrefixLabel = amountMode
+    ? t('aiQuota.summary.balanceKeyPrefix')
+    : t('aiQuota.summary.redisKeyPrefix');
+  const refreshModalTitle = amountMode
+    ? t('aiQuota.modals.refreshBalanceTitle')
+    : t('aiQuota.modals.refreshTitle');
+  const deltaModalTitle = amountMode
+    ? t('aiQuota.modals.deltaBalanceTitle')
+    : t('aiQuota.modals.deltaTitle');
+  const refreshValueLabel = amountMode
+    ? t('aiQuota.modals.refreshBalanceValue')
+    : t('aiQuota.modals.refreshValue');
+  const deltaValueLabel = amountMode
+    ? t('aiQuota.modals.deltaBalanceValue')
+    : t('aiQuota.modals.deltaValue');
+  const refreshSuccessMessage = amountMode
+    ? t('aiQuota.messages.refreshBalanceSuccess')
+    : t('aiQuota.messages.refreshSuccess');
+  const deltaSuccessMessage = amountMode
+    ? t('aiQuota.messages.deltaBalanceSuccess')
+    : t('aiQuota.messages.deltaSuccess');
+  const scheduleTitle = amountMode ? t('aiQuota.schedule.balanceTitle') : t('aiQuota.schedule.title');
+  const scheduleRefreshLabel = amountMode
+    ? t('aiQuota.schedule.actions.refreshBalance')
+    : t('aiQuota.schedule.actions.refresh');
+  const scheduleDeltaLabel = amountMode
+    ? t('aiQuota.schedule.actions.deltaBalance')
+    : t('aiQuota.schedule.actions.delta');
+
+  const createDefaultPolicyValues = (policy?: Partial<AiQuotaUserPolicy>) => ({
+    limitTotal: toFormQuotaValue(policy?.limitTotal ?? 0, selectedRoute?.quotaUnit),
+    limit5h: toFormQuotaValue(policy?.limit5h ?? 0, selectedRoute?.quotaUnit),
+    limitDaily: toFormQuotaValue(policy?.limitDaily ?? 0, selectedRoute?.quotaUnit),
+    dailyResetTime: policy?.dailyResetTime || '00:00',
+    limitWeekly: toFormQuotaValue(policy?.limitWeekly ?? 0, selectedRoute?.quotaUnit),
+    limitMonthly: toFormQuotaValue(policy?.limitMonthly ?? 0, selectedRoute?.quotaUnit),
+    costResetAt: policy?.costResetAt || '',
+  });
 
   const { loading: routesLoading, run: loadRoutes } = useRequest(getAiQuotaRoutes, {
     manual: true,
@@ -101,8 +190,17 @@ const AiQuotaPage: React.FC = () => {
     }
   }, [selectedRouteName]);
 
+  useEffect(() => {
+    setPolicyDrawerOpen(false);
+    setPolicyConsumer(null);
+    policyForm.resetFields();
+  }, [selectedRouteName]);
+
   const filteredQuotaList = useMemo(() => {
     return quotaList.filter((item) => {
+      if (item.consumerName === BUILTIN_ADMIN_CONSUMER) {
+        return false;
+      }
       if (!keyword) {
         return true;
       }
@@ -118,10 +216,13 @@ const AiQuotaPage: React.FC = () => {
   };
 
   const openQuotaModal = (type: QuotaModalType, consumer: AiQuotaConsumerQuota) => {
+    if (consumer.consumerName === BUILTIN_ADMIN_CONSUMER) {
+      return;
+    }
     setQuotaModalType(type);
     setCurrentConsumer(consumer);
     quotaForm.setFieldsValue({
-      value: type === 'refresh' ? consumer.quota : 0,
+      value: type === 'refresh' ? toFormQuotaValue(consumer.quota, selectedRoute?.quotaUnit) : 0,
     });
   };
 
@@ -136,19 +237,20 @@ const AiQuotaPage: React.FC = () => {
       return;
     }
     const values = await quotaForm.validateFields();
+    const storedValue = toStoredQuotaValue(values.value, selectedRoute?.quotaUnit);
     if (quotaModalType === 'refresh') {
-      await refreshAiQuota(selectedRouteName, currentConsumer.consumerName, values.value);
-      message.success(t('aiQuota.messages.refreshSuccess'));
+      await refreshAiQuota(selectedRouteName, currentConsumer.consumerName, storedValue);
+      message.success(refreshSuccessMessage);
     } else {
-      await deltaAiQuota(selectedRouteName, currentConsumer.consumerName, values.value);
-      message.success(t('aiQuota.messages.deltaSuccess'));
+      await deltaAiQuota(selectedRouteName, currentConsumer.consumerName, storedValue);
+      message.success(deltaSuccessMessage);
     }
     closeQuotaModal();
     await loadConsumers(selectedRouteName);
   };
 
   const openScheduleDrawer = async (consumer: AiQuotaConsumerQuota) => {
-    if (!selectedRouteName) {
+    if (!selectedRouteName || consumer.consumerName === BUILTIN_ADMIN_CONSUMER) {
       return;
     }
     setScheduleConsumer(consumer);
@@ -156,7 +258,7 @@ const AiQuotaPage: React.FC = () => {
     scheduleForm.setFieldsValue({
       action: 'REFRESH',
       cron: '0 0 0 * * *',
-      value: consumer.quota,
+      value: toFormQuotaValue(consumer.quota, selectedRoute?.quotaUnit),
       enabled: true,
     });
     setScheduleDrawerOpen(true);
@@ -171,6 +273,80 @@ const AiQuotaPage: React.FC = () => {
     scheduleForm.resetFields();
   };
 
+  const openPolicyDrawer = async (consumer: AiQuotaConsumerQuota) => {
+    if (!selectedRouteName || !amountMode || consumer.consumerName === BUILTIN_ADMIN_CONSUMER) {
+      return;
+    }
+    setPolicyConsumer(consumer);
+    setPolicyDrawerOpen(true);
+    setPolicyLoading(true);
+    try {
+      const policy = await getAiQuotaUserPolicy(selectedRouteName, consumer.consumerName);
+      policyForm.setFieldsValue(createDefaultPolicyValues(policy));
+    } finally {
+      setPolicyLoading(false);
+    }
+  };
+
+  const closePolicyDrawer = () => {
+    setPolicyDrawerOpen(false);
+    setPolicyConsumer(null);
+    setPolicyLoading(false);
+    setPolicySubmitting(false);
+    policyForm.resetFields();
+  };
+
+  const resetPolicyForm = async () => {
+    if (!selectedRouteName || !policyConsumer) {
+      return;
+    }
+    setPolicyLoading(true);
+    try {
+      const policy = await getAiQuotaUserPolicy(selectedRouteName, policyConsumer.consumerName);
+      policyForm.setFieldsValue(createDefaultPolicyValues(policy));
+    } finally {
+      setPolicyLoading(false);
+    }
+  };
+
+  const fillPolicyResetNow = () => {
+    const now = new Date();
+    const pad = (value: number) => `${value}`.padStart(2, '0');
+    const localValue = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(
+      now.getHours(),
+    )}:${pad(now.getMinutes())}`;
+    policyForm.setFieldsValue({ costResetAt: localValue });
+  };
+
+  const clearPolicyResetAt = () => {
+    policyForm.setFieldsValue({ costResetAt: '' });
+  };
+
+  const submitPolicy = async () => {
+    if (!selectedRouteName || !policyConsumer) {
+      return;
+    }
+    const values = await policyForm.validateFields();
+    const payload: AiQuotaUserPolicyRequest = {
+      limitTotal: toStoredQuotaValue(values.limitTotal, selectedRoute?.quotaUnit),
+      limit5h: toStoredQuotaValue(values.limit5h, selectedRoute?.quotaUnit),
+      limitDaily: toStoredQuotaValue(values.limitDaily, selectedRoute?.quotaUnit),
+      dailyResetMode: 'fixed',
+      dailyResetTime: values.dailyResetTime,
+      limitWeekly: toStoredQuotaValue(values.limitWeekly, selectedRoute?.quotaUnit),
+      limitMonthly: toStoredQuotaValue(values.limitMonthly, selectedRoute?.quotaUnit),
+      costResetAt: values.costResetAt?.trim() ? values.costResetAt.trim() : undefined,
+    };
+    setPolicySubmitting(true);
+    try {
+      const saved = await saveAiQuotaUserPolicy(selectedRouteName, policyConsumer.consumerName, payload);
+      message.success(t('aiQuota.messages.policySaved'));
+      policyForm.setFieldsValue(createDefaultPolicyValues(saved));
+    } finally {
+      setPolicySubmitting(false);
+    }
+  };
+
   const submitScheduleRule = async () => {
     if (!selectedRouteName || !scheduleConsumer) {
       return;
@@ -181,7 +357,7 @@ const AiQuotaPage: React.FC = () => {
       consumerName: scheduleConsumer.consumerName,
       action: values.action as AiQuotaScheduleAction,
       cron: values.cron,
-      value: values.value,
+      value: toStoredQuotaValue(values.value, selectedRoute?.quotaUnit),
       enabled: values.enabled,
     };
     await saveAiQuotaScheduleRule(selectedRouteName, payload);
@@ -190,7 +366,7 @@ const AiQuotaPage: React.FC = () => {
     scheduleForm.setFieldsValue({
       action: 'REFRESH',
       cron: '0 0 0 * * *',
-      value: scheduleConsumer.quota,
+      value: toFormQuotaValue(scheduleConsumer.quota, selectedRoute?.quotaUnit),
       enabled: true,
     });
     await loadSchedules(selectedRouteName, scheduleConsumer.consumerName);
@@ -202,7 +378,7 @@ const AiQuotaPage: React.FC = () => {
     scheduleForm.setFieldsValue({
       action: rule.action,
       cron: rule.cron,
-      value: rule.value,
+      value: toFormQuotaValue(rule.value, selectedRoute?.quotaUnit),
       enabled: rule.enabled,
     });
   };
@@ -218,7 +394,7 @@ const AiQuotaPage: React.FC = () => {
       scheduleForm.setFieldsValue({
         action: 'REFRESH',
         cron: '0 0 0 * * *',
-        value: scheduleConsumer.quota,
+        value: toFormQuotaValue(scheduleConsumer.quota, selectedRoute?.quotaUnit),
         enabled: true,
       });
     }
@@ -231,7 +407,7 @@ const AiQuotaPage: React.FC = () => {
     scheduleForm.setFieldsValue({
       action: 'REFRESH',
       cron: '0 0 0 * * *',
-      value: scheduleConsumer?.quota ?? 0,
+      value: toFormQuotaValue(scheduleConsumer?.quota ?? 0, selectedRoute?.quotaUnit),
       enabled: true,
     });
   };
@@ -243,19 +419,20 @@ const AiQuotaPage: React.FC = () => {
       key: 'consumerName',
     },
     {
-      title: t('aiQuota.columns.quota'),
+      title: quotaColumnTitle,
       dataIndex: 'quota',
       key: 'quota',
-      render: (value: number) => value ?? 0,
+      render: (value: number) => toDisplayQuota(value, selectedRoute?.quotaUnit),
     },
     {
       title: t('aiQuota.columns.actions'),
       key: 'actions',
-      width: 220,
+      width: amountMode ? 280 : 220,
       render: (_: unknown, record: AiQuotaConsumerQuota) => (
         <Space size="small">
-          <a onClick={() => openQuotaModal('refresh', record)}>{t('aiQuota.actions.refresh')}</a>
-          <a onClick={() => openQuotaModal('delta', record)}>{t('aiQuota.actions.delta')}</a>
+          <a onClick={() => openQuotaModal('refresh', record)}>{refreshActionLabel}</a>
+          <a onClick={() => openQuotaModal('delta', record)}>{deltaActionLabel}</a>
+          {amountMode && <a onClick={() => openPolicyDrawer(record)}>{t('aiQuota.actions.policy')}</a>}
           <a onClick={() => openScheduleDrawer(record)}>{t('aiQuota.actions.schedule')}</a>
         </Space>
       ),
@@ -269,7 +446,7 @@ const AiQuotaPage: React.FC = () => {
       key: 'action',
       render: (value: AiQuotaScheduleAction) => (
         <Tag color={value === 'REFRESH' ? 'blue' : 'green'}>
-          {value === 'REFRESH' ? t('aiQuota.schedule.actions.refresh') : t('aiQuota.schedule.actions.delta')}
+          {value === 'REFRESH' ? scheduleRefreshLabel : scheduleDeltaLabel}
         </Tag>
       ),
     },
@@ -282,6 +459,7 @@ const AiQuotaPage: React.FC = () => {
       title: t('aiQuota.schedule.columns.value'),
       dataIndex: 'value',
       key: 'value',
+      render: (value: number) => toDisplayQuota(value, selectedRoute?.quotaUnit),
     },
     {
       title: t('aiQuota.schedule.columns.enabled'),
@@ -331,6 +509,14 @@ const AiQuotaPage: React.FC = () => {
 
   return (
     <PageContainer>
+      <Alert
+        style={{ marginBottom: 16 }}
+        type={amountMode ? 'info' : 'success'}
+        showIcon
+        message={pageModeTitle}
+        description={pageModeDescription}
+      />
+
       <div style={{ background: '#fff', padding: 24, marginBottom: 16 }}>
         <Space wrap style={{ width: '100%', justifyContent: 'space-between' }}>
           <Space wrap size={16}>
@@ -375,7 +561,7 @@ const AiQuotaPage: React.FC = () => {
             <Descriptions.Item label={t('aiQuota.summary.domains')}>
               {selectedRoute.domains?.length ? selectedRoute.domains.join(', ') : '-'}
             </Descriptions.Item>
-            <Descriptions.Item label={t('aiQuota.summary.redisKeyPrefix')}>
+            <Descriptions.Item label={summaryKeyPrefixLabel}>
               {selectedRoute.redisKeyPrefix}
             </Descriptions.Item>
             <Descriptions.Item label={t('aiQuota.summary.adminConsumer')}>
@@ -383,6 +569,12 @@ const AiQuotaPage: React.FC = () => {
             </Descriptions.Item>
             <Descriptions.Item label={t('aiQuota.summary.adminPath')}>
               {selectedRoute.adminPath}
+            </Descriptions.Item>
+            <Descriptions.Item label={t('aiQuota.summary.quotaUnit')}>
+              {quotaUnitLabel}
+            </Descriptions.Item>
+            <Descriptions.Item label={t('aiQuota.summary.scheduleRuleCount')}>
+              {selectedRoute.scheduleRuleCount}
             </Descriptions.Item>
           </Descriptions>
         </div>
@@ -402,9 +594,7 @@ const AiQuotaPage: React.FC = () => {
       </div>
 
       <Modal
-        title={
-          quotaModalType === 'refresh' ? t('aiQuota.modals.refreshTitle') : t('aiQuota.modals.deltaTitle')
-        }
+        title={quotaModalType === 'refresh' ? refreshModalTitle : deltaModalTitle}
         open={!!quotaModalType}
         onCancel={closeQuotaModal}
         onOk={submitQuotaModal}
@@ -416,7 +606,8 @@ const AiQuotaPage: React.FC = () => {
           </Form.Item>
           <Form.Item
             name="value"
-            label={quotaModalType === 'refresh' ? t('aiQuota.modals.refreshValue') : t('aiQuota.modals.deltaValue')}
+            label={`${quotaModalType === 'refresh' ? refreshValueLabel : deltaValueLabel} (${quotaUnitLabel})`}
+            extra={amountMode ? t('aiQuota.form.amountValueHelp') : undefined}
             rules={[
               {
                 required: true,
@@ -427,14 +618,115 @@ const AiQuotaPage: React.FC = () => {
               },
             ]}
           >
-            <InputNumber style={{ width: '100%' }} precision={0} />
+            <InputNumber style={{ width: '100%' }} precision={quotaInputPrecision} step={quotaInputStep} />
           </Form.Item>
         </Form>
       </Modal>
 
       <Drawer
+        width={640}
+        title={t('aiQuota.policy.title')}
+        open={policyDrawerOpen}
+        onClose={closePolicyDrawer}
+        destroyOnClose
+      >
+        <Alert
+          style={{ marginBottom: 16 }}
+          type="info"
+          showIcon
+          message={t('aiQuota.policy.description')}
+        />
+        <div style={{ marginBottom: 16 }}>
+          <Text strong>{t('aiQuota.columns.consumer')}:</Text>{' '}
+          <Text>{policyConsumer?.consumerName || '-'}</Text>
+        </div>
+        <Form
+          form={policyForm}
+          layout="vertical"
+          initialValues={createDefaultPolicyValues()}
+        >
+          <Form.Item label={t('aiQuota.policy.form.dailyResetMode')}>
+            <Text>{t('aiQuota.policy.form.fixedResetMode')}</Text>
+          </Form.Item>
+          <Form.Item
+            name="limitTotal"
+            label={`${t('aiQuota.policy.form.limitTotal')} (${quotaUnitLabel})`}
+            extra={t('aiQuota.policy.form.amountHelp')}
+            rules={[{ required: true, message: t('aiQuota.validation.policyLimitRequired') || '' }]}
+          >
+            <InputNumber min={0} style={{ width: '100%' }} precision={quotaInputPrecision} step={quotaInputStep} />
+          </Form.Item>
+          <Form.Item
+            name="limit5h"
+            label={`${t('aiQuota.policy.form.limit5h')} (${quotaUnitLabel})`}
+            extra={t('aiQuota.policy.form.amountHelp')}
+            rules={[{ required: true, message: t('aiQuota.validation.policyLimitRequired') || '' }]}
+          >
+            <InputNumber min={0} style={{ width: '100%' }} precision={quotaInputPrecision} step={quotaInputStep} />
+          </Form.Item>
+          <Form.Item
+            name="limitDaily"
+            label={`${t('aiQuota.policy.form.limitDaily')} (${quotaUnitLabel})`}
+            extra={t('aiQuota.policy.form.amountHelp')}
+            rules={[{ required: true, message: t('aiQuota.validation.policyLimitRequired') || '' }]}
+          >
+            <InputNumber min={0} style={{ width: '100%' }} precision={quotaInputPrecision} step={quotaInputStep} />
+          </Form.Item>
+          <Form.Item
+            name="dailyResetTime"
+            label={t('aiQuota.policy.form.dailyResetTime')}
+            extra={t('aiQuota.policy.form.dailyResetTimeHelp')}
+            rules={[
+              { required: true, message: t('aiQuota.validation.policyDailyResetTimeRequired') || '' },
+              {
+                pattern: /^([01][0-9]|2[0-3]):[0-5][0-9]$/,
+                message: t('aiQuota.validation.policyDailyResetTimeInvalid') || '',
+              },
+            ]}
+          >
+            <Input placeholder="00:00" />
+          </Form.Item>
+          <Form.Item
+            name="limitWeekly"
+            label={`${t('aiQuota.policy.form.limitWeekly')} (${quotaUnitLabel})`}
+            extra={t('aiQuota.policy.form.amountHelp')}
+            rules={[{ required: true, message: t('aiQuota.validation.policyLimitRequired') || '' }]}
+          >
+            <InputNumber min={0} style={{ width: '100%' }} precision={quotaInputPrecision} step={quotaInputStep} />
+          </Form.Item>
+          <Form.Item
+            name="limitMonthly"
+            label={`${t('aiQuota.policy.form.limitMonthly')} (${quotaUnitLabel})`}
+            extra={t('aiQuota.policy.form.amountHelp')}
+            rules={[{ required: true, message: t('aiQuota.validation.policyLimitRequired') || '' }]}
+          >
+            <InputNumber min={0} style={{ width: '100%' }} precision={quotaInputPrecision} step={quotaInputStep} />
+          </Form.Item>
+          <Form.Item
+            name="costResetAt"
+            label={t('aiQuota.policy.form.costResetAt')}
+            extra={t('aiQuota.policy.form.costResetAtHelp')}
+          >
+            <Input placeholder="2026-03-27T10:30" />
+          </Form.Item>
+          <Space style={{ marginBottom: 24 }}>
+            <Button onClick={fillPolicyResetNow}>{t('aiQuota.policy.actions.setResetNow')}</Button>
+            <Button onClick={clearPolicyResetAt}>{t('aiQuota.policy.actions.clearResetAt')}</Button>
+          </Space>
+          <Space>
+            <Button type="primary" loading={policySubmitting} onClick={submitPolicy}>
+              {t('misc.save')}
+            </Button>
+            <Button loading={policyLoading} onClick={resetPolicyForm}>
+              {t('misc.reset')}
+            </Button>
+          </Space>
+        </Form>
+      </Drawer>
+
+      <Drawer
         width={760}
-        title={t('aiQuota.schedule.title')}
+        title={scheduleTitle}
         open={scheduleDrawerOpen}
         onClose={closeScheduleDrawer}
         destroyOnClose
@@ -451,8 +743,8 @@ const AiQuotaPage: React.FC = () => {
           >
             <Select
               options={[
-                { label: t('aiQuota.schedule.actions.refresh'), value: 'REFRESH' },
-                { label: t('aiQuota.schedule.actions.delta'), value: 'DELTA' },
+                { label: scheduleRefreshLabel, value: 'REFRESH' },
+                { label: scheduleDeltaLabel, value: 'DELTA' },
               ]}
             />
           </Form.Item>
@@ -466,10 +758,11 @@ const AiQuotaPage: React.FC = () => {
           </Form.Item>
           <Form.Item
             name="value"
-            label={t('aiQuota.schedule.form.value')}
+            label={`${t('aiQuota.schedule.form.value')} (${quotaUnitLabel})`}
+            extra={amountMode ? t('aiQuota.schedule.form.amountValueHelp') : undefined}
             rules={[{ required: true, message: t('aiQuota.validation.scheduleValueRequired') || '' }]}
           >
-            <InputNumber style={{ width: '100%' }} precision={0} />
+            <InputNumber style={{ width: '100%' }} precision={quotaInputPrecision} step={quotaInputStep} />
           </Form.Item>
           <Form.Item name="enabled" label={t('aiQuota.schedule.form.enabled')} valuePropName="checked">
             <Switch />

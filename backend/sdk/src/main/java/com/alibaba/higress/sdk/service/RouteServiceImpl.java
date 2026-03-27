@@ -13,7 +13,9 @@
 package com.alibaba.higress.sdk.service;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 import org.apache.commons.collections4.CollectionUtils;
@@ -43,7 +45,7 @@ import lombok.extern.slf4j.Slf4j;
 class RouteServiceImpl implements RouteService {
 
     private static final RoutePageQuery DEFAULT_QUERY = new RoutePageQuery();
-    private static final RouteAuthConfig DEFAULT_AUTH_CONFIG = new RouteAuthConfig(false, null, null);
+    private static final RouteAuthConfig DEFAULT_AUTH_CONFIG = new RouteAuthConfig(false, null, null, null);
 
     private final KubernetesClientService kubernetesClientService;
     private final KubernetesModelConverter kubernetesModelConverter;
@@ -120,6 +122,7 @@ class RouteServiceImpl implements RouteService {
 
     @Override
     public Route add(Route route) {
+        normalizeAndAttachAuthConfig(route);
         V1Ingress ingress = kubernetesModelConverter.route2Ingress(route);
         V1Ingress newIngress;
         try {
@@ -137,6 +140,7 @@ class RouteServiceImpl implements RouteService {
 
     @Override
     public Route update(Route route) {
+        normalizeAndAttachAuthConfig(route);
         V1Ingress ingress = kubernetesModelConverter.route2Ingress(route);
 
         V1Ingress updatedIngress;
@@ -168,6 +172,8 @@ class RouteServiceImpl implements RouteService {
         if (authConfig == null) {
             authConfig = DEFAULT_AUTH_CONFIG;
         }
+        authConfig.setAllowedConsumerLevels(RouteAuthConfig.normalizeAllowedConsumerLevels(
+            authConfig.getAllowedConsumerLevels()));
         AllowList allowList = AllowList.forTarget(WasmPluginInstanceScope.ROUTE, routeName)
             .authEnabled(authConfig.getEnabled()).credentialTypes(authConfig.getAllowedCredentialTypes())
             .consumerNames(authConfig.getAllowedConsumers()).build();
@@ -177,6 +183,7 @@ class RouteServiceImpl implements RouteService {
     private Route ingress2Route(V1Ingress ingress, AllowList allowList) {
         Route route = kubernetesModelConverter.ingress2Route(ingress);
         RouteAuthConfig authConfig = new RouteAuthConfig();
+        authConfig.setAllowedConsumerLevels(readAllowedConsumerLevels(route.getCustomConfigs()));
         if (allowList == null) {
             authConfig.setEnabled(false);
         } else {
@@ -186,5 +193,46 @@ class RouteServiceImpl implements RouteService {
         }
         route.setAuthConfig(authConfig);
         return route;
+    }
+
+    private void normalizeAndAttachAuthConfig(Route route) {
+        if (route == null) {
+            return;
+        }
+        RouteAuthConfig authConfig = route.getAuthConfig();
+        if (authConfig == null) {
+            removeAllowedConsumerLevelsAnnotation(route);
+            return;
+        }
+        List<String> levels = RouteAuthConfig.normalizeAllowedConsumerLevels(authConfig.getAllowedConsumerLevels());
+        authConfig.setAllowedConsumerLevels(levels);
+        if (CollectionUtils.isEmpty(levels)) {
+            removeAllowedConsumerLevelsAnnotation(route);
+            return;
+        }
+        Map<String, String> customConfigs = new HashMap<>();
+        if (route.getCustomConfigs() != null) {
+            customConfigs.putAll(route.getCustomConfigs());
+        }
+        customConfigs.put(RouteAuthConfig.ANNOTATION_ALLOWED_CONSUMER_LEVELS,
+            RouteAuthConfig.encodeAllowedConsumerLevels(levels));
+        route.setCustomConfigs(customConfigs);
+    }
+
+    private void removeAllowedConsumerLevelsAnnotation(Route route) {
+        if (route == null || route.getCustomConfigs() == null) {
+            return;
+        }
+        Map<String, String> customConfigs = new HashMap<>(route.getCustomConfigs());
+        customConfigs.remove(RouteAuthConfig.ANNOTATION_ALLOWED_CONSUMER_LEVELS);
+        route.setCustomConfigs(customConfigs);
+    }
+
+    private List<String> readAllowedConsumerLevels(Map<String, String> customConfigs) {
+        if (customConfigs == null) {
+            return Collections.emptyList();
+        }
+        return RouteAuthConfig.parseAllowedConsumerLevels(customConfigs.get(
+            RouteAuthConfig.ANNOTATION_ALLOWED_CONSUMER_LEVELS));
     }
 }

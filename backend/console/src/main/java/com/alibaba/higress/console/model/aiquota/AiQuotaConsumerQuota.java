@@ -17,5 +17,5 @@ public class AiQuotaConsumerQuota {
     private String consumerName;
 
     @Schema(description = "Current quota")
-    private int quota;
+    private long quota;
 }

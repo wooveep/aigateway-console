@@ -32,6 +32,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.alibaba.higress.console.controller.dto.PaginatedResponse;
 import com.alibaba.higress.console.controller.dto.Response;
 import com.alibaba.higress.console.controller.util.ControllerUtil;
+import com.alibaba.higress.console.service.portal.PortalConsumerLevelAuthService;
 import com.alibaba.higress.sdk.model.CommonPageQuery;
 import com.alibaba.higress.sdk.model.PaginatedResult;
 import com.alibaba.higress.sdk.model.ai.AiRoute;
@@ -49,10 +50,16 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 public class AiRoutesController {
 
     private AiRouteService aiRouteService;
+    private PortalConsumerLevelAuthService portalConsumerLevelAuthService;
 
     @Resource
     public void setAiRouteService(AiRouteService aiRouteService) {
         this.aiRouteService = aiRouteService;
+    }
+
+    @Resource
+    public void setPortalConsumerLevelAuthService(PortalConsumerLevelAuthService portalConsumerLevelAuthService) {
+        this.portalConsumerLevelAuthService = portalConsumerLevelAuthService;
     }
 
     @GetMapping
@@ -71,6 +78,7 @@ public class AiRoutesController {
         @ApiResponse(responseCode = "409", description = "Route already existed with the same name."),
         @ApiResponse(responseCode = "500", description = "Internal server error")})
     public ResponseEntity<Response<AiRoute>> add(@RequestBody AiRoute route) {
+        portalConsumerLevelAuthService.resolveAiRouteAuthConfig(route);
         route.validate();
         AiRoute newRoute = aiRouteService.add(route);
         return ControllerUtil.buildResponseEntity(newRoute);
@@ -100,6 +108,7 @@ public class AiRoutesController {
         } else if (!StringUtils.equals(name, route.getName())) {
             throw new ValidationException("Route name in the URL doesn't match the one in the body.");
         }
+        portalConsumerLevelAuthService.resolveAiRouteAuthConfig(route);
         route.validate();
         AiRoute updatedRoute = aiRouteService.update(route);
         return ControllerUtil.buildResponseEntity(updatedRoute);

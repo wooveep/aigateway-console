@@ -31,4 +31,7 @@ public class ConsumerAuthInfo {
 
     @Schema(description = "Allowed consumer names")
     private List<String> allowedConsumers;
+
+    @Schema(description = "Allowed consumer levels")
+    private List<String> allowedConsumerLevels;
 }

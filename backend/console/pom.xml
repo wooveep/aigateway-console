@@ -17,7 +17,7 @@
 		<nodejs.version>16.19.0</nodejs.version>
 		<springdoc-openapi-maven-plugin.version>1.4</springdoc-openapi-maven-plugin.version>
 
-		<app.build.version>2.1.0</app.build.version>
+		<app.build.version>2.2.0</app.build.version>
 		<app.build.dev>true</app.build.dev>
 	</properties>
 
@@ -98,6 +98,11 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>com.h2database</groupId>
+			<artifactId>h2</artifactId>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>

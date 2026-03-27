@@ -13,6 +13,7 @@ import { history } from 'ice';
 import React, { useEffect, useRef, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { normalizeUserLevels } from '@/utils/consumer-level';
 import RouteForm from './components/RouteForm';
 
 interface FormRef {
@@ -110,22 +111,23 @@ const AiRouteList: React.FC = () => {
     },
     {
       title: t('aiRoute.columns.auth'),
-      dataIndex: ['authConfig', 'allowedConsumers'],
-      key: 'authConfig.allowedConsumers',
+      dataIndex: ['authConfig', 'allowedConsumerLevels'],
+      key: 'authConfig.allowedConsumerLevels',
       render: (value, record) => {
         const { authConfig } = record;
         if (!authConfig || !authConfig.enabled) {
           return t('aiRoute.authNotEnabled');
         }
-        if (!Array.isArray(value) || !value.length) {
+        const levels = normalizeUserLevels(value);
+        if (!levels.length) {
           return t('aiRoute.authEnabledWithoutConsumer');
         }
         const result: React.ReactNode[] = [];
-        value.forEach((consumer, index) => {
+        levels.forEach((level, index) => {
           if (index > 0) {
             result.push(<br key={`br-${index}`} />);
           }
-          result.push(<span key={`span-${index}`}>{consumer}</span>);
+          result.push(<span key={`span-${index}`}>{t(`consumer.userLevel.${level}`)}</span>);
         });
         return result;
       },

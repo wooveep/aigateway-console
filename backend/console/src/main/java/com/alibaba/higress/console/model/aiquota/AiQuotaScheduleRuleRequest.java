@@ -24,7 +24,7 @@ public class AiQuotaScheduleRuleRequest {
     private String cron;
 
     @Schema(description = "Quota value for REFRESH or delta value for DELTA")
-    private Integer value;
+    private Long value;
 
     @Schema(description = "Whether the rule is enabled")
     private Boolean enabled;
