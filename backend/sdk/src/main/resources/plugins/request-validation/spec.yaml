@@ -12,7 +12,7 @@ info:
   x-description-i18n:
     zh-CN: 提前验证向上游服务转发的请求，可以验证请求的 Body 以及 Header 的数据。
   iconUrl: https://img.alicdn.com/imgextra/i3/O1CN01bAFa9k1t1gdQcVTH0_!!6000000005842-2-tps-42-42.png
-  version: 1.0.0
+  version: 2.0.0
   contact:
     name: Higress Team
     url: http://higress.io/
