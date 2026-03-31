@@ -5,6 +5,7 @@ import java.util.List;
 import com.alibaba.higress.console.model.aisensitive.AiSensitiveBlockAudit;
 import com.alibaba.higress.console.model.aisensitive.AiSensitiveBlockAuditEvent;
 import com.alibaba.higress.console.model.aisensitive.AiSensitiveDetectRule;
+import com.alibaba.higress.console.model.aisensitive.AiSensitiveMenuState;
 import com.alibaba.higress.console.model.aisensitive.AiSensitiveReplaceRule;
 import com.alibaba.higress.console.model.aisensitive.AiSensitiveStatus;
 import com.alibaba.higress.console.model.aisensitive.AiSensitiveSystemConfig;
@@ -31,6 +32,8 @@ public interface AiSensitiveWordService {
     AiSensitiveSystemConfig saveSystemConfig(AiSensitiveSystemConfig config);
 
     AiSensitiveStatus getStatus();
+
+    AiSensitiveMenuState getMenuState();
 
     AiSensitiveStatus reconcile();
 

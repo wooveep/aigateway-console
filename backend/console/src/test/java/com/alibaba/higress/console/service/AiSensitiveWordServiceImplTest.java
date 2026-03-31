@@ -6,22 +6,32 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import com.alibaba.higress.console.model.aisensitive.AiSensitiveBlockAudit;
 import com.alibaba.higress.console.model.aisensitive.AiSensitiveBlockAuditEvent;
+import com.alibaba.higress.console.model.aisensitive.AiSensitiveMenuState;
 import com.alibaba.higress.console.model.aisensitive.AiSensitiveSystemConfig;
 import com.alibaba.higress.console.model.User;
 import com.alibaba.higress.console.model.portal.PortalUserRecord;
 import com.alibaba.higress.console.service.portal.AiSensitiveWordJdbcService;
 import com.alibaba.higress.console.service.portal.PortalUserJdbcService;
+import com.alibaba.higress.sdk.constant.plugin.BuiltInPluginName;
+import com.alibaba.higress.sdk.model.WasmPluginInstance;
+import com.alibaba.higress.sdk.model.WasmPluginInstanceScope;
+import com.alibaba.higress.sdk.service.WasmPluginInstanceService;
 
 class AiSensitiveWordServiceImplTest {
 
     private AiSensitiveWordJdbcService aiSensitiveWordJdbcService;
     private PortalUserJdbcService portalUserJdbcService;
     private AiSensitiveWordProjectionService projectionService;
+    private WasmPluginInstanceService wasmPluginInstanceService;
     private AiSensitiveWordServiceImpl service;
 
     @BeforeEach
@@ -30,11 +40,13 @@ class AiSensitiveWordServiceImplTest {
         aiSensitiveWordJdbcService = mock(AiSensitiveWordJdbcService.class);
         portalUserJdbcService = mock(PortalUserJdbcService.class);
         projectionService = mock(AiSensitiveWordProjectionService.class);
+        wasmPluginInstanceService = mock(WasmPluginInstanceService.class);
 
         service = new AiSensitiveWordServiceImpl();
         service.setAiSensitiveWordJdbcService(aiSensitiveWordJdbcService);
         service.setPortalUserJdbcService(portalUserJdbcService);
         service.setProjectionService(projectionService);
+        service.setWasmPluginInstanceService(wasmPluginInstanceService);
     }
 
     @Test
@@ -85,5 +97,30 @@ class AiSensitiveWordServiceImplTest {
         assertSame(saved, result);
         verify(aiSensitiveWordJdbcService).saveSystemConfig(config, "Alice");
         verify(projectionService).syncNow();
+    }
+
+    @Test
+    void getMenuStateShouldCountEnabledRouteInstances() {
+        WasmPluginInstance enabledRouteInstance = WasmPluginInstance.builder()
+            .enabled(true)
+            .targets(Collections.singletonMap(WasmPluginInstanceScope.ROUTE, "ai-route-a"))
+            .build();
+        WasmPluginInstance disabledRouteInstance = WasmPluginInstance.builder()
+            .enabled(false)
+            .targets(Collections.singletonMap(WasmPluginInstanceScope.ROUTE, "ai-route-b"))
+            .build();
+        WasmPluginInstance enabledGlobalInstance = WasmPluginInstance.builder()
+            .enabled(true)
+            .targets(Collections.singletonMap(WasmPluginInstanceScope.GLOBAL, "global"))
+            .build();
+
+        when(wasmPluginInstanceService.list(BuiltInPluginName.AI_DATA_MASKING, false))
+            .thenReturn(Arrays.asList(enabledRouteInstance, disabledRouteInstance, enabledGlobalInstance));
+
+        AiSensitiveMenuState result = service.getMenuState();
+
+        assertEquals(true, result.isEnabled());
+        assertEquals(1, result.getEnabledRouteCount());
+        verify(wasmPluginInstanceService).list(BuiltInPluginName.AI_DATA_MASKING, false);
     }
 }

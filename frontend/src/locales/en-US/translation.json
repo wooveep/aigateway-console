@@ -16,7 +16,7 @@
     "aiServiceManagement": "AI Gateway Config",
     "aiRouteManagement": "AI Route Config",
     "aiQuotaManagement": "AI Quota Management",
-    "aiSensitiveManagement": "Sensitive Word Management",
+    "aiSensitiveManagement": "AI Desensitization Management",
     "aiDashboard": "AI Dashboard",
     "llmProviderManagement": "LLM Provider Management",
     "domainManagement": "Domain Management",
@@ -123,7 +123,7 @@
   },
   "aiSensitive": {
     "notice": {
-      "pluginConfigReadonly": "Detect rules, replace rules, system dictionary settings, and audit sink settings are managed only from the Sensitive Word Management page and cannot be edited in the plugin configuration page."
+      "pluginConfigReadonly": "Detect rules, replace rules, system dictionary settings, and audit sink settings are managed only from the AI Desensitization Management page and cannot be edited in the plugin configuration page."
     },
     "tabs": {
       "detect": "Detect Rules",
@@ -147,11 +147,13 @@
       "addDetectRule": "Add Detect Rule",
       "addReplaceRule": "Add Replace Rule",
       "editSystemDictionary": "Edit System Dictionary",
+      "selectReplacePreset": "Select Preset",
       "search": "Search",
       "reset": "Reset"
     },
     "fields": {
       "pattern": "Pattern",
+      "replacePreset": "Preset",
       "matchType": "Match Type",
       "replaceType": "Replace Type",
       "replaceValue": "Replace Value",
@@ -176,7 +178,8 @@
     "placeholders": {
       "consumerName": "Input consumer_name",
       "displayName": "Input display_name",
-      "routeName": "Input route_name"
+      "routeName": "Input route_name",
+      "replacePreset": "Select a preset to prefill the rule"
     },
     "matchTypes": {
       "contains": "Contains",
@@ -197,6 +200,22 @@
       "auditQueryFailed": "Failed to query audit records. Please check your login status or the backend service.",
       "deleteDetectConfirm": "Delete this detect rule?",
       "deleteReplaceConfirm": "Delete this replace rule?"
+    },
+    "replacePreset": {
+      "help": "Selecting a preset prefills the recommended matching rule. For numeric data, a single-character replace value keeps the first 3 digits and the last 1 digit while filling the middle digits with that character.",
+      "custom": "Custom",
+      "mobilePhone": {
+        "label": "Mobile Phone Masking",
+        "description": "Matches 11-digit mainland China mobile phone numbers and preserves the first 3 digits and last 1 digit."
+      },
+      "email": {
+        "label": "Email Masking",
+        "description": "Matches email addresses and replaces them with a placeholder."
+      },
+      "bankCard": {
+        "label": "Bank Card Masking",
+        "description": "Matches 16 to 19 digit bank card numbers and masks the middle digits."
+      }
     },
     "modals": {
       "addDetect": "Add Detect Rule",

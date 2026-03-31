@@ -78,6 +78,7 @@ export default {
           {
             name: 'menu.aiSensitiveManagement',
             path: '/ai/sensitive',
+            visiblePredicate: (_configData: any, menuState: any) => menuState && menuState.aiSensitiveEnabled,
           },
           {
             name: 'menu.aiDashboard',

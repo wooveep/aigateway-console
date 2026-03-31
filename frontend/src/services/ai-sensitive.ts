@@ -2,6 +2,7 @@ import {
   AiSensitiveAuditQuery,
   AiSensitiveBlockAudit,
   AiSensitiveDetectRule,
+  AiSensitiveMenuState,
   AiSensitiveReplaceRule,
   AiSensitiveStatus,
   AiSensitiveSystemConfig,
@@ -9,6 +10,10 @@ import {
 import request from './request';
 
 const BASE_URL = '/v1/ai/sensitive-words';
+
+export const getAiSensitiveMenuState = (): Promise<AiSensitiveMenuState> => {
+  return request.get<any, AiSensitiveMenuState>(`${BASE_URL}/menu-state`);
+};
 
 export const getAiSensitiveStatus = (): Promise<AiSensitiveStatus> => {
   return request.get<any, AiSensitiveStatus>(`${BASE_URL}/status`);

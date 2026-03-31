@@ -3,6 +3,7 @@ import {
   AiSensitiveDateTimeValue,
   AiSensitiveDetectRule,
   AiSensitiveMatchType,
+  AiSensitiveReplacePreset,
   AiSensitiveReplaceRule,
   AiSensitiveReplaceType,
   AiSensitiveStatus,
@@ -145,6 +146,51 @@ const AiSensitivePage: React.FC = () => {
     [t],
   );
 
+  const replacePresets = useMemo<AiSensitiveReplacePreset[]>(
+    () => [
+      {
+        key: 'mobilePhone',
+        label: t('aiSensitive.replacePreset.mobilePhone.label'),
+        description: t('aiSensitive.replacePreset.mobilePhone.description'),
+        pattern: String.raw`\b1\d{10}\b`,
+        replaceType: 'replace',
+        replaceValue: '1',
+        restore: false,
+        priority: 100,
+      },
+      {
+        key: 'email',
+        label: t('aiSensitive.replacePreset.email.label'),
+        description: t('aiSensitive.replacePreset.email.description'),
+        pattern: String.raw`[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}`,
+        replaceType: 'replace',
+        replaceValue: '[EMAIL]',
+        restore: false,
+        priority: 90,
+      },
+      {
+        key: 'bankCard',
+        label: t('aiSensitive.replacePreset.bankCard.label'),
+        description: t('aiSensitive.replacePreset.bankCard.description'),
+        pattern: String.raw`\b\d{16,19}\b`,
+        replaceType: 'replace',
+        replaceValue: '1',
+        restore: false,
+        priority: 80,
+      },
+    ],
+    [t],
+  );
+
+  const replacePresetOptions = useMemo(
+    () =>
+      replacePresets.map((preset) => ({
+        label: preset.label,
+        value: preset.key,
+      })),
+    [replacePresets],
+  );
+
   const loadStatus = async () => {
     const result = await getAiSensitiveStatus();
     setStatus(result);
@@ -246,6 +292,7 @@ const AiSensitivePage: React.FC = () => {
   const openCreateReplaceModal = () => {
     setEditingReplaceRule(null);
     replaceForm.setFieldsValue({
+      presetKey: undefined,
       pattern: '',
       replaceType: 'replace',
       replaceValue: '',
@@ -260,11 +307,29 @@ const AiSensitivePage: React.FC = () => {
   const openEditReplaceModal = (rule: AiSensitiveReplaceRule) => {
     setEditingReplaceRule(rule);
     replaceForm.setFieldsValue({
+      presetKey: undefined,
       ...rule,
       restore: !!rule.restore,
       enabled: rule.enabled !== false,
     });
     setReplaceModalOpen(true);
+  };
+
+  const applyReplacePreset = (presetKey?: string) => {
+    const preset = replacePresets.find((item) => item.key === presetKey);
+    if (!preset) {
+      return;
+    }
+    replaceForm.setFieldsValue({
+      ...replaceForm.getFieldsValue(),
+      presetKey,
+      pattern: preset.pattern,
+      replaceType: preset.replaceType,
+      replaceValue: preset.replaceValue,
+      restore: preset.restore,
+      priority: preset.priority,
+      description: preset.description,
+    });
   };
 
   const openSystemDictionaryModal = () => {
@@ -319,11 +384,12 @@ const AiSensitivePage: React.FC = () => {
 
   const submitReplaceRule = async () => {
     const values = await replaceForm.validateFields();
+    const { presetKey: _presetKey, ...payload } = values;
     setSavingRule(true);
     try {
       await saveAiSensitiveReplaceRule({
         ...editingReplaceRule,
-        ...values,
+        ...payload,
       });
       message.success(t('aiSensitive.messages.replaceSaved'));
       setReplaceModalOpen(false);
@@ -796,6 +862,18 @@ const AiSensitivePage: React.FC = () => {
         destroyOnClose
       >
         <Form form={replaceForm} layout="vertical">
+          <Form.Item
+            name="presetKey"
+            label={t('aiSensitive.fields.replacePreset')}
+            extra={t('aiSensitive.replacePreset.help')}
+          >
+            <Select
+              allowClear
+              options={replacePresetOptions}
+              placeholder={t('aiSensitive.placeholders.replacePreset')}
+              onChange={applyReplacePreset}
+            />
+          </Form.Item>
           <Form.Item
             name="pattern"
             label={t('aiSensitive.fields.pattern')}

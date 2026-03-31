@@ -2,6 +2,11 @@ export type AiSensitiveMatchType = 'contains' | 'exact' | 'regex';
 export type AiSensitiveReplaceType = 'replace' | 'hash';
 export type AiSensitiveDateTimeValue = string | number[];
 
+export interface AiSensitiveMenuState {
+  enabled: boolean;
+  enabledRouteCount: number;
+}
+
 export interface AiSensitiveDetectRule {
   id?: number;
   pattern: string;
@@ -24,6 +29,17 @@ export interface AiSensitiveReplaceRule {
   enabled?: boolean;
   createdAt?: AiSensitiveDateTimeValue;
   updatedAt?: AiSensitiveDateTimeValue;
+}
+
+export interface AiSensitiveReplacePreset {
+  key: string;
+  label: string;
+  description?: string;
+  pattern: string;
+  replaceType: AiSensitiveReplaceType;
+  replaceValue?: string;
+  restore?: boolean;
+  priority?: number;
 }
 
 export interface AiSensitiveBlockAudit {

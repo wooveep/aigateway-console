@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.alibaba.higress.console.controller.dto.Response;
 import com.alibaba.higress.console.model.aisensitive.AiSensitiveBlockAudit;
 import com.alibaba.higress.console.model.aisensitive.AiSensitiveDetectRule;
+import com.alibaba.higress.console.model.aisensitive.AiSensitiveMenuState;
 import com.alibaba.higress.console.model.aisensitive.AiSensitiveReplaceRule;
 import com.alibaba.higress.console.model.aisensitive.AiSensitiveStatus;
 import com.alibaba.higress.console.model.aisensitive.AiSensitiveSystemConfig;
@@ -126,6 +127,12 @@ public class AiSensitiveWordController {
     @Operation(summary = "Get AI sensitive word status")
     public ResponseEntity<Response<AiSensitiveStatus>> getStatus() {
         return ResponseEntity.ok(Response.success(aiSensitiveWordService.getStatus()));
+    }
+
+    @GetMapping("/menu-state")
+    @Operation(summary = "Get AI data masking menu visibility state")
+    public ResponseEntity<Response<AiSensitiveMenuState>> getMenuState() {
+        return ResponseEntity.ok(Response.success(aiSensitiveWordService.getMenuState()));
     }
 
     @PostMapping("/reconcile")

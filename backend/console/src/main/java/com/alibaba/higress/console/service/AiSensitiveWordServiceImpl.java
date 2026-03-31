@@ -5,12 +5,14 @@ import java.util.List;
 
 import javax.annotation.Resource;
 
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
 import com.alibaba.higress.console.model.aisensitive.AiSensitiveBlockAudit;
 import com.alibaba.higress.console.model.aisensitive.AiSensitiveBlockAuditEvent;
 import com.alibaba.higress.console.model.aisensitive.AiSensitiveDetectRule;
+import com.alibaba.higress.console.model.aisensitive.AiSensitiveMenuState;
 import com.alibaba.higress.console.model.aisensitive.AiSensitiveReplaceRule;
 import com.alibaba.higress.console.model.aisensitive.AiSensitiveStatus;
 import com.alibaba.higress.console.model.aisensitive.AiSensitiveSystemConfig;
@@ -18,7 +20,11 @@ import com.alibaba.higress.console.model.User;
 import com.alibaba.higress.console.model.portal.PortalUserRecord;
 import com.alibaba.higress.console.service.portal.AiSensitiveWordJdbcService;
 import com.alibaba.higress.console.service.portal.PortalUserJdbcService;
+import com.alibaba.higress.sdk.constant.plugin.BuiltInPluginName;
 import com.alibaba.higress.sdk.exception.ValidationException;
+import com.alibaba.higress.sdk.model.WasmPluginInstance;
+import com.alibaba.higress.sdk.model.WasmPluginInstanceScope;
+import com.alibaba.higress.sdk.service.WasmPluginInstanceService;
 
 @Service
 public class AiSensitiveWordServiceImpl implements AiSensitiveWordService {
@@ -26,6 +32,7 @@ public class AiSensitiveWordServiceImpl implements AiSensitiveWordService {
     private AiSensitiveWordJdbcService aiSensitiveWordJdbcService;
     private PortalUserJdbcService portalUserJdbcService;
     private AiSensitiveWordProjectionService projectionService;
+    private WasmPluginInstanceService wasmPluginInstanceService;
 
     @Resource
     public void setAiSensitiveWordJdbcService(AiSensitiveWordJdbcService aiSensitiveWordJdbcService) {
@@ -40,6 +47,11 @@ public class AiSensitiveWordServiceImpl implements AiSensitiveWordService {
     @Resource
     public void setProjectionService(AiSensitiveWordProjectionService projectionService) {
         this.projectionService = projectionService;
+    }
+
+    @Resource
+    public void setWasmPluginInstanceService(WasmPluginInstanceService wasmPluginInstanceService) {
+        this.wasmPluginInstanceService = wasmPluginInstanceService;
     }
 
     @Override
@@ -110,6 +122,25 @@ public class AiSensitiveWordServiceImpl implements AiSensitiveWordService {
     @Override
     public AiSensitiveStatus getStatus() {
         return projectionService.getStatus();
+    }
+
+    @Override
+    public AiSensitiveMenuState getMenuState() {
+        if (wasmPluginInstanceService == null) {
+            return AiSensitiveMenuState.builder().enabled(false).enabledRouteCount(0).build();
+        }
+        List<WasmPluginInstance> instances = wasmPluginInstanceService.list(BuiltInPluginName.AI_DATA_MASKING, false);
+        if (CollectionUtils.isEmpty(instances)) {
+            return AiSensitiveMenuState.builder().enabled(false).enabledRouteCount(0).build();
+        }
+        int enabledRouteCount = (int) instances.stream()
+            .filter(instance -> instance != null && Boolean.TRUE.equals(instance.getEnabled()))
+            .filter(instance -> instance.hasScopedTarget(WasmPluginInstanceScope.ROUTE))
+            .count();
+        return AiSensitiveMenuState.builder()
+            .enabled(enabledRouteCount > 0)
+            .enabledRouteCount(enabledRouteCount)
+            .build();
     }
 
     @Override

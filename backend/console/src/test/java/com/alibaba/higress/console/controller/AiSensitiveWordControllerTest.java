@@ -14,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 
 import com.alibaba.higress.console.controller.dto.Response;
 import com.alibaba.higress.console.model.aisensitive.AiSensitiveBlockAudit;
+import com.alibaba.higress.console.model.aisensitive.AiSensitiveMenuState;
 import com.alibaba.higress.console.model.aisensitive.AiSensitiveSystemConfig;
 import com.alibaba.higress.console.service.AiSensitiveWordService;
 
@@ -89,5 +90,20 @@ class AiSensitiveWordControllerTest {
         assertEquals(200, response.getStatusCodeValue());
         assertEquals(config, response.getBody().getData());
         verify(aiSensitiveWordService).getSystemConfig();
+    }
+
+    @Test
+    void getMenuStateShouldReturnServiceResult() {
+        AiSensitiveMenuState state = AiSensitiveMenuState.builder()
+            .enabled(true)
+            .enabledRouteCount(2)
+            .build();
+        when(aiSensitiveWordService.getMenuState()).thenReturn(state);
+
+        ResponseEntity<Response<AiSensitiveMenuState>> response = controller.getMenuState();
+
+        assertEquals(200, response.getStatusCodeValue());
+        assertEquals(state, response.getBody().getData());
+        verify(aiSensitiveWordService).getMenuState();
     }
 }

@@ -3,6 +3,7 @@ import ChatRobot from '@/components/ChatRobot';
 import Footer from '@/components/Footer';
 import LanguageDropdown from '@/components/LanguageDropdown';
 import { getAiQuotaMenuState } from '@/services/ai-quota';
+import { getAiSensitiveMenuState } from '@/services/ai-sensitive';
 import store from '@/store';
 import ProLayout from '@ant-design/pro-layout';
 import { Route } from '@ant-design/pro-layout/es/typing';
@@ -21,24 +22,24 @@ export default function Layout() {
   const configData = configModel.properties || {};
   const location = useLocation();
   const { t, i18n } = useTranslation();
-  const [menuState, setMenuState] = useState({ aiQuotaEnabled: false });
+  const [menuState, setMenuState] = useState({ aiQuotaEnabled: false, aiSensitiveEnabled: false });
 
   const antdLocale = i18n.language === 'en-US' ? enUS : zhCN;
 
   useEffect(() => {
     let cancelled = false;
-    const loadMenuState = () => {
-      getAiQuotaMenuState()
-        .then((result) => {
-          if (!cancelled) {
-            setMenuState({ aiQuotaEnabled: !!result?.enabled });
-          }
-        })
-        .catch(() => {
-          if (!cancelled) {
-            setMenuState({ aiQuotaEnabled: false });
-          }
-        });
+    const loadMenuState = async () => {
+      const [quotaResult, sensitiveResult] = await Promise.all([
+        getAiQuotaMenuState().catch(() => undefined),
+        getAiSensitiveMenuState().catch(() => undefined),
+      ]);
+      if (cancelled) {
+        return;
+      }
+      setMenuState({
+        aiQuotaEnabled: !!quotaResult?.enabled,
+        aiSensitiveEnabled: !!sensitiveResult?.enabled,
+      });
     };
 
     const handleFocus = () => {

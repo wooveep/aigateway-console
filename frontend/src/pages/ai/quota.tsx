@@ -108,10 +108,6 @@ const AiQuotaPage: React.FC = () => {
   const quotaColumnTitle = amountMode ? t('aiQuota.columns.balance') : t('aiQuota.columns.quota');
   const refreshActionLabel = amountMode ? t('aiQuota.actions.refreshBalance') : t('aiQuota.actions.refresh');
   const deltaActionLabel = amountMode ? t('aiQuota.actions.deltaBalance') : t('aiQuota.actions.delta');
-  const pageModeTitle = amountMode ? t('aiQuota.mode.amountTitle') : t('aiQuota.mode.tokenTitle');
-  const pageModeDescription = amountMode
-    ? t('aiQuota.mode.amountDescription')
-    : t('aiQuota.mode.tokenDescription');
   const summaryKeyPrefixLabel = amountMode
     ? t('aiQuota.summary.balanceKeyPrefix')
     : t('aiQuota.summary.redisKeyPrefix');
@@ -509,14 +505,6 @@ const AiQuotaPage: React.FC = () => {
 
   return (
     <PageContainer>
-      <Alert
-        style={{ marginBottom: 16 }}
-        type={amountMode ? 'info' : 'success'}
-        showIcon
-        message={pageModeTitle}
-        description={pageModeDescription}
-      />
-
       <div style={{ background: '#fff', padding: 24, marginBottom: 16 }}>
         <Space wrap style={{ width: '100%', justifyContent: 'space-between' }}>
           <Space wrap size={16}>
