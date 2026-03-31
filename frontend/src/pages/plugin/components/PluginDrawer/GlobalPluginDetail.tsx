@@ -12,6 +12,16 @@ import ArrayForm from './ArrayForm';
 
 const { Text } = Typography;
 const { TabPane } = Tabs;
+const AI_DATA_MASKING_PLUGIN_NAME = 'ai-data-masking';
+const AI_DATA_MASKING_MANAGED_KEYS = [
+  'deny_words',
+  'deny_rules',
+  'replace_roles',
+  'replace_rules',
+  'audit_sink',
+  'system_deny',
+  'system_deny_words',
+];
 
 const QUERY_TYPE_2_MESSAGE_KEY = {};
 QUERY_TYPE_2_MESSAGE_KEY[QueryType.DOMAIN] = 'plugins.configForm.targetDomain';
@@ -121,13 +131,14 @@ const GlobalPluginDetail = forwardRef((props: IProps, ref) => {
   const { loading: getConfigLoading, run: getConfig } = useRequest(servicesApi.getWasmPluginsConfig, {
     manual: true,
     onSuccess: (res) => {
-      setConfigData(res);
-      setSchema(res.schema);
-      if (!res.schema?.jsonSchema?.properties) {
+      const nextConfig = pluginName === AI_DATA_MASKING_PLUGIN_NAME ? omitManagedSchema(res) : res;
+      setConfigData(nextConfig);
+      setSchema(nextConfig.schema);
+      if (!nextConfig.schema?.jsonSchema?.properties) {
         setCurrentTabKey('yaml');
       }
       if (!defaultValue) {
-        let exampleRaw = res.schema?.extensions ? res.schema.extensions['x-example-raw'] : '';
+        let exampleRaw = nextConfig.schema?.extensions ? nextConfig.schema.extensions['x-example-raw'] : '';
         if (isChangeExampleRaw) {
           // Need a space after the colon
           exampleRaw = 'allow: []';
@@ -460,14 +471,47 @@ const GlobalPluginDetail = forwardRef((props: IProps, ref) => {
     return result;
   }
 
+  function omitAiDataMaskingManagedKeys(obj) {
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) {
+      return obj;
+    }
+    const result = { ...obj };
+    AI_DATA_MASKING_MANAGED_KEYS.forEach((key) => {
+      delete result[key];
+    });
+    return result;
+  }
+
+  function omitManagedSchema(obj) {
+    if (!obj?.schema?.jsonSchema?.properties) {
+      return obj;
+    }
+    const next = JSON.parse(JSON.stringify(obj));
+    AI_DATA_MASKING_MANAGED_KEYS.forEach((key) => {
+      delete next.schema.jsonSchema.properties[key];
+      if (Array.isArray(next.schema.jsonSchema.required)) {
+        next.schema.jsonSchema.required = next.schema.jsonSchema.required.filter((item) => item !== key);
+      }
+    });
+    return next;
+  }
+
   const onSubmit = async () => {
     await form.validateFields();
     const values = form.getFieldsValue();
 
+    let nextRawConfigurations = rawConfigurations;
+    if (pluginName === AI_DATA_MASKING_PLUGIN_NAME && rawConfigurations) {
+      const parsed = yaml.load(rawConfigurations);
+      const sanitized = omitAiDataMaskingManagedKeys(parsed);
+      nextRawConfigurations = schemaToYaml(sanitized || {});
+      setRawConfigurations(nextRawConfigurations);
+    }
+
     const params = {
       ...pluginData,
       enabled: values.enabled,
-      rawConfigurations,
+      rawConfigurations: nextRawConfigurations,
     };
 
     delete params.configurations;
@@ -548,6 +592,14 @@ const GlobalPluginDetail = forwardRef((props: IProps, ref) => {
       <Spin spinning={getConfigLoading || getDataLoading || updateLoading}>
         {alertStatus.isShow && (
           <Alert style={{ marginBottom: '10px' }} message={alertStatus.message} type="warning" showIcon />
+        )}
+        {pluginName === AI_DATA_MASKING_PLUGIN_NAME && (
+          <Alert
+            style={{ marginBottom: '10px' }}
+            message={t('aiSensitive.notice.pluginConfigReadonly')}
+            type="info"
+            showIcon
+          />
         )}
         <Form name="basic" form={form} autoComplete="off" layout="vertical" onFieldsChange={fieldChange}>
           <Form.Item label={t('plugins.configForm.enableStatus')} name="enabled" valuePropName="checked">

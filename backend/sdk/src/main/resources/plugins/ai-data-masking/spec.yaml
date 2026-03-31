@@ -17,7 +17,7 @@ info:
   gatewayMinVersion: "2.0.0"    
 spec:
   phase: AUTHN
-  priority: 991
+  priority: 100
   configSchema:
     openAPIV3Schema:
       type: object
@@ -59,7 +59,17 @@ spec:
           description: 开启内置拦截规则
           x-description-i18n:
             en-US: Enable built-in interception rules
-          default: true
+          default: false
+        system_deny_words:
+          type: array
+          title: 系统拦截词库
+          x-title-i18n:
+            en-US: System Interception Dictionary
+          description: Console 投影的系统拦截词库
+          x-description-i18n:
+            en-US: Console-projected system interception dictionary
+          items:
+            type: string
         deny_code:
           type: integer
           title: 拦截状态码
@@ -96,95 +106,12 @@ spec:
           x-description-i18n:
             en-US: Content-Type header for non-OpenAI interception
           default: "application/json"
-        deny_words:
-          type: array
-          title: 自定义敏感词
-          x-title-i18n:
-            en-US: Custom Sensitive Words
-          description: 自定义敏感词列表
-          x-description-i18n:
-            en-US: Custom sensitive word list
-          items:
-            type: string
-          default: []
-        replace_roles:
-          type: array
-          title: 敏感词替换规则
-          x-title-i18n:
-            en-US: Sensitive Word Replacement Rules
-          description: 自定义敏感词正则替换
-          x-description-i18n:
-            en-US: Custom sensitive word regex replacement
-          items:
-            type: object
-            properties:
-              regex:
-                type: string
-                title: 规则正则
-                x-title-i18n:
-                  en-US: Rule Regex
-                description: 规则正则(内置GROK规则)
-                x-description-i18n:
-                  en-US: Rule regex (built-in GROK rules)
-              type:
-                type: string
-                title: 替换类型
-                x-title-i18n:
-                  en-US: Replacement Type
-                description: 替换类型
-                x-description-i18n:
-                  en-US: Replacement type
-                enum: ["replace", "hash"]
-              restore:
-                type: boolean
-                title: 是否恢复
-                x-title-i18n:
-                  en-US: Restore
-                description: 是否恢复
-                x-description-i18n:
-                  en-US: Whether to restore
-                default: false
-              value:
-                type: string
-                title: 替换值
-                x-title-i18n:
-                  en-US: Replacement Value
-                description: 替换值（支持正则变量）
-                x-description-i18n:
-                  en-US: Replacement value (supports regex variables)
       example:
-        system_deny: true
+        system_deny: false
         deny_openai: true
         deny_jsonpath:
           - "$.messages[*].content"
         deny_message: "Question or answer contains sensitive words and has been blocked."
-        deny_words:
-          - "Custom Sensitive Word 1"
-          - "Custom Sensitive Word 2"
-        replace_roles:
-          - regex: "%{MOBILE}"
-            type: "replace"
-            value: "****"
-            # Phone number: 13800138000 -> ****
-          - regex: "%{EMAILLOCALPART}@%{HOSTNAME:domain}"
-            type: "replace"
-            restore: true
-            value: "****@$domain"
-            # Email:  admin@gmail.com -> ****@gmail.com
-          - regex: "%{IP}"
-            type: "replace"
-            restore: true
-            value: "***.***.***.***"
-            # IP: 192.168.0.1 -> ***.***.***.***
-          - regex: "%{IDCARD}"
-            type: "replace"
-            value: "****"
-            # ID card: 110000000000000000 -> ****
-          - regex: "sk-[0-9a-zA-Z]*"
-            restore: true
-            type: "hash"
-            # hash sk-12345 -> 9cb495455da32f41567dab1d07f1973d
-            # The hashed value is provided to the large model, and within the data returned by the large model, the hash value is reversed back to its original value.
   routeConfigSchema:
     openAPIV3Schema:
       type: object
@@ -226,7 +153,17 @@ spec:
           description: 开启内置拦截规则
           x-description-i18n:
             en-US: Enable built-in interception rules
-          default: true
+          default: false
+        system_deny_words:
+          type: array
+          title: 系统拦截词库
+          x-title-i18n:
+            en-US: System Interception Dictionary
+          description: Console 投影的系统拦截词库
+          x-description-i18n:
+            en-US: Console-projected system interception dictionary
+          items:
+            type: string
         deny_code:
           type: integer
           title: 拦截状态码
@@ -263,92 +200,9 @@ spec:
           x-description-i18n:
             en-US: Content-Type header for non-OpenAI interception
           default: "application/json"
-        deny_words:
-          type: array
-          title: 自定义敏感词
-          x-title-i18n:
-            en-US: Custom Sensitive Words
-          description: 自定义敏感词列表
-          x-description-i18n:
-            en-US: Custom sensitive word list
-          items:
-            type: string
-          default: []
-        replace_roles:
-          type: array
-          title: 敏感词替换规则
-          x-title-i18n:
-            en-US: Sensitive Word Replacement Rules
-          description: 自定义敏感词正则替换
-          x-description-i18n:
-            en-US: Custom sensitive word regex replacement
-          items:
-            type: object
-            properties:
-              regex:
-                type: string
-                title: 规则正则
-                x-title-i18n:
-                  en-US: Rule Regex
-                description: 规则正则(内置GROK规则)
-                x-description-i18n:
-                  en-US: Rule regex (built-in GROK rules)
-              type:
-                type: string
-                title: 替换类型
-                x-title-i18n:
-                  en-US: Replacement Type
-                description: 替换类型
-                x-description-i18n:
-                  en-US: Replacement type
-                enum: ["replace", "hash"]
-              restore:
-                type: boolean
-                title: 是否恢复
-                x-title-i18n:
-                  en-US: Restore
-                description: 是否恢复
-                x-description-i18n:
-                  en-US: Whether to restore
-                default: false
-              value:
-                type: string
-                title: 替换值
-                x-title-i18n:
-                  en-US: Replacement Value
-                description: 替换值（支持正则变量）
-                x-description-i18n:
-                  en-US: Replacement value (supports regex variables)
       example:
-        system_deny: true
+        system_deny: false
         deny_openai: true
         deny_jsonpath:
           - "$.messages[*].content"
         deny_message: "Question or answer contains sensitive words and has been blocked."
-        deny_words:
-          - "Custom Sensitive Word 1"
-          - "Custom Sensitive Word 2"
-        replace_roles:
-          - regex: "%{MOBILE}"
-            type: "replace"
-            value: "****"
-            # Phone number: 13800138000 -> ****
-          - regex: "%{EMAILLOCALPART}@%{HOSTNAME:domain}"
-            type: "replace"
-            restore: true
-            value: "****@$domain"
-            # Email:  admin@gmail.com -> ****@gmail.com
-          - regex: "%{IP}"
-            type: "replace"
-            restore: true
-            value: "***.***.***.***"
-            # IP: 192.168.0.1 -> ***.***.***.***
-          - regex: "%{IDCARD}"
-            type: "replace"
-            value: "****"
-            # ID card: 110000000000000000 -> ****
-          - regex: "sk-[0-9a-zA-Z]*"
-            restore: true
-            type: "hash"
-            # hash sk-12345 -> 9cb495455da32f41567dab1d07f1973d
-            # The hashed value is provided to the large model, and within the data returned by the large model, the hash value is reversed back to its original value.

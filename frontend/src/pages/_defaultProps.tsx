@@ -76,6 +76,10 @@ export default {
             visiblePredicate: (_configData: any, menuState: any) => menuState && menuState.aiQuotaEnabled,
           },
           {
+            name: 'menu.aiSensitiveManagement',
+            path: '/ai/sensitive',
+          },
+          {
             name: 'menu.aiDashboard',
             path: '/ai/dashboard',
             visiblePredicate: (configData: any) => configData && configData['dashboard.builtin'],

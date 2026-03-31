@@ -4,7 +4,7 @@ keywords: [higress, ai data masking]
 description: AI Data Masking Plugin Configuration Reference
 ---
 ## Function Description
-  Interception and replacement of sensitive words in requests/responses
+  Sensitive-word interception for requests plus replacement and restoration for requests/responses
 ![image](https://img.alicdn.com/imgextra/i4/O1CN0156Wtko1T9JO0RiWow_!!6000000002339-0-tps-1314-638.jpg)
 
 ### Data Handling Scope
@@ -13,7 +13,7 @@ description: AI Data Masking Plugin Configuration Reference
   - raw: Entire request/response body
 
 ### Sensitive Word Interception
-  - Directly intercept sensitive words in the data handling scope and return preset error messages
+  - By default, only request content is intercepted for sensitive words and returns preset error messages
   - Supports system's built-in sensitive word library and custom sensitive words
 
 ### Sensitive Word Replacement
@@ -23,7 +23,9 @@ description: AI Data Masking Plugin Configuration Reference
 
 ## Execution Properties
 Plugin Execution Phase: `Authentication Phase`  
-Plugin Execution Priority: `991`
+Plugin Execution Priority: `100`
+
+Recommended order: run after `model-router` so the request body is parsed and `x-higress-llm-model` is populated before request-side interception, while still remaining earlier than statistics and quota plugins.
 
 ## Configuration Fields
 | Name                   | Data Type       | Default Value | Description                          |
@@ -31,7 +33,8 @@ Plugin Execution Priority: `991`
 |  deny_openai           | bool             | true           |  Intercept openai protocol          |
 |  deny_jsonpath         | string           |   []           |  Intercept specified jsonpath       |
 |  deny_raw              | bool             | false          |  Intercept raw body                 |
-|  system_deny           | bool             | true           |  Enable built-in interception rules  |
+|  system_deny           | bool             | false          |  Enable built-in interception rules  |
+|  system_deny_words     | array of string  |   -            |  Console-projected system dictionary; falls back to the bundled dictionary when omitted |
 |  deny_code             | int              | 200            |  HTTP status code when intercepted   |
 |  deny_message          | string           | Sensitive words found in the question or answer have been blocked | AI returned message when intercepted |
 |  deny_raw_message      | string           | {"errmsg":"Sensitive words found in the question or answer have been blocked"} | Content returned when not openai intercepted |
@@ -45,7 +48,7 @@ Plugin Execution Priority: `991`
 
 ## Configuration Example
 ```yaml
-system_deny: true
+system_deny: false
 deny_openai: true
 deny_jsonpath:
   - "$.messages[*].content"
@@ -126,6 +129,6 @@ Please note that you need to replace `"key":"value"` with the actual data conten
 
 ## Related Notes
  - In streaming mode, if the masked words are split across multiple chunks, restoration may not be possible
- - In streaming mode, if sensitive words are split across multiple chunks, there may be cases where part of the sensitive word is returned to the user
+ - AI/OpenAI responses are not blocked by sensitive-word rules by default; only restore/masking behavior is preserved on the response side
  - Grok built-in rule list: https://help.aliyun.com/zh/sls/user-guide/grok-patterns
  - Built-in sensitive word library data source: https://github.com/houbb/sensitive-word/tree/master/src/main/resources

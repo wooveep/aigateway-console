@@ -15,6 +15,8 @@ package com.alibaba.higress.sdk.service;
 import com.alibaba.higress.sdk.exception.BusinessException;
 import com.alibaba.higress.sdk.exception.NotFoundException;
 import com.alibaba.higress.sdk.exception.ResourceConflictException;
+import com.alibaba.higress.sdk.constant.KubernetesConstants;
+import com.alibaba.higress.sdk.constant.Separators;
 import com.alibaba.higress.sdk.http.HttpStatus;
 import com.alibaba.higress.sdk.model.PaginatedResult;
 import com.alibaba.higress.sdk.model.WasmPlugin;
@@ -480,61 +482,164 @@ class WasmPluginServiceImpl implements WasmPluginService {
 
         List<V1alpha1WasmPlugin> existedCrs;
         try {
-            final String pluginVersion = cachedBuiltInPlugin.getPlugin().getInfo().getVersion();
-            existedCrs = kubernetesClientService.listWasmPlugin(name, pluginVersion, true);
+            existedCrs = kubernetesClientService.listWasmPlugin(name, null, true);
         } catch (ApiException e) {
             throw new BusinessException("Error occurs when checking existed Wasm plugins with name " + name, e);
         }
 
-        V1alpha1WasmPlugin updatedCr = null;
+        WasmPlugin builtInPlugin = cachedBuiltInPlugin.buildWasmPlugin();
+        builtInPlugin.setImageRepository(plugin.getImageRepository());
+        builtInPlugin.setImageVersion(plugin.getImageVersion());
+        builtInPlugin.setPhase(plugin.getPhase());
+        builtInPlugin.setPriority(plugin.getPriority());
+        builtInPlugin.setImagePullPolicy(plugin.getImagePullPolicy());
+        builtInPlugin.setImagePullSecret(plugin.getImagePullSecret());
 
-        if (existedCrs.stream().allMatch(KubernetesUtil::isInternalResource)) {
-            WasmPlugin builtInPlugin = cachedBuiltInPlugin.buildWasmPlugin();
-            builtInPlugin.setImageRepository(plugin.getImageRepository());
-            builtInPlugin.setImageVersion(plugin.getImageVersion());
-            builtInPlugin.setPhase(plugin.getPhase());
-            builtInPlugin.setPriority(plugin.getPriority());
-            builtInPlugin.setImagePullPolicy(plugin.getImagePullPolicy());
-            builtInPlugin.setImagePullSecret(plugin.getImagePullSecret());
-            V1alpha1WasmPlugin cr = kubernetesModelConverter.wasmPluginToCr(builtInPlugin);
-            // Make sure it is disabled by default.
-            cr.getSpec().setDefaultConfigDisable(true);
-            try {
-                updatedCr = kubernetesClientService.createWasmPlugin(cr);
-            } catch (ApiException e) {
-                if (e.getCode() == HttpStatus.CONFLICT) {
-                    throw new ResourceConflictException();
-                }
-                throw new BusinessException(
-                    "Error occurs when adding a new Wasm plugin with name: " + cr.getMetadata().getName(), e);
+        final String desiredPluginVersion = builtInPlugin.getPluginVersion();
+        final String desiredUserCrName = name + Separators.DASH + desiredPluginVersion;
+
+        List<V1alpha1WasmPlugin> userCrs = new ArrayList<>();
+        List<V1alpha1WasmPlugin> internalCrs = new ArrayList<>();
+        for (V1alpha1WasmPlugin existedCr : existedCrs) {
+            if (KubernetesUtil.isInternalResource(existedCr)) {
+                internalCrs.add(existedCr);
+            } else {
+                userCrs.add(existedCr);
             }
         }
 
-        for (V1alpha1WasmPlugin existedCr : existedCrs) {
-            V1alpha1WasmPluginSpec spec = existedCr.getSpec();
-            if (spec == null) {
+        V1alpha1WasmPlugin updatedUserCr = reconcileBuiltInUserCr(plugin, builtInPlugin, desiredUserCrName, userCrs);
+        V1alpha1WasmPlugin updatedInternalCr =
+            reconcileBuiltInInternalCr(plugin, desiredPluginVersion, internalCrs);
+
+        V1alpha1WasmPlugin updatedCr = updatedUserCr != null ? updatedUserCr : updatedInternalCr;
+        assert updatedCr != null;
+        return kubernetesModelConverter.wasmPluginFromCr(updatedCr);
+    }
+
+    private V1alpha1WasmPlugin reconcileBuiltInUserCr(
+        WasmPlugin updateRequest,
+        WasmPlugin builtInPlugin,
+        String desiredUserCrName,
+        List<V1alpha1WasmPlugin> userCrs
+    ) {
+        V1alpha1WasmPlugin targetCr = userCrs.stream()
+            .filter(cr -> cr.getMetadata() != null && Objects.equals(desiredUserCrName, cr.getMetadata().getName()))
+            .findFirst()
+            .orElse(null);
+
+        boolean needCreate = targetCr == null;
+        if (needCreate) {
+            targetCr = kubernetesModelConverter.wasmPluginToCr(builtInPlugin);
+            if (targetCr.getSpec() != null) {
+                targetCr.getSpec().setDefaultConfigDisable(true);
+            }
+        }
+
+        mergeLegacyBuiltInSpecs(targetCr, userCrs);
+        applyBuiltInUpdate(targetCr, updateRequest, builtInPlugin.getPluginVersion());
+
+        V1alpha1WasmPlugin updatedCr;
+        try {
+            updatedCr = needCreate ? kubernetesClientService.createWasmPlugin(targetCr)
+                : kubernetesClientService.replaceWasmPlugin(targetCr);
+        } catch (ApiException e) {
+            if (e.getCode() == HttpStatus.CONFLICT) {
+                throw new ResourceConflictException();
+            }
+            String action = needCreate ? "adding" : "updating";
+            throw new BusinessException(
+                "Error occurs when " + action + " the Wasm plugin wth name " + targetCr.getMetadata().getName(), e);
+        }
+
+        for (V1alpha1WasmPlugin userCr : userCrs) {
+            if (userCr.getMetadata() == null || Objects.equals(updatedCr.getMetadata().getName(), userCr.getMetadata().getName())) {
                 continue;
             }
-            ImageUrl imageUrl = new ImageUrl(plugin.getImageRepository(), plugin.getImageVersion());
-            spec.setUrl(imageUrl.toUrlString());
-            spec.setPhase(plugin.getPhase());
-            spec.setPriority(plugin.getPriority());
-            spec.setImagePullPolicy(plugin.getImagePullPolicy());
-            spec.setImagePullSecret(plugin.getImagePullSecret());
             try {
-                updatedCr = kubernetesClientService.replaceWasmPlugin(existedCr);
+                kubernetesClientService.deleteWasmPlugin(userCr.getMetadata().getName());
             } catch (ApiException e) {
-                if (e.getCode() == HttpStatus.CONFLICT) {
-                    throw new ResourceConflictException();
-                }
                 throw new BusinessException(
-                    "Error occurs when updating the Wasm plugin wth name " + existedCr.getMetadata().getName(), e);
+                    "Error occurs when deleting the outdated Wasm plugin CR wth name "
+                        + userCr.getMetadata().getName(),
+                    e
+                );
             }
         }
 
-        assert updatedCr != null;
+        return updatedCr;
+    }
 
-        return kubernetesModelConverter.wasmPluginFromCr(updatedCr);
+    private V1alpha1WasmPlugin reconcileBuiltInInternalCr(
+        WasmPlugin updateRequest,
+        String desiredPluginVersion,
+        List<V1alpha1WasmPlugin> internalCrs
+    ) {
+        if (CollectionUtils.isEmpty(internalCrs)) {
+            return null;
+        }
+
+        V1alpha1WasmPlugin targetCr = internalCrs.get(0);
+        mergeLegacyBuiltInSpecs(targetCr, internalCrs);
+        applyBuiltInUpdate(targetCr, updateRequest, desiredPluginVersion);
+
+        V1alpha1WasmPlugin updatedCr;
+        try {
+            updatedCr = kubernetesClientService.replaceWasmPlugin(targetCr);
+        } catch (ApiException e) {
+            if (e.getCode() == HttpStatus.CONFLICT) {
+                throw new ResourceConflictException();
+            }
+            throw new BusinessException(
+                "Error occurs when updating the Wasm plugin wth name " + targetCr.getMetadata().getName(),
+                e
+            );
+        }
+
+        for (int i = 1; i < internalCrs.size(); i++) {
+            V1alpha1WasmPlugin extraInternalCr = internalCrs.get(i);
+            if (extraInternalCr.getMetadata() == null) {
+                continue;
+            }
+            try {
+                kubernetesClientService.deleteWasmPlugin(extraInternalCr.getMetadata().getName());
+            } catch (ApiException e) {
+                throw new BusinessException(
+                    "Error occurs when deleting the outdated Wasm plugin CR wth name "
+                        + extraInternalCr.getMetadata().getName(),
+                    e
+                );
+            }
+        }
+
+        return updatedCr;
+    }
+
+    private void mergeLegacyBuiltInSpecs(V1alpha1WasmPlugin targetCr, List<V1alpha1WasmPlugin> existedCrs) {
+        for (V1alpha1WasmPlugin existedCr : existedCrs) {
+            if (existedCr == null || existedCr == targetCr) {
+                continue;
+            }
+            kubernetesModelConverter.mergeWasmPluginSpec(existedCr, targetCr);
+        }
+    }
+
+    private void applyBuiltInUpdate(V1alpha1WasmPlugin cr, WasmPlugin updateRequest, String desiredPluginVersion) {
+        if (cr == null || cr.getSpec() == null) {
+            return;
+        }
+
+        if (cr.getMetadata() != null) {
+            KubernetesUtil.setLabel(cr, KubernetesConstants.Label.WASM_PLUGIN_VERSION_KEY, desiredPluginVersion);
+        }
+
+        V1alpha1WasmPluginSpec spec = cr.getSpec();
+        ImageUrl imageUrl = new ImageUrl(updateRequest.getImageRepository(), updateRequest.getImageVersion());
+        spec.setUrl(imageUrl.toUrlString());
+        spec.setPhase(updateRequest.getPhase());
+        spec.setPriority(updateRequest.getPriority());
+        spec.setImagePullPolicy(updateRequest.getImagePullPolicy());
+        spec.setImagePullSecret(updateRequest.getImagePullSecret());
     }
 
     @Override

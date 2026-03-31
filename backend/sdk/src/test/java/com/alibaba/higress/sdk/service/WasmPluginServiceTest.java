@@ -14,7 +14,6 @@ package com.alibaba.higress.sdk.service;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -56,7 +55,7 @@ import com.google.common.collect.Lists;
 public class WasmPluginServiceTest {
 
     private static final String TEST_BUILT_IN_PLUGIN_NAME = "basic-auth";
-    private static final String DEFAULT_VERSION = "1.0.0";
+    private static final String DEFAULT_VERSION = "2.0.0";
     private static final String TEST_BUILT_IN_PLUGIN_USER_CR_NAME =
         TEST_BUILT_IN_PLUGIN_NAME + Separators.DASH + DEFAULT_VERSION;
     private static final String TEST_BUILT_IN_PLUGIN_INTERNAL_CR_NAME =
@@ -159,7 +158,7 @@ public class WasmPluginServiceTest {
     public void updateBuiltInTestNotConfigured() throws Exception {
         service.initialize();
 
-        when(kubernetesClientService.listWasmPlugin(eq(TEST_BUILT_IN_PLUGIN_NAME), anyString(), anyBoolean()))
+        when(kubernetesClientService.listWasmPlugin(eq(TEST_BUILT_IN_PLUGIN_NAME), eq((String)null), anyBoolean()))
             .thenReturn(Collections.emptyList());
         when(kubernetesClientService.createWasmPlugin(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(kubernetesClientService.replaceWasmPlugin(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -208,7 +207,7 @@ public class WasmPluginServiceTest {
         kubernetesModelConverter.setWasmPluginInstanceToCr(existedCr, WasmPluginInstance.builder()
             .scope(WasmPluginInstanceScope.DOMAIN).target("test").configurations(MapUtil.of("ki", "vi")).build());
 
-        when(kubernetesClientService.listWasmPlugin(eq(TEST_BUILT_IN_PLUGIN_NAME), anyString(), anyBoolean()))
+        when(kubernetesClientService.listWasmPlugin(eq(TEST_BUILT_IN_PLUGIN_NAME), eq((String)null), anyBoolean()))
             .thenReturn(Lists.newArrayList(existedCr));
         when(kubernetesClientService.createWasmPlugin(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(kubernetesClientService.replaceWasmPlugin(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -256,7 +255,7 @@ public class WasmPluginServiceTest {
         kubernetesModelConverter.setWasmPluginInstanceToCr(existedCr, WasmPluginInstance.builder()
             .scope(WasmPluginInstanceScope.DOMAIN).target("test").configurations(MapUtil.of("ki", "vi")).build());
 
-        when(kubernetesClientService.listWasmPlugin(eq(TEST_BUILT_IN_PLUGIN_NAME), anyString(), anyBoolean()))
+        when(kubernetesClientService.listWasmPlugin(eq(TEST_BUILT_IN_PLUGIN_NAME), eq((String)null), anyBoolean()))
             .thenReturn(Lists.newArrayList(existedCr));
         when(kubernetesClientService.createWasmPlugin(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(kubernetesClientService.replaceWasmPlugin(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -329,7 +328,7 @@ public class WasmPluginServiceTest {
         when(kubernetesClientService.createWasmPlugin(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(kubernetesClientService.replaceWasmPlugin(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        when(kubernetesClientService.listWasmPlugin(eq(TEST_BUILT_IN_PLUGIN_NAME), anyString(), anyBoolean()))
+        when(kubernetesClientService.listWasmPlugin(eq(TEST_BUILT_IN_PLUGIN_NAME), eq((String)null), anyBoolean()))
             .thenReturn(Lists.newArrayList(userCr, internalCr));
         when(kubernetesClientService.createWasmPlugin(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(kubernetesClientService.replaceWasmPlugin(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -382,6 +381,46 @@ public class WasmPluginServiceTest {
         Assertions.assertEquals(plugin.getPriority(), userCr.getSpec().getPriority());
         Assertions.assertEquals(plugin.getImagePullPolicy(), userCr.getSpec().getImagePullPolicy());
         Assertions.assertEquals(plugin.getImagePullSecret(), userCr.getSpec().getImagePullSecret());
+    }
+
+    @Test
+    public void updateBuiltInTestShouldMigrateLegacyUserCrToCurrentVersionAndDeleteOldOne() throws Exception {
+        service.initialize();
+
+        WasmPlugin legacyPlugin = WasmPlugin.builder().name(TEST_BUILT_IN_PLUGIN_NAME).pluginVersion("1.0.0").builtIn(true)
+            .category("TEST").icon("http://dummy-icon").phase(PluginPhase.UNSPECIFIED.name()).priority(1000)
+            .imageRepository("oci://docker.io/" + TEST_BUILT_IN_PLUGIN_NAME).build();
+        V1alpha1WasmPlugin legacyUserCr = kubernetesModelConverter.wasmPluginToCr(legacyPlugin, false);
+        kubernetesModelConverter.setWasmPluginInstanceToCr(legacyUserCr, WasmPluginInstance.builder()
+            .scope(WasmPluginInstanceScope.GLOBAL).configurations(MapUtil.of("legacy", "config")).build());
+
+        V1alpha1WasmPlugin currentUserCr = buildWasmPluginResource(TEST_BUILT_IN_PLUGIN_NAME, true, false);
+
+        when(kubernetesClientService.listWasmPlugin(eq(TEST_BUILT_IN_PLUGIN_NAME), eq((String)null), anyBoolean()))
+            .thenReturn(Lists.newArrayList(legacyUserCr, currentUserCr));
+        when(kubernetesClientService.replaceWasmPlugin(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        WasmPlugin plugin = new WasmPlugin();
+        plugin.setName(TEST_BUILT_IN_PLUGIN_NAME);
+        plugin.setImageRepository("oci://docker.io/plugins/" + TEST_BUILT_IN_PLUGIN_NAME);
+        plugin.setImageVersion("3.0.0");
+        plugin.setPhase(PluginPhase.AUTHN.getName());
+        plugin.setPriority(500);
+        plugin.setImagePullPolicy(ImagePullPolicy.ALWAYS.getName());
+        plugin.setImagePullSecret("test-secret");
+
+        service.updateBuiltIn(plugin);
+
+        ArgumentCaptor<V1alpha1WasmPlugin> crCaptor = ArgumentCaptor.forClass(V1alpha1WasmPlugin.class);
+        verify(kubernetesClientService).replaceWasmPlugin(crCaptor.capture());
+        V1alpha1WasmPlugin updatedCurrentCr = crCaptor.getValue();
+        Assertions.assertEquals(TEST_BUILT_IN_PLUGIN_USER_CR_NAME, updatedCurrentCr.getMetadata().getName());
+        Assertions.assertEquals(
+            legacyUserCr.getSpec().getDefaultConfig(),
+            updatedCurrentCr.getSpec().getDefaultConfig()
+        );
+        verify(kubernetesClientService).deleteWasmPlugin("basic-auth-1.0.0");
+        verify(kubernetesClientService, never()).createWasmPlugin(any());
     }
 
     private V1alpha1WasmPlugin buildWasmPluginResource(String name, boolean builtIn, boolean internal) {

@@ -6,7 +6,7 @@ description: AI 数据脱敏插件配置参考
 
 ## 功能说明
 
-  对请求/返回中的敏感词拦截、替换
+  对请求中的敏感词拦截，以及对请求/返回中的敏感内容进行替换、还原
 
 ![image](https://img.alicdn.com/imgextra/i4/O1CN0156Wtko1T9JO0RiWow_!!6000000002339-0-tps-1314-638.jpg)
 
@@ -16,7 +16,7 @@ description: AI 数据脱敏插件配置参考
   - raw：整个请求/返回body
 
 ### 敏感词拦截
-  - 处理数据范围中出现敏感词直接拦截，返回预设错误信息
+  - 默认只对请求内容进行敏感词拦截，返回预设错误信息
   - 支持系统内置敏感词库和自定义敏感词
 
 ### 敏感词替换
@@ -27,7 +27,9 @@ description: AI 数据脱敏插件配置参考
 ## 运行属性
 
 插件执行阶段：`认证阶段`
-插件执行优先级：`991`
+插件执行优先级：`100`
+
+推荐执行顺序：应在 `model-router` 之后执行，以便先从请求体提取 `model` 并补齐 `x-higress-llm-model`，同时仍早于统计与配额插件完成请求侧拦截。
 
 ## 配置字段
 
@@ -36,7 +38,8 @@ description: AI 数据脱敏插件配置参考
 |  deny_openai            | bool            | true  |  对openai协议进行拦截 |
 |  deny_jsonpath          | string          |   []  |  对指定jsonpath拦截 |
 |  deny_raw               | bool            | false |  对原始body拦截 |
-|  system_deny            | bool            | true  |  开启内置拦截规则  |
+|  system_deny            | bool            | false |  开启内置拦截规则  |
+|  system_deny_words      | array of string |   -   |  Console 投影的系统词库；为空时回退到内置词库  |
 |  deny_code              | int             | 200   |  拦截时http状态码   |
 |  deny_message           | string          | 提问或回答中包含敏感词，已被屏蔽 |  拦截时ai返回消息   |
 |  deny_raw_message       | string          | {"errmsg":"提问或回答中包含敏感词，已被屏蔽"} |  非openai拦截时返回内容   |
@@ -51,7 +54,7 @@ description: AI 数据脱敏插件配置参考
 ## 配置示例
 
 ```yaml
-system_deny: true
+system_deny: false
 deny_openai: true
 deny_jsonpath:
   - "$.messages[*].content"
@@ -145,7 +148,7 @@ curl -X POST \
 ## 相关说明
 
  - 流模式中如果脱敏后的词被多个chunk拆分，可能无法进行还原
- - 流模式中，如果敏感词语被多个chunk拆分，可能会有敏感词的一部分返回给用户的情况
+ - AI/OpenAI 响应默认不做敏感词拦截，仅保留脱敏内容恢复能力
  - grok 内置规则列表 https://help.aliyun.com/zh/sls/user-guide/grok-patterns
  - 内置敏感词库数据来源 https://github.com/houbb/sensitive-word/tree/master/src/main/resources
  

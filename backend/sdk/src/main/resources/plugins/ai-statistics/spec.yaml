@@ -16,7 +16,7 @@ info:
   contact:
     name: rinfx
 spec:
-  phase: default
+  phase: STATS
   priority: 900
   configSchema:
     openAPIV3Schema:

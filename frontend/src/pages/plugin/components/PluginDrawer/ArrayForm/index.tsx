@@ -2,7 +2,7 @@ import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import { Button, Form, Input, Select, Table } from 'antd';
 import type { FormInstance } from 'antd/es/form';
 import { uniqueId } from 'lodash';
-import React, { useContext, useEffect, useRef, useState } from 'react';
+import React, { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import styles from './index.module.css';
 import i18next from 'i18next';
@@ -174,14 +174,24 @@ type ColumnTypes = Exclude<EditableTableProps['columns'], undefined>;
 const ArrayForm: React.FC = ({ array, value, onChange }) => {
   const { t } = useTranslation();
 
-  const initDataSource = value || [];
-  for (const item of initDataSource) {
-    if (!item.uid) {
-      item.uid = uniqueId();
-    }
-  }
+  const normalizeDataSource = (items = []) => {
+    return items.map((item) => {
+      if (!item || typeof item !== 'object') {
+        return item;
+      }
+      return {
+        ...item,
+        uid: item.uid || uniqueId(),
+      };
+    });
+  };
 
+  const initDataSource = useMemo(() => normalizeDataSource(value || []), [value]);
   const [dataSource, setDataSource] = useState<DataType[]>(initDataSource);
+
+  useEffect(() => {
+    setDataSource(initDataSource);
+  }, [initDataSource]);
 
   function getLocalizedText(obj: any, index: string, defaultText: string) {
     const i18nObj = obj[`x-${index}-i18n`];

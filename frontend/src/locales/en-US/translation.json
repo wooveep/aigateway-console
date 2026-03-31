@@ -16,6 +16,7 @@
     "aiServiceManagement": "AI Gateway Config",
     "aiRouteManagement": "AI Route Config",
     "aiQuotaManagement": "AI Quota Management",
+    "aiSensitiveManagement": "Sensitive Word Management",
     "aiDashboard": "AI Dashboard",
     "llmProviderManagement": "LLM Provider Management",
     "domainManagement": "Domain Management",
@@ -119,6 +120,105 @@
     "aiRouteUsage": "AI Route Usage",
     "aiRouteUsageContent": "You can send a test request using the command below:",
     "searchPlaceholder": "Search routes by route name, domain, routing conditions and target providers."
+  },
+  "aiSensitive": {
+    "notice": {
+      "pluginConfigReadonly": "Detect rules, replace rules, system dictionary settings, and audit sink settings are managed only from the Sensitive Word Management page and cannot be edited in the plugin configuration page."
+    },
+    "tabs": {
+      "detect": "Detect Rules",
+      "replace": "Replace Rules",
+      "audit": "Block Audits"
+    },
+    "status": {
+      "detectRuleCount": "Detect Rules",
+      "replaceRuleCount": "Replace Rules",
+      "auditRecordCount": "Audit Records",
+      "systemDenyEnabled": "System Dictionary Enabled",
+      "systemDictionaryWordCount": "System Dictionary Words",
+      "systemDictionaryUpdatedAt": "System Dictionary Updated At",
+      "projectedInstanceCount": "Projected Instances",
+      "lastReconciledAt": "Last Reconciled At",
+      "lastMigratedAt": "Last Migrated At"
+    },
+    "actions": {
+      "refresh": "Refresh",
+      "reconcile": "Reconcile",
+      "addDetectRule": "Add Detect Rule",
+      "addReplaceRule": "Add Replace Rule",
+      "editSystemDictionary": "Edit System Dictionary",
+      "search": "Search",
+      "reset": "Reset"
+    },
+    "fields": {
+      "pattern": "Pattern",
+      "matchType": "Match Type",
+      "replaceType": "Replace Type",
+      "replaceValue": "Replace Value",
+      "priority": "Priority",
+      "enabled": "Enabled",
+      "restore": "Restore",
+      "description": "Description",
+      "updatedAt": "Updated At",
+      "blockedAt": "Blocked At",
+      "consumerName": "Username",
+      "displayName": "Display Name",
+      "routeName": "Route Name",
+      "phase": "Phase",
+      "matchedRule": "Matched Rule",
+      "matchedExcerpt": "Matched Excerpt",
+      "requestId": "Request ID",
+      "blockedBy": "Blocked By",
+      "blockedReason": "Blocked Reason",
+      "startTime": "Start Time",
+      "endTime": "End Time"
+    },
+    "placeholders": {
+      "consumerName": "Input consumer_name",
+      "displayName": "Input display_name",
+      "routeName": "Input route_name"
+    },
+    "matchTypes": {
+      "contains": "Contains",
+      "exact": "Exact",
+      "regex": "Regex"
+    },
+    "replaceTypes": {
+      "replace": "Replace",
+      "hash": "Hash"
+    },
+    "messages": {
+      "detectSaved": "Detect rule saved",
+      "replaceSaved": "Replace rule saved",
+      "detectDeleted": "Detect rule deleted",
+      "replaceDeleted": "Replace rule deleted",
+      "reconciled": "Rules reconciled to plugin instances",
+      "systemConfigSaved": "System dictionary settings saved",
+      "auditQueryFailed": "Failed to query audit records. Please check your login status or the backend service.",
+      "deleteDetectConfirm": "Delete this detect rule?",
+      "deleteReplaceConfirm": "Delete this replace rule?"
+    },
+    "modals": {
+      "addDetect": "Add Detect Rule",
+      "editDetect": "Edit Detect Rule",
+      "addReplace": "Add Replace Rule",
+      "editReplace": "Edit Replace Rule",
+      "editSystemDictionary": "Edit System Dictionary"
+    },
+    "rules": {
+      "patternRequired": "Please input the pattern",
+      "matchTypeRequired": "Please select a match type",
+      "replaceTypeRequired": "Please select a replace type"
+    },
+    "systemConfig": {
+      "title": "System Dictionary",
+      "enabled": "Enable system dictionary interception",
+      "wordCount": "Word count: {{count}}",
+      "currentStatus": "Current Status",
+      "updatedBy": "Updated By",
+      "updatedAt": "Updated At",
+      "dictionaryHelp": "One word per line. Empty lines are removed, surrounding spaces are trimmed, and duplicate entries are deduplicated on save."
+    }
   },
   "aiQuota": {
     "route": "AI Route",

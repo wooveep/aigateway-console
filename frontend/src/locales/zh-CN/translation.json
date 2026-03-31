@@ -16,6 +16,7 @@
     "aiServiceManagement": "AI网关管理",
     "aiRouteManagement": "AI路由管理",
     "aiQuotaManagement": "AI配额管理",
+    "aiSensitiveManagement": "敏感词管理",
     "aiDashboard": "AI监控面板",
     "llmProviderManagement": "AI服务提供者管理",
     "domainManagement": "域名管理",
@@ -119,6 +120,105 @@
     "aiRouteUsage": "AI路由使用方法",
     "aiRouteUsageContent": "可使用以下命令发送请求：",
     "searchPlaceholder": "根据路由名称、域名、路由条件和目标服务搜索路由"
+  },
+  "aiSensitive": {
+    "notice": {
+      "pluginConfigReadonly": "敏感词拦截规则、替换规则、系统词库和审计上报配置由“敏感词管理”页面统一维护，插件配置页不支持编辑这些字段。"
+    },
+    "tabs": {
+      "detect": "拦截规则",
+      "replace": "替换规则",
+      "audit": "拦截审计"
+    },
+    "status": {
+      "detectRuleCount": "拦截规则数",
+      "replaceRuleCount": "替换规则数",
+      "auditRecordCount": "审计记录数",
+      "systemDenyEnabled": "系统词库开关",
+      "systemDictionaryWordCount": "系统词条数",
+      "systemDictionaryUpdatedAt": "系统词库更新时间",
+      "projectedInstanceCount": "已投影实例数",
+      "lastReconciledAt": "最近同步时间",
+      "lastMigratedAt": "最近迁移时间"
+    },
+    "actions": {
+      "refresh": "刷新",
+      "reconcile": "立即同步",
+      "addDetectRule": "新增拦截规则",
+      "addReplaceRule": "新增替换规则",
+      "editSystemDictionary": "编辑系统词库",
+      "search": "查询",
+      "reset": "重置"
+    },
+    "fields": {
+      "pattern": "规则内容",
+      "matchType": "匹配类型",
+      "replaceType": "替换类型",
+      "replaceValue": "替换值",
+      "priority": "优先级",
+      "enabled": "启用",
+      "restore": "恢复原值",
+      "description": "描述",
+      "updatedAt": "更新时间",
+      "blockedAt": "拦截时间",
+      "consumerName": "用户名",
+      "displayName": "显示名",
+      "routeName": "路由名",
+      "phase": "阶段",
+      "matchedRule": "命中规则",
+      "matchedExcerpt": "命中片段",
+      "requestId": "请求ID",
+      "blockedBy": "拦截来源",
+      "blockedReason": "拦截详情",
+      "startTime": "开始时间",
+      "endTime": "结束时间"
+    },
+    "placeholders": {
+      "consumerName": "输入 consumer_name",
+      "displayName": "输入 display_name",
+      "routeName": "输入 route_name"
+    },
+    "matchTypes": {
+      "contains": "包含匹配",
+      "exact": "精确匹配",
+      "regex": "正则匹配"
+    },
+    "replaceTypes": {
+      "replace": "替换",
+      "hash": "哈希"
+    },
+    "messages": {
+      "detectSaved": "拦截规则已保存",
+      "replaceSaved": "替换规则已保存",
+      "detectDeleted": "拦截规则已删除",
+      "replaceDeleted": "替换规则已删除",
+      "reconciled": "规则已同步到插件实例",
+      "systemConfigSaved": "系统词库配置已保存",
+      "auditQueryFailed": "审计记录查询失败，请检查登录状态或后端服务。",
+      "deleteDetectConfirm": "确认删除这条拦截规则？",
+      "deleteReplaceConfirm": "确认删除这条替换规则？"
+    },
+    "modals": {
+      "addDetect": "新增拦截规则",
+      "editDetect": "编辑拦截规则",
+      "addReplace": "新增替换规则",
+      "editReplace": "编辑替换规则",
+      "editSystemDictionary": "编辑系统词库"
+    },
+    "rules": {
+      "patternRequired": "请输入规则内容",
+      "matchTypeRequired": "请选择匹配类型",
+      "replaceTypeRequired": "请选择替换类型"
+    },
+    "systemConfig": {
+      "title": "系统词库",
+      "enabled": "启用系统词库拦截",
+      "wordCount": "当前词条数：{{count}}",
+      "currentStatus": "当前状态",
+      "updatedBy": "最近更新人",
+      "updatedAt": "最近更新时间",
+      "dictionaryHelp": "一行一个词。保存时会自动去除空行、裁剪首尾空白并去重。"
+    }
   },
   "aiQuota": {
     "route": "AI路由",

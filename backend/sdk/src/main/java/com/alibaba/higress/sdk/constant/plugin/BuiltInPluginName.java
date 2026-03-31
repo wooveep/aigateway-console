@@ -26,6 +26,7 @@ public final class BuiltInPluginName {
     public static final String AI_PROXY = "ai-proxy";
     public static final String AI_HISTORY = "ai-history";
     public static final String AI_INTENT = "ai-intent";
+    public static final String AI_DATA_MASKING = "ai-data-masking";
     public static final String AI_QUOTA = "ai-quota";
     public static final String AI_AGENT = "ai-agent";
     public static final String MODEL_ROUTER = "model-router";
