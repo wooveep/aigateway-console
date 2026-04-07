@@ -2,24 +2,20 @@ import i18n from "@/i18n";
 import { AiRoute, AiUpstream } from '@/interfaces/ai-route';
 import { fetchPluginsByRoute, RoutePredicate } from '@/interfaces/route';
 import { WasmPluginData } from '@/interfaces/wasm-plugin';
+import { filterVisiblePlugins, PluginVisibilityScope } from '@/pages/plugin/visibility';
 import { getI18nValue } from "@/pages/plugin/utils";
 import { addAiRoute, deleteAiRoute, getAiRoutes, updateAiRoute } from '@/services/ai-route';
 import { getWasmPlugins } from '@/services';
 import { ArrowRightOutlined, ExclamationCircleOutlined, RedoOutlined, SearchOutlined } from '@ant-design/icons';
 import { PageContainer } from '@ant-design/pro-layout';
 import { useRequest } from 'ahooks';
-import { Button, Col, Drawer, Form, FormProps, Input, message, Modal, Row, Space, Table } from 'antd';
+import { Button, Col, Drawer, Form, Input, message, Modal, Row, Space, Table } from 'antd';
 import { history } from 'ice';
 import React, { useEffect, useRef, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { normalizeUserLevels } from '@/utils/consumer-level';
-import RouteForm from './components/RouteForm';
-
-interface FormRef {
-  reset: () => void;
-  handleSubmit: () => Promise<FormProps>;
-}
+import RouteForm, { AiRouteFormHandle } from './components/RouteForm';
 
 const AiRouteList: React.FC = () => {
   const { t } = useTranslation();
@@ -150,10 +146,10 @@ const AiRouteList: React.FC = () => {
   ];
 
   const [form] = Form.useForm();
-  const formRef = useRef<FormRef>(null);
+  const formRef = useRef<AiRouteFormHandle>(null);
   const routesRef = useRef<AiRoute[] | null>(null);
   const [dataSource, setDataSource] = useState<AiRoute[]>([]);
-  const [currentAiRoute, setCurrentAiRoute] = useState<AiRoute | null>();
+  const [currentAiRoute, setCurrentAiRoute] = useState<AiRoute | null>(null);
   const [openDrawer, setOpenDrawer] = useState(false);
   const [loadingapi, setLoading] = useState(false);
   const [openModal, setOpenModal] = useState(false);
@@ -170,7 +166,7 @@ const AiRouteList: React.FC = () => {
   }, {
     manual: true,
     onSuccess: (result = []) => {
-      let plugins = result || [];
+      const plugins = filterVisiblePlugins(result as WasmPluginData[], PluginVisibilityScope.AI_ROUTE);
       setPluginInfoList(plugins);
     },
   });
@@ -267,28 +263,28 @@ const AiRouteList: React.FC = () => {
     predicate.caseSensitive = !predicate.ignoreCase || !predicate.ignoreCase.length;
   };
 
-  const handleDrawerOK = async () => {
+  const handleDrawerOK = async (): Promise<void> => {
     setLoading(true);
     try {
-      const values = formRef.current ? await formRef.current.handleSubmit() : {};
+      const values = formRef.current ? await formRef.current.handleSubmit() : null;
       if (!values) {
-        return false;
+        return;
       }
 
-      const { pathPredicate, headerPredicates, urlParamPredicates } = values as AiRoute;
+      const { pathPredicate, headerPredicates, urlParamPredicates } = values;
       pathPredicate && normalizeRoutePredicate(pathPredicate);
       headerPredicates && headerPredicates.forEach((h) => normalizeRoutePredicate(h));
       urlParamPredicates && urlParamPredicates.forEach((h) => normalizeRoutePredicate(h));
 
       if (currentAiRoute) {
-        const params: AiRoute = { version: currentAiRoute.version, ...values };
+        const params: AiRoute = { ...values, version: currentAiRoute.version };
         await updateAiRoute(params);
       } else {
-        await addAiRoute(values as AiRoute);
+        await addAiRoute(values);
       }
 
       setOpenDrawer(false);
-      formRef.current && formRef.current.reset();
+      formRef.current?.reset();
       refresh();
     } finally {
       setLoading(false);
@@ -342,13 +338,14 @@ const AiRouteList: React.FC = () => {
           );
           return {
             ...plugin,
+            category: pluginInfo?.category || plugin.category,
             title: pluginInfo?.title || plugin.title || '',
             description: pluginInfo?.description || plugin.description || '',
           };
-        })
+        });
         setPluginsData((prev) => ({
           ...prev,
-          [record.name]: mergedPlugins,
+          [record.name]: filterVisiblePlugins(mergedPlugins, PluginVisibilityScope.AI_ROUTE),
         }));
       } catch (error) {
         message.error('Failed to fetch strategies, error:', error);
@@ -412,7 +409,8 @@ const AiRouteList: React.FC = () => {
             await onShowStrategyList(record, expanded);
           },
           expandedRowRender: (record) => {
-            const plugins = (pluginData[record.name] || []).filter(plugin => plugin.enabled);
+            const plugins = filterVisiblePlugins(pluginData[record.name] || [], PluginVisibilityScope.AI_ROUTE)
+              .filter(plugin => plugin.enabled);
             return (
               <Table
                 dataSource={plugins}
@@ -483,9 +481,12 @@ const AiRouteList: React.FC = () => {
         okText={t('misc.confirm')}
       >
         <p>
-          <Trans t={t} i18nKey="aiRoute.deleteConfirmation">
-            确定删除 <span style={{ color: '#0070cc' }}>{{ currentRouteName: (currentAiRoute && currentAiRoute.name) || '' }}</span> 吗？
-          </Trans>
+          <Trans
+            t={t}
+            i18nKey="aiRoute.deleteConfirmation"
+            values={{ currentRouteName: currentAiRoute?.name || '' }}
+            components={[<></>, <span style={{ color: '#0070cc' }} />]}
+          />
         </p>
       </Modal>
     </PageContainer>

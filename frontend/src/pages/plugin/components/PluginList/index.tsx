@@ -8,6 +8,7 @@ import { Avatar, Button, Card, Col, Dropdown, Popconfirm, Typography, Tag } from
 import { useSearchParams } from 'ice';
 import { forwardRef, useEffect, useImperativeHandle, useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { filterVisiblePlugins, resolvePluginVisibilityScope } from '../../visibility';
 import { getI18nValue, QueryType } from '../../utils';
 import { BUILTIN_ROUTE_PLUGIN_LIST, DEFAULT_PLUGIN_IMG } from './constant';
 import PluginCategory from '../PluginCategory';
@@ -32,9 +33,7 @@ const PluginList = forwardRef((props: Props, ref) => {
   const [searchParams] = useSearchParams();
 
   const type = searchParams.get('type') || '';
-
-  const HIDDEN_PLUGINS_BY_QUERY_TYPE = {};
-  HIDDEN_PLUGINS_BY_QUERY_TYPE[QueryType.AI_ROUTE] = ['ai-proxy', 'key-auth', 'model-router', 'model-mapper'];
+  const visibilityScope = resolvePluginVisibilityScope(type);
 
   const handleClickPlugin = (item) => {
     onOpen(item);
@@ -47,11 +46,8 @@ const PluginList = forwardRef((props: Props, ref) => {
   }, {
     manual: true,
     onSuccess: async (result = []) => {
-      let plugins = result || [];
-      const hiddenPlugins = HIDDEN_PLUGINS_BY_QUERY_TYPE[type];
-      if (Array.isArray(hiddenPlugins)) {
-        plugins = plugins.filter(p => !p.builtIn || hiddenPlugins.indexOf(p.name) === -1);
-      }
+      const visiblePlugins = filterVisiblePlugins(result as WasmPluginData[], visibilityScope);
+      let plugins = visiblePlugins;
       const name = searchParams.get('name');
       if (type && !name) {
         // If the type is specified but no name is provided, we cannot proceed
@@ -64,14 +60,22 @@ const PluginList = forwardRef((props: Props, ref) => {
           routeName = `ai-route-${routeName}.internal`;
           builtInRoutePluginList = builtInRoutePluginList.filter(p => p.enabledInAiRoute !== false);
         }
+        builtInRoutePluginList = filterVisiblePlugins(builtInRoutePluginList, visibilityScope);
         const currentRoute = await getGatewayRouteDetail(routeName);
+        const builtInPlugins: WasmPluginData[] = builtInRoutePluginList.map((plugin) => {
+          return {
+            ...plugin,
+            name: plugin.key,
+            enabled: false,
+          };
+        });
         if (!currentRoute) {
-          plugins = builtInRoutePluginList.concat(plugins);
+          plugins = builtInPlugins.concat(visiblePlugins);
           setPluginList(plugins);
           return
         }
         const pluginByRoutes = await fetchPluginsByRoute(currentRoute);
-        const builtInPlugins: WasmPluginData[] = builtInRoutePluginList.map((plugin) => {
+        const routeBuiltInPlugins: WasmPluginData[] = builtInRoutePluginList.map((plugin) => {
           const foundPlugin = pluginByRoutes.find((p) => p.name === plugin.key && p.internal);
           return {
             ...plugin,
@@ -79,17 +83,17 @@ const PluginList = forwardRef((props: Props, ref) => {
             enabled: foundPlugin ? foundPlugin.enabled : false,
           };
         });
-        const updatedPlugins = result.map((plugin: { name: string }) => {
+        const updatedPlugins = visiblePlugins.map((plugin: { name: string }) => {
           const foundPlugin = pluginByRoutes.find((p) => p.name === plugin.name);
           return {
             ...plugin,
             enabled: foundPlugin ? foundPlugin.enabled : false,
           };
         });
-        plugins = builtInPlugins.concat(updatedPlugins);
+        plugins = routeBuiltInPlugins.concat(updatedPlugins);
       } else if (type === QueryType.DOMAIN) {
         const pluginsByDomain = await getDomainPluginInstances(name);
-        plugins = result.map((plugin: { name: string }) => {
+        plugins = visiblePlugins.map((plugin: { name: string }) => {
           const foundPlugin = pluginsByDomain.find((p: { pluginName: string }) => p.pluginName === plugin.name);
           return {
             ...plugin,

@@ -17,6 +17,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation, Trans } from 'react-i18next';
 import DomainForm from './components/DomainForm';
 import { history } from 'ice';
+import { filterVisiblePlugins, PluginVisibilityScope } from "@/pages/plugin/visibility";
 import { getI18nValue } from "@/pages/plugin/utils";
 import i18n from '@/i18n';
 import { WasmPluginData } from "@/interfaces/wasm-plugin";
@@ -87,7 +88,7 @@ const DomainList: React.FC = () => {
   }, {
     manual: true,
     onSuccess: (result = []) => {
-      let plugins = result || [];
+      const plugins = filterVisiblePlugins(result as WasmPluginData[], PluginVisibilityScope.DOMAIN);
       setPluginInfoList(plugins);
     },
   });
@@ -166,13 +167,15 @@ const DomainList: React.FC = () => {
           const description = pluginInfo?.description ?? plugin.description ?? '';
           return {
             ...plugin,
+            name: plugin.pluginName,
+            category: pluginInfo?.category || plugin.category,
             title,
             description,
           };
         })
         setPluginsData((prev) => ({
           ...prev,
-          [record.name]: pluginInfos,
+          [record.name]: filterVisiblePlugins(pluginInfos, PluginVisibilityScope.DOMAIN),
         }));
         if (plugins.some((plugin: { enabled: boolean; }) => plugin.enabled)) {
           setExpandedKeys((prev) => [...prev, record.name]);
@@ -281,7 +284,8 @@ const DomainList: React.FC = () => {
             return record.name !== DEFAULT_DOMAIN;
           },
           expandedRowRender: (record) => {
-            const plugins = (pluginData[record.name] || []).filter(plugin => plugin.enabled);
+            const plugins = filterVisiblePlugins(pluginData[record.name] || [], PluginVisibilityScope.DOMAIN)
+              .filter(plugin => plugin.enabled);
             return (
               <Table
                 dataSource={plugins}

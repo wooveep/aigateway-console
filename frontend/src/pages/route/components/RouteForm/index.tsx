@@ -2,7 +2,13 @@ import i18n, { lngs } from '@/i18n';
 import { OptionItem } from '@/interfaces/common';
 import { Consumer, CredentialType } from '@/interfaces/consumer';
 import { DEFAULT_DOMAIN, Domain } from '@/interfaces/domain';
-import { upstreamServiceToString } from '@/interfaces/route';
+import {
+  AuthConfig,
+  KeyedRoutePredicate,
+  Route,
+  RoutePredicate,
+  upstreamServiceToString,
+} from '@/interfaces/route';
 import { getGatewayDomains, getGatewayServices } from '@/services';
 import { getConsumers } from '@/services/consumer';
 import { QuestionCircleOutlined, RedoOutlined } from '@ant-design/icons';
@@ -22,6 +28,27 @@ import {
 
 const { Option } = Select;
 
+interface RouteFormProps {
+  value?: Route | null;
+}
+
+export interface RouteFormValue {
+  name: string;
+  domains: string[];
+  headers?: KeyedRoutePredicate[];
+  methods?: string[];
+  path: RoutePredicate;
+  urlParams?: KeyedRoutePredicate[];
+  services: string[];
+  customConfigs?: Record<string, string>;
+  authConfig: AuthConfig;
+}
+
+export interface RouteFormHandle {
+  reset: () => void;
+  handleSubmit: () => Promise<RouteFormValue>;
+}
+
 const MethodOptions = [
   { label: "GET", value: "GET" },
   { label: "POST", value: "POST" },
@@ -34,8 +61,9 @@ const MethodOptions = [
   { label: "CONNECT", value: "CONNECT" },
 ];
 
-const RouteForm: React.FC = forwardRef((props, ref) => {
+const RouteForm = forwardRef<RouteFormHandle, RouteFormProps>((props, ref) => {
   const { t } = useTranslation();
+  const tr = (key: string) => String(t(key));
 
   const { value } = props;
   const [form] = Form.useForm();
@@ -119,7 +147,7 @@ const RouteForm: React.FC = forwardRef((props, ref) => {
         values.domains = [values.domains];
       }
       if (values.customConfigs) {
-        const customConfigsObj = {};
+        const customConfigsObj: Record<string, string> = {};
         for (const config of values.customConfigs) {
           if (config.key) {
             customConfigsObj[config.key] = config.value || '';
@@ -134,7 +162,7 @@ const RouteForm: React.FC = forwardRef((props, ref) => {
         allowedConsumerLevels: allowedLevels,
       };
       values.authConfig = authConfig;
-      return values;
+      return values as RouteFormValue;
     },
   }));
 
@@ -156,16 +184,16 @@ const RouteForm: React.FC = forwardRef((props, ref) => {
           {
             required: true,
             pattern: /^[a-z0-9][a-z0-9.-]*$/,
-            message: t('route.routeForm.routeNameRequired'),
+            message: tr('route.routeForm.routeNameRequired'),
           },
         ]}
       >
         <Input
           showCount
           allowClear
-          disabled={value}
+          disabled={!!value}
           maxLength={63}
-          placeholder={t('route.routeForm.routeNamePlaceholder')}
+          placeholder={tr('route.routeForm.routeNamePlaceholder')}
         />
       </Form.Item>
       <Form.Item
@@ -189,7 +217,7 @@ const RouteForm: React.FC = forwardRef((props, ref) => {
             style={{ marginLeft: 8 }}
             onClick={refreshDomains}
             icon={<RedoOutlined />}
-            aria-label={t('route.routeForm.refreshDomains')}
+            aria-label={String(t('route.routeForm.refreshDomains'))}
           />
         </div>
       </Form.Item>
@@ -206,7 +234,7 @@ const RouteForm: React.FC = forwardRef((props, ref) => {
               rules={[
                 {
                   required: true,
-                  message: t('route.routeForm.pathPredicateRequired'),
+                  message: tr('route.routeForm.pathPredicateRequired'),
                 },
               ]}
             >
@@ -225,11 +253,11 @@ const RouteForm: React.FC = forwardRef((props, ref) => {
               rules={[
                 {
                   required: true,
-                  message: t('route.routeForm.pathMatcherRequired'),
+                  message: tr('route.routeForm.pathMatcherRequired'),
                 },
               ]}
             >
-              <Input style={{ width: '60%' }} placeholder={t('route.routeForm.pathMatcherPlacedholder')} />
+              <Input style={{ width: '60%' }} placeholder={tr('route.routeForm.pathMatcherPlacedholder')} />
             </Form.Item>
             <Form.Item
               name={['path', 'ignoreCase']}
@@ -368,7 +396,7 @@ const RouteForm: React.FC = forwardRef((props, ref) => {
               style={{ marginLeft: 8 }}
               onClick={refreshServices}
               icon={<RedoOutlined />}
-              aria-label={t('route.routeForm.refreshServices')}
+              aria-label={String(t('route.routeForm.refreshServices'))}
             />
           </div>
         </Form.Item>

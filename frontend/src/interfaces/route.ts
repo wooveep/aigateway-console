@@ -129,6 +129,7 @@ export const getRouteBuiltInPlugins = (route: Route): WasmPluginData[] => {
     return route[routeProperty]?.enabled;
   }).map(pluginConfig => ({
     name: pluginConfig.key,
+    category: pluginConfig.category,
     title: pluginConfig.title,
     description: pluginConfig.description,
     internal: true,

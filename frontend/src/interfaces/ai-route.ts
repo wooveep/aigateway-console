@@ -18,6 +18,8 @@ export interface AiRouteFallbackConfig {
   enabled: boolean;
   upstreams: AiUpstream[];
   fallbackStrategy?: string;
+  strategy?: string;
+  responseCodes?: string[];
 }
 
 export interface AiUpstream {

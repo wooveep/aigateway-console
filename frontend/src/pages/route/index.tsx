@@ -9,6 +9,7 @@ import {
   upstreamServiceToString,
 } from '@/interfaces/route';
 import { WasmPluginData } from '@/interfaces/wasm-plugin';
+import { filterVisiblePlugins, PluginVisibilityScope } from '@/pages/plugin/visibility';
 import { getI18nValue } from "@/pages/plugin/utils";
 import { addGatewayRoute, deleteGatewayRoute, getGatewayRoutes, getWasmPlugins, updateGatewayRoute } from '@/services';
 import store from '@/store';
@@ -19,34 +20,23 @@ import { ExclamationCircleOutlined, RedoOutlined, SearchOutlined } from '@ant-de
 import { PageContainer } from '@ant-design/pro-layout';
 import { useRequest } from 'ahooks';
 import { Alert, Button, Col, Drawer, Form, Input, message, Modal, Row, Space, Table, Typography, Select } from 'antd';
+import type { ColumnsType } from 'antd/es/table';
 import { history } from 'ice';
 import React, { useEffect, useRef, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
-import RouteForm from './components/RouteForm';
+import RouteForm, { RouteFormHandle, RouteFormValue } from './components/RouteForm';
 
 const { Text } = Typography;
 const { Option } = Select;
-
-interface RouteFormProps {
-  name: string;
-  domains: string[];
-  headers: KeyedRoutePredicate[];
-  methods: string[];
-  path: RoutePredicate;
-  urlParams: KeyedRoutePredicate[];
-  services: string[];
-  customConfigs: {
-    [key: string]: string;
-  };
-}
 
 const RouteList: React.FC = () => {
   const { t } = useTranslation();
 
   const [systemState] = store.useModel('system');
-  const routeManagementSupported = !(systemState && systemState.capabilities && systemState.capabilities.indexOf('config.ingress.v1') === -1);
+  const routeManagementSupported = !systemState?.capabilities
+    || systemState.capabilities.includes('config.ingress.v1');
 
-  const columns = [
+  const columns: ColumnsType<Route> = [
     {
       title: t('route.columns.name'),
       dataIndex: 'name',
@@ -145,9 +135,9 @@ const RouteList: React.FC = () => {
   const [form] = Form.useForm();
   const [openModal, setOpenModal] = useState(false);
   const [confirmLoading, setConfirmLoading] = useState(false);
-  const [currentRoute, setCurrentRoute] = useState<Route | null>();
+  const [currentRoute, setCurrentRoute] = useState<Route | null>(null);
   const [openDrawer, setOpenDrawer] = useState(false);
-  const formRef = useRef(null);
+  const formRef = useRef<RouteFormHandle>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [searchValue, setSearchValue] = useState('');
   const [expandedKeys, setExpandedKeys] = useState<string[]>([]);
@@ -168,22 +158,22 @@ const RouteList: React.FC = () => {
   const selectedAllowedConsumerLevelsRef = useRef(selectedAllowedConsumerLevels);
 
 
-  const getRouteList = async (factor): Promise<RouteResponse> => getGatewayRoutes(factor);
+  const getRouteList = async (): Promise<RouteResponse> => getGatewayRoutes();
   const [pluginInfoList, setPluginInfoList] = useState<WasmPluginData[]>([]);
   const { loading: wasmLoading, run: loadWasmPlugins } = useRequest(() => {
     return getWasmPlugins(i18n.language)
   }, {
     manual: true,
     onSuccess: (result = []) => {
-      let plugins = result || [];
+      const plugins = filterVisiblePlugins(result as WasmPluginData[], PluginVisibilityScope.ROUTE);
       setPluginInfoList(plugins);
     },
   });
 
   const { loading, run, refresh } = useRequest(getRouteList, {
     manual: true,
-    onSuccess: (result: Route[], params) => {
-      result = result || [];
+    onSuccess: (response) => {
+      let result = response?.data || [];
       result.forEach((i) => {
         i.key || (i.key = i.id ? `${i.id}` : i.name);
         i.internal = isInternalResource(i.name);
@@ -211,7 +201,7 @@ const RouteList: React.FC = () => {
   });
 
   useEffect(() => {
-    run({});
+    run();
     loadWasmPlugins();
 
     const handleLanguageChange = () => loadWasmPlugins();
@@ -242,7 +232,10 @@ const RouteList: React.FC = () => {
 
   const handleDrawerOK = async () => {
     try {
-      const values: RouteFormProps = formRef.current && (await formRef.current.handleSubmit());
+      const values: RouteFormValue | null = formRef.current ? await formRef.current.handleSubmit() : null;
+      if (!values) {
+        return;
+      }
       const { name, domains, headers, methods, urlParams, path, services, customConfigs, authConfig } = values;
       path && normalizeRoutePredicate(path);
       headers && headers.forEach((h) => normalizeRoutePredicate(h));
@@ -273,7 +266,7 @@ const RouteList: React.FC = () => {
       }
       setOpenDrawer(false);
       refresh();
-      currentRoute ? setCurrentRoute(null) : formRef.current.reset();
+      currentRoute ? setCurrentRoute(null) : formRef.current?.reset();
     } catch (errInfo) {
       // eslint-disable-next-line no-console
       console.log('Save failed:', errInfo);
@@ -317,13 +310,14 @@ const RouteList: React.FC = () => {
           );
           return {
             ...plugin,
+            category: pluginInfo?.category || plugin.category,
             title: pluginInfo?.title || plugin.title || '',
             description: pluginInfo?.description || plugin.description || '',
           };
         })
         setPluginsData((prev) => ({
           ...prev,
-          [record.name]: mergedPlugins,
+          [record.name]: filterVisiblePlugins(mergedPlugins, PluginVisibilityScope.ROUTE),
         }));
       } catch (error) {
         message.error('Failed to fetch strategies, error:', error);
@@ -336,18 +330,18 @@ const RouteList: React.FC = () => {
   };
 
   const handleSearch = (value: string | null, result: Route[] | null) => {
-    value = value != null ? value : searchValue;
-    result = result != null ? result : originalDataSource;
-    if (!value) {
-      setDataSource(result);
+    const keyword = value ?? searchValue;
+    const routeList = result ?? originalDataSource;
+    if (!keyword) {
+      setDataSource(routeList);
       return;
     }
     setIsLoading(true);
-    const filteredData = result.filter((item) => {
-      const nameMatch = item.name?.includes(value);
-      const domainsMatch = item.domains?.some(domain => domain.includes(value));
-      const pathMatch = item.path?.matchValue?.includes(value);
-      const servicesMatch = item.services?.some(service => service.name?.includes(value));
+    const filteredData = routeList.filter((item) => {
+      const nameMatch = item.name?.includes(keyword);
+      const domainsMatch = item.domains?.some(domain => domain.includes(keyword));
+      const pathMatch = item.path?.matchValue?.includes(keyword);
+      const servicesMatch = item.services?.some(service => service.name?.includes(keyword));
       return nameMatch || domainsMatch || pathMatch || servicesMatch;
     });
     setDataSource(filteredData);
@@ -589,7 +583,8 @@ const RouteList: React.FC = () => {
             await onShowStrategyList(record, expanded);
           },
           expandedRowRender: (record) => {
-            const plugins = (pluginData[record.name] || []).filter(plugin => plugin.enabled);
+            const plugins = filterVisiblePlugins(pluginData[record.name] || [], PluginVisibilityScope.ROUTE)
+              .filter(plugin => plugin.enabled);
             return (
               <Table
                 dataSource={plugins}
@@ -634,11 +629,12 @@ const RouteList: React.FC = () => {
         onCancel={handleModalCancel}
       >
         <p>
-          <Trans t={t} i18nKey="route.deleteConfirmation">
-            确定删除
-            <span style={{ color: '#0070cc' }}>{{ currentRouteName: (currentRoute && currentRoute.name) || '' }}</span>
-            吗？
-          </Trans>
+          <Trans
+            t={t}
+            i18nKey="route.deleteConfirmation"
+            values={{ currentRouteName: currentRoute?.name || '' }}
+            components={[<></>, <span style={{ color: '#0070cc' }} />]}
+          />
         </p>
       </Modal>
       <Drawer

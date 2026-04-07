@@ -1,4 +1,4 @@
-import { WasmPluginData } from '@/interfaces/route';
+import { WasmPluginData } from '@/interfaces/wasm-plugin';
 import { Empty, Row, Collapse } from 'antd';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';

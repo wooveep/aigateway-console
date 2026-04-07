@@ -1,4 +1,5 @@
 /* eslint-disable max-lines */
+import { AiRoute } from '@/interfaces/ai-route';
 import { Consumer, CredentialType } from '@/interfaces/consumer';
 import { DEFAULT_DOMAIN, Domain } from '@/interfaces/domain';
 import { LlmProvider } from '@/interfaces/llm-provider';
@@ -23,8 +24,18 @@ import { modelMapping2String, string2ModelMapping } from './util';
 
 const { Option } = Select;
 
-const AiRouteForm: React.FC = forwardRef((props: { value: any }, ref) => {
+interface AiRouteFormProps {
+  value?: AiRoute | null;
+}
+
+export interface AiRouteFormHandle {
+  reset: () => void;
+  handleSubmit: () => Promise<AiRoute | false>;
+}
+
+const AiRouteForm = forwardRef<AiRouteFormHandle, AiRouteFormProps>((props, ref) => {
   const { t } = useTranslation();
+  const tr = (key: string) => String(t(key));
   const { value } = props;
   const [form] = Form.useForm();
   const [fallbackConfig_enabled, setFallbackConfigEnabled] = useState(false);
@@ -78,7 +89,7 @@ const AiRouteForm: React.FC = forwardRef((props: { value: any }, ref) => {
       pathPredicate = { matchType: 'PRE', matchValue: '/', caseSensitive: false },
       headerPredicates = [],
       urlParamPredicates = [],
-      upstreams = [{}],
+      upstreams = [{ provider: '', weight: 100 }],
       modelPredicates,
     } = (value || {});
     const _authConfig_enabled = value?.authConfig?.enabled || false;
@@ -108,9 +119,15 @@ const AiRouteForm: React.FC = forwardRef((props: { value: any }, ref) => {
       return { ...header, uid: uniqueId() };
     });
 
+    let normalizedDomains: string[] = [];
+    if (Array.isArray(domains)) {
+      normalizedDomains = domains;
+    } else if (domains) {
+      normalizedDomains = [domains];
+    }
     const initValues = {
       name,
-      domains: (Array.isArray(domains) ? domains : [domains]).filter(d => !!d),
+      domains: normalizedDomains.filter(Boolean),
       pathPredicate: Object.assign({ ...pathPredicate }, { ignoreCase: pathPredicate.caseSensitive === false ? ['ignore'] : [] }),
       headerPredicates,
       urlParamPredicates,
@@ -208,7 +225,7 @@ const AiRouteForm: React.FC = forwardRef((props: { value: any }, ref) => {
       }
       payload['authConfig']['allowedConsumerLevels'] = normalizedLevels;
       payload['authConfig']['allowedConsumers'] = expandedConsumers;
-      return payload;
+      return payload as AiRoute;
     },
   }));
 
@@ -247,7 +264,7 @@ const AiRouteForm: React.FC = forwardRef((props: { value: any }, ref) => {
           {
             required: true,
             pattern: /^[a-z0-9](?:[a-z0-9.-]{0,61}[a-z0-9])?$/,
-            message: t('aiRoute.routeForm.rule.nameRequired'),
+            message: tr('aiRoute.routeForm.rule.nameRequired'),
           },
         ]}
       >
@@ -255,8 +272,8 @@ const AiRouteForm: React.FC = forwardRef((props: { value: any }, ref) => {
           showCount
           allowClear
           maxLength={63}
-          disabled={value}
-          placeholder={t('aiRoute.routeForm.rule.nameRequired')}
+          disabled={!!value}
+          placeholder={tr('aiRoute.routeForm.rule.nameRequired')}
         />
       </Form.Item>
       <div style={{ display: 'flex' }}>
@@ -280,7 +297,7 @@ const AiRouteForm: React.FC = forwardRef((props: { value: any }, ref) => {
             rules={[
               {
                 required: true,
-                message: t('route.routeForm.pathPredicateRequired'),
+                message: tr('route.routeForm.pathPredicateRequired'),
               },
             ]}
           >
@@ -297,11 +314,11 @@ const AiRouteForm: React.FC = forwardRef((props: { value: any }, ref) => {
             rules={[
               {
                 required: true,
-                message: t('route.routeForm.pathMatcherRequired'),
+                message: tr('route.routeForm.pathMatcherRequired'),
               },
             ]}
           >
-            <Input style={{ width: '60%' }} placeholder={t('route.routeForm.pathMatcherPlacedholder')} />
+            <Input style={{ width: '60%' }} placeholder={tr('route.routeForm.pathMatcherPlacedholder')} />
           </Form.Item>
           <Form.Item
             name={['pathPredicate', 'ignoreCase']}
@@ -360,7 +377,7 @@ const AiRouteForm: React.FC = forwardRef((props: { value: any }, ref) => {
                               <Form.Item
                                 name={[name, 'matchType']}
                                 noStyle
-                                rules={[{ required: true, message: t("aiRoute.routeForm.rule.matchTypeRequired") }]}
+                                rules={[{ required: true, message: tr("aiRoute.routeForm.rule.matchTypeRequired") }]}
                               >
                                 <Select style={{ width: "200px" }}>
                                   {
@@ -438,7 +455,7 @@ const AiRouteForm: React.FC = forwardRef((props: { value: any }, ref) => {
                       {...restField}
                       name={[name, 'provider']}
                       style={{ marginBottom: '0.5rem' }}
-                      rules={[{ required: true, message: t('aiRoute.routeForm.rule.targetServiceRequired') }]}
+                      rules={[{ required: true, message: tr('aiRoute.routeForm.rule.targetServiceRequired') }]}
                     >{/* 服务名称 */}
                       <Select
                         showSearch
@@ -458,7 +475,7 @@ const AiRouteForm: React.FC = forwardRef((props: { value: any }, ref) => {
                       {...restField}
                       name={[name, 'weight']}
                       style={{ ...baseStyle, marginBottom: '0' }}
-                      rules={[{ required: true, message: t('aiRoute.routeForm.rule.serviceWeightRequired') }]}
+                      rules={[{ required: true, message: tr('aiRoute.routeForm.rule.serviceWeightRequired') }]}
                     >{/* 请求比例 */}
                       <InputNumber
                         style={{ ...baseStyle }}
@@ -520,7 +537,7 @@ const AiRouteForm: React.FC = forwardRef((props: { value: any }, ref) => {
                 required
                 name="fallbackConfig_responseCodes"
                 label={t('aiRoute.routeForm.label.fallbackResponseCodes')} // {/* 响应码列表 */}
-                rules={[{ required: true, message: t('aiRoute.routeForm.rule.fallbackResponseCodesRequired') }]}
+                rules={[{ required: true, message: tr('aiRoute.routeForm.rule.fallbackResponseCodesRequired') }]}
               >
                 <Select mode="multiple">
                   {default_fallback_responseCodes.map((item) =>
@@ -532,7 +549,7 @@ const AiRouteForm: React.FC = forwardRef((props: { value: any }, ref) => {
                 required
                 name="fallbackConfig_upstreams"
                 label={t('aiRoute.routeForm.label.fallbackUpstream')} // {/* 降级服务列表 */}
-                rules={[{ required: true, message: t('aiRoute.routeForm.rule.fallbackUpstreamRequired') }]}
+                rules={[{ required: true, message: tr('aiRoute.routeForm.rule.fallbackUpstreamRequired') }]}
               >
                 <Select
                   showSearch
@@ -546,7 +563,7 @@ const AiRouteForm: React.FC = forwardRef((props: { value: any }, ref) => {
                 style={{ flex: 1 }}
                 name={"fallbackConfig_modelNames"}
                 label={t("aiRoute.routeForm.label.targetModel")}
-                rules={[{ required: true, message: t('aiRoute.routeForm.rule.modelNameRequired') }]}
+                rules={[{ required: true, message: tr('aiRoute.routeForm.rule.modelNameRequired') }]}
               >{/* 模型名称 */}
                 <ModelMappingEditor
                   options={getOptionsForAi(form.getFieldValue("fallbackConfig_upstreams"))}
