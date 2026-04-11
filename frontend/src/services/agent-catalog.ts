@@ -10,7 +10,9 @@ export const getAgentCatalog = (agentId: string): Promise<AgentCatalogRecord> =>
 };
 
 export const getAgentCatalogOptions = (): Promise<AgentCatalogOptions> => {
-  return request.get<any, AgentCatalogOptions>('/v1/ai/agent-catalog/options');
+  return request.get<any, AgentCatalogOptions>('/v1/ai/agent-catalog/options', {
+    skipErrorModal: true,
+  });
 };
 
 export const createAgentCatalog = (payload: AgentCatalogRecord): Promise<AgentCatalogRecord> => {

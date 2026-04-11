@@ -118,7 +118,7 @@
     },
     "create": "创建AI路由",
     "edit": "编辑AI路由",
-    "deleteConfirmation": "确定删除 <1>{{currentRouteName}}</1> 吗？",
+    "deleteConfirmation": "确定删除 <1>{currentRouteName}</1> 吗？",
     "authNotEnabled": "未开启认证",
     "authEnabledWithoutConsumer": "未授权任何人访问",
     "usage": "使用方法",
@@ -237,7 +237,7 @@
     "systemConfig": {
       "title": "系统词库",
       "enabled": "启用系统词库拦截",
-      "wordCount": "当前词条数：{{count}}",
+      "wordCount": "当前词条数：{count}",
       "currentStatus": "当前状态",
       "updatedBy": "最近更新人",
       "updatedAt": "最近更新时间",
@@ -249,6 +249,7 @@
     "search": "用户搜索",
     "searchPlaceholder": "请输入用户名称",
     "empty": "当前没有启用 AI Quota 的 AI 路由",
+    "amountOnlyEmpty": "当前没有启用金额模式 AI 配额的 AI 路由",
     "mode": {
       "amountTitle": "金额余额管理",
       "amountDescription": "当前路由已启用金额模式。页面展示的是用户钱包余额，表单输入单位为 RMB，提交后会换算为 micro_yuan 并同步到 Portal 钱包和 Redis 运行态缓存。",
@@ -366,10 +367,13 @@
     }
   },
   "consumer": {
+    "departmentTree": "组织树",
+    "notAssigned": "未分配",
     "columns": {
       "organization": "组织节点",
       "department": "部门",
       "name": "用户名称",
+      "displayName": "显示名",
       "type": "类型",
       "authMethods": "认证方式",
       "portalStatus": "Portal状态",
@@ -382,14 +386,16 @@
     "createDepartment": "新增部门",
     "create": "新增用户",
     "edit": "编辑用户",
-    "deleteConfirmation": "确定删除 <1>{{currentConsumerName}}</1> 吗？",
-    "departmentSummary": "{{count}} 个用户",
+    "deleteConfirmation": "确定删除 <1>{currentConsumerName}</1> 吗？",
+    "departmentSummary": "{count} 个用户",
     "departmentCreateSuccess": "部门创建成功",
     "ungrouped": "未分组",
     "departmentForm": {
       "name": "部门名称",
       "nameRequired": "请输入部门名称",
-      "namePlaceholder": "请输入部门名称"
+      "namePlaceholder": "请输入部门名称",
+      "parentDepartment": "父部门",
+      "parentDepartmentPlaceholder": "留空则创建为顶级部门"
     },
     "consumerForm": {
       "department": "所属部门",
@@ -397,19 +403,24 @@
       "name": "用户名称",
       "namePlaceholder": "请输入用户名称",
       "nameRequired": "请输入用户名称",
+      "displayName": "显示名",
+      "displayNameRequired": "请输入显示名",
+      "email": "邮箱",
       "portalUserLevel": "Portal 用户等级",
       "portalUserLevelRequired": "请选择 Portal 用户等级",
       "portalUserLevelPlaceholder": "请选择 Portal 用户等级",
+      "password": "初始密码",
+      "passwordPlaceholder": "留空则由系统按默认策略处理",
       "tokenSourceRequired": "请选择令牌来源",
       "authTokenRequired": "请输入认证令牌",
       "headerNameRequired": "请输入Header名称",
       "paramNameRequired": "请输入参数名称"
     },
     "userLevel": {
-      "normal": "Normal",
-      "plus": "Plus",
-      "pro": "Pro",
-      "ultra": "Ultra"
+      "normal": "普通",
+      "plus": "增强",
+      "pro": "专业",
+      "ultra": "旗舰"
     },
     "selectBEARER": "Authorization: Bearer ${value}",
     "selectHEADER": "自定义 HTTP Header",
@@ -431,11 +442,11 @@
     },
     "resetPassword": "重置密码",
     "resetPasswordTitle": "临时密码",
-    "resetPasswordHint": "用户 {{name}} 的临时密码如下（请妥善保存）：",
+    "resetPasswordHint": "用户 {name} 的临时密码如下（请妥善保存）：",
     "resetPasswordSuccess": "密码已重置",
     "resetPasswordFailed": "密码重置失败",
     "noActiveKeys": "无可用 API Key",
-    "keyCount": "Key {{count}} 个",
+    "keyCount": "Key {count} 个",
     "inviteCode": {
       "manage": "邀请码管理",
       "create": "生成邀请码",
@@ -474,7 +485,7 @@
     "defaultDomain": "缺省域名",
     "createDomain": "创建域名",
     "editDomain": "编辑域名",
-    "deleteConfirmation": "确定删除 <1>{{currentDomainName}}</1> 吗？",
+    "deleteConfirmation": "确定删除 <1>{currentDomainName}</1> 吗？",
     "domainForm": {
       "name": "域名",
       "nameTooltip": "支持完整域名（例如：hello.com）或模糊域名（例如：*.hello.com），独立管理该域名的协议及证书，且域名能将路由配置相互隔离",
@@ -496,7 +507,7 @@
     "loadFailed": "加载监控面板失败，请稍后刷新页面重试",
     "uninitialized": "监控面板未自动初始化，点击按钮尝试人工操作",
     "initDashboard": "初始化监控面板",
-    "noBuiltInDashboard": "未安装 Aigateway Console 的内置监控模块。请人工配置监控页面地址。",
+    "noBuiltInDashboard": "当前未启用内置原生监控，本页不再嵌入外部 Grafana。",
     "configureDashboard": "请配置监控页面URL",
     "reconfigure": "重新配置",
     "openInNewPage": "在新窗口打开监控面板",
@@ -506,7 +517,7 @@
       "range": "时间范围",
       "refreshEvery": "自动刷新",
       "refresh": "立即刷新",
-      "lastUpdated": "最后刷新：{{time}}",
+      "lastUpdated": "最后刷新：{time}",
       "noData": "暂无监控数据",
       "rangeOptions": {
         "300000": "最近 5 分钟",
@@ -616,6 +627,9 @@
       "item3_download": "下载配置文件",
       "item4": "强烈建议填写 Grafana 的 HTTPS URL 以确保监控面板可以在本页面内正常显示。"
     }
+  },
+  "agentCatalog": {
+    "optionsLoadFailed": "MCP 服务选项加载失败，仍可查看和编辑现有目录。"
   },
   "llmProvider": {
     "columns": {
@@ -772,7 +786,7 @@
         "vertexProjectIdRequired": "请输入 Google Cloud 项目 ID",
         "vertexAuthKeyRequired": "请输入 Google Cloud 服务账号密钥",
         "vertexAuthKeyBadFormat": "Google Cloud 服务账号密钥的格式不正确，必须为 JSON 格式的字符串",
-        "vertexAuthKeyBadRequiredProperty": "Google Cloud 服务账号密钥中缺少必要的属性：{{key}}",
+        "vertexAuthKeyBadRequiredProperty": "Google Cloud 服务账号密钥中缺少必要的属性：{key}",
         "geminiSafetyCategoryRequired": "请输入危害类别",
         "geminiSafetyCategoryDuplicated": "存在重复配置的危害类别",
         "geminiSafetyThresholdRequired": "请输入屏蔽阈值"
@@ -825,7 +839,7 @@
     },
     "create": "创建AI服务提供者",
     "edit": "编辑AI服务提供者",
-    "deleteConfirmation": "确定删除 <1>{{currentLlmProviderName}}</1> 吗？"
+    "deleteConfirmation": "确定删除 <1>{currentLlmProviderName}</1> 吗？"
   },
   "plugins": {
     "title": "策略配置",
@@ -989,7 +1003,7 @@
     "createServiceSource": "创建服务来源",
     "editServiceSource": "编辑服务来源",
     "manageProxyServers": "管理代理服务器",
-    "deleteConfirmation": "确定删除 <1>{{currentServiceSourceName}}</1> 吗？",
+    "deleteConfirmation": "确定删除 <1>{currentServiceSourceName}</1> 吗？",
     "serviceSourceForm": {
       "type": "类型",
       "typeTooltip": "目前支持Nacos 1.x、Nacos 2.x、Zookeeper、固定地址和DNS域名等类型",
@@ -1112,7 +1126,7 @@
     "unsupported": "注意：路由配置功能暂不支持版本低于1.19.0的Kubenetes。敬请谅解。",
     "createRoute": "创建路由",
     "editRoute": "编辑路由",
-    "deleteConfirmation": "确定删除 <1>{{currentRouteName}}</1> 吗？",
+    "deleteConfirmation": "确定删除 <1>{currentRouteName}</1> 吗？",
     "noCustomIngresses": "注：列表中仅包含通过控制台页面创建的路由配置。",
     "routeSearchPlaceholder": "根据路由名称、域名、路由条件和目标服务搜索路由",
     "factorGroup": {
@@ -1185,7 +1199,7 @@
     },
     "createTlsCertificate": "创建证书",
     "editTlsCertificate": "编辑证书",
-    "deleteConfirmation": "确定删除 <1>{{currentTlsCertificateName}}</1> 吗？",
+    "deleteConfirmation": "确定删除 <1>{currentTlsCertificateName}</1> 吗？",
     "tlsCertificateForm": {
       "name": "证书名称",
       "nameTooltip": "全局唯一",
@@ -1201,7 +1215,7 @@
     }
   },
   "exception": {
-    "info": "错误详情（错误码：<1>{{code}}</1>）"
+    "info": "错误详情（错误码：<1>{code}</1>）"
   },
   "error": {
     "404": {
@@ -1250,6 +1264,9 @@
     "close": "关闭",
     "save": "保存",
     "create": "创建",
+    "copy": "复制",
+    "copySuccess": "复制成功",
+    "copyError": "复制失败，请手动复制",
     "refresh": "刷新",
     "strategy": "策略",
     "strategyList": "策略列表",
@@ -1366,11 +1383,11 @@
       "presetTemplatesLoadFailed": "加载预置模板列表失败",
       "presetTemplateContentLoadFailed": "加载预置模板内容失败",
       "presetTemplateApplyFailed": "应用预置模板失败",
-      "ssePathRule": "路径 (SSE) : /mcp-servers/<1>{{currentMcpServerName}}</1>/sse",
-      "httpPathRule": "路径 (Streamable HTTP) : /mcp-servers/<1>{{currentMcpServerName}}</1>",
+      "ssePathRule": "路径 (SSE) : /mcp-servers/<1>{currentMcpServerName}</1>/sse",
+      "httpPathRule": "路径 (Streamable HTTP) : /mcp-servers/<1>{currentMcpServerName}</1>",
       "nameDefault": "MCP服务名称"
     },
-    "deleteConfirm": "确定删除 <1>{{currentMcpServerName}}</1> 吗？",
+    "deleteConfirm": "确定删除 <1>{currentMcpServerName}</1> 吗？",
     "detail": {
       "titlePrefix": "MCP 服务",
       "basicInfo": "基本信息",
@@ -1397,7 +1414,7 @@
       "copyError": "复制失败，请手动复制",
       "dnsDesc": "Aigateway 不提供域名解析能力，需用户自行在 DNS 服务中对业务域名进行配置，可根据实际场景选择合适的记录类型（如 CNAME 记录、A 记录等），将其指向网关访问入口地址，从而实现流量转发",
       "gatewayAddress": "网关访问地址：",
-      "commandDesc": "请运行以下命令以安装 <1>{{client}}</1> MCP Server：",
+      "commandDesc": "请运行以下命令以安装 <1>{client}</1> MCP Server：",
       "authStatus": "开启请求认证",
       "enabled": "已启用",
       "disabled": "已禁用",
@@ -1417,7 +1434,7 @@
       "apiKeyTooltip": "API Key是一种简单的认证方式，客户端访问时，需将凭证以指定的方式添加至请求中，网关收到请求后会验证API Key的合法性及权限。API Key常用于不涉及敏感操作的简单场景，安全性相比JWT、AK/SK较低，请注意凭证的管理与保护。",
       "addConsumerAuth": "添加用户授权",
       "authScope": "授权范围",
-      "authScopeMcpService": "MCP服务：{{name}}",
+      "authScopeMcpService": "MCP服务：{name}",
       "consumer": "用户",
       "selectConsumer": "请选择用户",
       "fetchConsumerListError": "获取用户列表失败",

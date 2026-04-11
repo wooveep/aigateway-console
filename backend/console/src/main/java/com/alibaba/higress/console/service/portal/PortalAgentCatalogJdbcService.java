@@ -36,6 +36,7 @@ import com.alibaba.higress.sdk.model.CommonPageQuery;
 import com.alibaba.higress.sdk.model.PaginatedResult;
 import com.alibaba.higress.sdk.model.mcp.ConsumerAuthInfo;
 import com.alibaba.higress.sdk.model.mcp.McpServer;
+import com.alibaba.higress.sdk.model.mcp.McpServerPageQuery;
 import com.alibaba.higress.sdk.service.mcp.McpServerService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -107,7 +108,7 @@ public class PortalAgentCatalogJdbcService {
         ensureEnabled();
         List<AgentCatalogOptionServerRecord> servers = new ArrayList<>();
         try {
-            PaginatedResult<McpServer> result = mcpServerService.list(null);
+            PaginatedResult<McpServer> result = mcpServerService.list(new McpServerPageQuery());
             if (result != null && CollectionUtils.isNotEmpty(result.getData())) {
                 for (McpServer item : result.getData()) {
                     if (item == null || StringUtils.isBlank(item.getName())) {

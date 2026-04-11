@@ -181,7 +181,7 @@ public class McpServiceContextImpl implements McpServerService {
     }
 
     private void filterMcpServers(List<McpServer> resultList, McpServerPageQuery query) {
-        if (CollectionUtils.isEmpty(resultList)) {
+        if (CollectionUtils.isEmpty(resultList) || query == null) {
             return;
         }
         String fuzzyServerName = query.getMcpServerName();

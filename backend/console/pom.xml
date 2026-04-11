@@ -14,7 +14,7 @@
 	<description>Console Project for Higress</description>
 
 	<properties>
-		<nodejs.version>16.19.0</nodejs.version>
+		<nodejs.version>20.12.2</nodejs.version>
 		<springdoc-openapi-maven-plugin.version>1.4</springdoc-openapi-maven-plugin.version>
 
 		<app.build.version>2.2.0</app.build.version>
