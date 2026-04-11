@@ -3,7 +3,6 @@
 
 const fs = require('fs');
 const path = require('path');
-const glob = require('glob');
 
 // 配置
 const CONFIG = {
@@ -12,14 +11,15 @@ const CONFIG = {
   // 国际化文件目录
   localesDir: path.join(__dirname, '../src/locales'),
   // 需要检查的文件类型
-  fileExtensions: ['tsx', 'ts', 'jsx', 'js'],
+  fileExtensions: ['vue', 'tsx', 'ts', 'jsx', 'js'],
   // 忽略的目录
   ignoreDirs: ['node_modules', 'dist', 'build', '.git'],
   // 国际化函数调用模式
   i18nPatterns: [
-    /t\(['"`]([^'"`]+)['"`]\)/g, // t('key') 或 t("key")
-    /t\(['"`]([^'"`]+)['"`]\s*\|\|\s*['"`]([^'"`]+)['"`]\)/g, // t('key') || 'fallback'
-    /t\(`([^`]+)`\)/g, // t(`key`)
+    /(?:^|[^\w$.])t\(\s*['"`]([^'"`\n]+)['"`]\s*(?:,|\))/g, // t('key') / t("key")
+    /\$t\(\s*['"`]([^'"`\n]+)['"`]\s*(?:,|\))/g, // $t('key')
+    /i18n\.global\.t\(\s*['"`]([^'"`\n]+)['"`]\s*(?:,|\))/g, // i18n.global.t('key')
+    /t\(\s*['"`]([^'"`\n]+)['"`]\s*\|\|\s*['"`]([^'"`\n]+)['"`]\s*\)/g, // t('key') || 'fallback'
   ],
 };
 
@@ -58,8 +58,8 @@ function isValidI18nKey(key) {
     /^\s*$/, // 空字符串或只有空白字符
     /^[\\n\\t\\r]+$/, // 转义字符
     /^[0-9]+$/, // 纯数字
+    /\$\{.+\}/, // 动态模板字符串
     /^[^a-zA-Z_]+$/, // 不包含字母和下划线的字符串
-    /^\${.*}$/, // 模板字符串变量
     /^[^a-zA-Z_][^a-zA-Z0-9_.]*$/, // 不以字母或下划线开头的键
   ];
 
@@ -87,21 +87,56 @@ function extractI18nKeys(filePath) {
 }
 
 /**
+ * 判断是否为需要忽略的目录
+ * @param {string} dirName - 目录名
+ * @returns {boolean} 是否忽略
+ */
+function isIgnoredDir(dirName) {
+  return CONFIG.ignoreDirs.includes(dirName);
+}
+
+/**
+ * 递归收集源码文件
+ * @param {string} dirPath - 目录路径
+ * @param {string[]} files - 文件列表
+ * @returns {string[]} 文件路径数组
+ */
+function walkSourceFiles(dirPath, files = []) {
+  if (!fs.existsSync(dirPath)) {
+    return files;
+  }
+
+  const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+
+  entries.forEach((entry) => {
+    if (isIgnoredDir(entry.name)) {
+      return;
+    }
+
+    const fullPath = path.join(dirPath, entry.name);
+
+    if (entry.isDirectory()) {
+      walkSourceFiles(fullPath, files);
+      return;
+    }
+
+    const extension = path.extname(entry.name).slice(1);
+    if (CONFIG.fileExtensions.includes(extension)) {
+      files.push(fullPath);
+    }
+  });
+
+  return files;
+}
+
+/**
  * 获取所有源码文件
  * @returns {string[]} 文件路径数组
  */
 function getSourceFiles() {
-  const patterns = CONFIG.fileExtensions.map((ext) => `${CONFIG.srcDir}/**/*.${ext}`);
   const files = [];
-
-  patterns.forEach((pattern) => {
-    const matches = glob.sync(pattern, {
-      ignore: CONFIG.ignoreDirs.map((dir) => `**/${dir}/**`),
-    });
-    files.push(...matches);
-  });
-
-  return files;
+  walkSourceFiles(CONFIG.srcDir, files);
+  return files.sort();
 }
 
 /**
