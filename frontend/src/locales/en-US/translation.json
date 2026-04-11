@@ -1183,10 +1183,10 @@
     }
   },
   "system": {
-    "higress-config": {
-      "title": "Edit Global Configuration: higress-config",
-      "note_k8s": "Note: Changes to \"mesh\" or \"meshNetworks\" won't come effective until Higress Gateway is restarted.",
-      "note_standalone": "Note: Changes to \"mesh\" or \"meshNetworks\" won't come effective until Higress is completely restarted."
+    "aigateway-config": {
+      "title": "Edit Global Configuration: aigateway-config",
+      "note_k8s": "Note: Changes to \"mesh\" or \"meshNetworks\" won't come effective until AIGateway Gateway is restarted.",
+      "note_standalone": "Note: Changes to \"mesh\" or \"meshNetworks\" won't come effective until AIGateway is completely restarted."
     }
   },
   "tlsCertificate": {

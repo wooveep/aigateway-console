@@ -1,4 +1,4 @@
-# Higress Console 项目图谱（2026-03 版）
+# AIGateway Console 项目图谱（2026-03 版）
 
 ## 1. 领域边界
 - 网关配置领域（K8s CRD）：`Route`、`Domain`、`WasmPlugin`、`MCP`、Service Source 等。

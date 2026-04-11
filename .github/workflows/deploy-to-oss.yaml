@@ -60,7 +60,7 @@ jobs:
           name: higress
           version: "v0.24.0"
 
-      - name: Build Higress Console API Docs
+      - name: Build AIGateway Console API Docs
         run: |
           helm repo add higress.io https://higress.cn/helm-charts
           helm install higress -n higress-system higress.io/higress \

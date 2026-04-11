@@ -16,7 +16,7 @@ router.beforeEach(async (to) => {
   await appStore.bootstrap();
 
   const title = i18n.global.t(to.meta.titleKey || 'index.title');
-  document.title = `${title} · Higress Console`;
+  document.title = `${title} · AIGateway Console`;
 
   if (!appStore.isInitialized && to.path !== '/init') {
     return `/init`;

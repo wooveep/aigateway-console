@@ -1,8 +1,8 @@
 apiVersion: v2
-name: higress-console
-description: Management console for Higress
+name: aigateway-console
+description: Management console for AIGateway
 type: application
 version: 2.2.0
 sources:
-  - https://github.com/higress-group/higress-console
+  - https://github.com/alibaba/aigateway-group/aigateway-console
 appVersion: "2.2.0"

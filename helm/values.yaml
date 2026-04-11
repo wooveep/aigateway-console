@@ -9,7 +9,7 @@ global:
     # cluster domain. Default value is "cluster.local".
     clusterDomain: "cluster.local"
 
-  # -- Default hub (registry) for Higress images, passed from parent chart.
+  # -- Default hub (registry) for console-related images, passed from parent chart.
   # Used for plugin image registry when pluginServer.imageRegistry is not set.
   hub: ""
   # -- Plugin image namespace for built-in plugins, passed from parent chart.
@@ -62,7 +62,7 @@ global:
 replicaCount: 1
 
 image:
-  repository: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/console
+  repository: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/aigateway-console
   pullPolicy: IfNotPresent
   tag: ""
 

@@ -21,11 +21,11 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Build Higress Console Package
+      - name: Build AIGateway Console Package
         run: mvn clean package -f ./backend/pom.xml -Dpmd.language=en
 
-      - name: Upload Higress Console Package
+      - name: Upload AIGateway Console Package
         uses: actions/upload-artifact@v4
         with:
-          name: higress-console
+          name: aigateway-console
           path: backend/target/*.jar

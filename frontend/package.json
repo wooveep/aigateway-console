@@ -1,8 +1,8 @@
 {
-  "name": "higress-console-frontend",
+  "name": "aigateway-console-frontend",
   "version": "1.0.0",
   "private": true,
-  "description": "Higress console frontend rebuilt with Vue 3 + Vite",
+  "description": "AIGateway console frontend rebuilt with Vue 3 + Vite",
   "scripts": {
     "prepare": "cd .. && husky install frontend/.husky",
     "dev": "vite",

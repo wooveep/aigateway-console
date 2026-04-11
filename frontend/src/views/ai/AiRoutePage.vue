@@ -66,7 +66,7 @@ function openDrawer(record?: any) {
 }
 
 function openUsage(record: any) {
-  usageCommand.value = `curl -sv http://<higress-gateway-ip>/v1/chat/completions \\
+  usageCommand.value = `curl -sv http://<aigateway-gateway-ip>/v1/chat/completions \\
 -X POST \\
 -H 'Content-Type: application/json'${record.domains?.[0] ? ` \\\n+-H 'Host: ${record.domains[0]}'` : ''} \\
 -d '{\n  "model": "<model-name>",\n  "messages": [{"role":"user","content":"Hello!"}]\n}'`;

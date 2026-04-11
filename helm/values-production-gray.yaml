@@ -1,4 +1,4 @@
-# Production gray deployment values for the standalone higress-console chart.
+# Production gray deployment values for the standalone aigateway-console chart.
 # Update tag values if your release pipeline publishes a different version.
 
 global:

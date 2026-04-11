@@ -2,7 +2,7 @@
 import { onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import PageSection from '@/components/common/PageSection.vue';
-import { getHigressConfig, getSystemInfo, updateHigressConfig } from '@/services/system';
+import { getAIGatewayConfig, getSystemInfo, updateAIGatewayConfig } from '@/services/system';
 import { showSuccess } from '@/lib/feedback';
 
 const { t } = useI18n();
@@ -16,7 +16,7 @@ async function load() {
   try {
     const [info, config] = await Promise.all([
       getSystemInfo().catch(() => ({})),
-      getHigressConfig().catch(() => ''),
+      getAIGatewayConfig().catch(() => ''),
     ]);
     systemInfo.value = info || {};
     configText.value = typeof config === 'string' ? config : JSON.stringify(config, null, 2);
@@ -28,7 +28,7 @@ async function load() {
 async function saveConfig() {
   saving.value = true;
   try {
-    await updateHigressConfig(configText.value);
+    await updateAIGatewayConfig(configText.value);
     showSuccess(t('misc.save'));
   } finally {
     saving.value = false;
@@ -57,7 +57,7 @@ onMounted(load);
       </div>
     </PageSection>
 
-    <PageSection title="Higress Config">
+    <PageSection title="AIGateway Config">
       <a-textarea v-model:value="configText" :rows="24" spellcheck="false" />
       <div class="system-page__actions">
         <a-button @click="load">{{ t('misc.refresh') }}</a-button>

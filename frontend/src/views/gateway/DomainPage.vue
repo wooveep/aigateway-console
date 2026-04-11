@@ -9,7 +9,7 @@ import StrategyLink from '@/components/common/StrategyLink.vue';
 import { addGatewayDomain, deleteGatewayDomain, getGatewayDomains, updateGatewayDomain } from '@/services/domain';
 import { showSuccess } from '@/lib/feedback';
 
-const DEFAULT_DOMAIN = 'higress-default-domain';
+const DEFAULT_DOMAIN = 'aigateway-default-domain';
 const router = useRouter();
 const loading = ref(false);
 const search = ref('');

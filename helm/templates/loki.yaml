@@ -1,6 +1,6 @@
 {{- $o11y := merge (dict) .Values.o11y .Values.global.o11y  }}
 {{- if $o11y.enabled }}
-{{- $appName := (include "higress-console-loki.name" .) }}
+{{- $appName := (include "aigateway-console-loki.name" .) }}
 {{- $config := $o11y.loki }}
 {{- $ports := $config.ports -}}
 {{- $storageClassName := $config.pvc.storageClassName }}

@@ -34,7 +34,7 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Build Higress Console Package
+      - name: Build AIGateway Console Package
         run: |
           BUILD_ARGS=""
           DEV=true
@@ -87,7 +87,7 @@ jobs:
       #   if: inputs.skipDeployment != true
       #   env:
       #     KUBE_CONFIG_DATA: ${{ secrets.KUBE_CONFIG }}
-      #     RELEASE_NAME: ${{ vars.RELEASE_NAME || 'higress-console' }}
+      #     RELEASE_NAME: ${{ vars.RELEASE_NAME || 'aigateway-console' }}
       #     NAMESPACE: ${{ vars.NAMESPACE || 'higress-system' }}
       #     DOMAIN: ${{ vars.DOMAIN || 'demo.higress.io' }}
       #     ADMIN_PASSWORD: ${{ vars.ADMIN_PASSWORD || 'admin' }}
