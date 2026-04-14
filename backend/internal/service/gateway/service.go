@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/alibaba/aigateway-group/aigateway-console/backend/internal/consts"
-	k8sclient "github.com/alibaba/aigateway-group/aigateway-console/backend/utility/clients/k8s"
+	"github.com/wooveep/aigateway-console/backend/internal/consts"
+	k8sclient "github.com/wooveep/aigateway-console/backend/utility/clients/k8s"
 )
 
 type Service struct {
@@ -21,14 +21,31 @@ func New(k8sClient k8sclient.Client) *Service {
 }
 
 func (s *Service) List(ctx context.Context, kind string) ([]map[string]any, error) {
-	return s.k8sClient.ListResources(ctx, kind)
+	items, err := s.k8sClient.ListResources(ctx, kind)
+	if err != nil {
+		return nil, err
+	}
+	if kind == "wasm-plugins" {
+		return s.mergeWasmPlugins(items), nil
+	}
+	return s.hydrateResources(kind, items), nil
 }
 
 func (s *Service) Get(ctx context.Context, kind, name string) (map[string]any, error) {
-	return s.k8sClient.GetResource(ctx, kind, name)
+	item, err := s.k8sClient.GetResource(ctx, kind, name)
+	if err == nil {
+		return s.hydrateResource(kind, item), nil
+	}
+	if kind == "wasm-plugins" {
+		if fallback, ok := s.loadBuiltinWasmPlugin(name); ok {
+			return fallback, nil
+		}
+	}
+	return nil, err
 }
 
 func (s *Service) Save(ctx context.Context, kind string, payload map[string]any) (map[string]any, error) {
+	payload = clonePayload(payload)
 	name := strings.TrimSpace(fmt.Sprint(payload["name"]))
 	if name == "" {
 		return nil, errors.New("name is required")
@@ -39,7 +56,15 @@ func (s *Service) Save(ctx context.Context, kind string, payload map[string]any)
 	if s.isInternalWriteBlocked(kind, name) {
 		return nil, fmt.Errorf("%s %s is an internal resource", kind, name)
 	}
-	return s.k8sClient.UpsertResource(ctx, kind, name, payload)
+	normalized, err := s.normalizeForSave(ctx, kind, payload)
+	if err != nil {
+		return nil, err
+	}
+	item, err := s.k8sClient.UpsertResource(ctx, kind, name, normalized)
+	if err != nil {
+		return nil, err
+	}
+	return s.hydrateResource(kind, item), nil
 }
 
 func (s *Service) Delete(ctx context.Context, kind, name string) error {
@@ -80,20 +105,68 @@ func (s *Service) GetPluginInstance(ctx context.Context, scope, target, pluginNa
 }
 
 func (s *Service) SavePluginInstance(ctx context.Context, scope, target, pluginName string, payload map[string]any) (map[string]any, error) {
+	if err := s.validatePluginInstance(ctx, scope, target, pluginName, payload); err != nil {
+		return nil, err
+	}
 	payload["name"] = pluginName
 	return s.k8sClient.UpsertResource(ctx, pluginInstanceKind(scope, target), pluginName, payload)
+}
+
+func (s *Service) DeletePluginInstance(ctx context.Context, scope, target, pluginName string) error {
+	return s.k8sClient.DeleteResource(ctx, pluginInstanceKind(scope, target), pluginName)
 }
 
 func (s *Service) ListPluginInstances(ctx context.Context, scope, target string) ([]map[string]any, error) {
 	return s.k8sClient.ListResources(ctx, pluginInstanceKind(scope, target))
 }
 
+func (s *Service) GetWasmPluginConfig(ctx context.Context, name string) (map[string]any, error) {
+	item, err := s.Get(ctx, "wasm-plugins", name)
+	if err != nil {
+		return nil, err
+	}
+	config := map[string]any{
+		"name": name,
+		"type": "yaml",
+	}
+	if schema, ok := item["configSchema"]; ok {
+		config["schema"] = schema
+	} else if schema, ok := item["schema"]; ok {
+		config["schema"] = schema
+	} else {
+		config["schema"] = map[string]any{}
+	}
+	return config, nil
+}
+
+func (s *Service) GetWasmPluginReadme(ctx context.Context, name string) (string, error) {
+	item, err := s.Get(ctx, "wasm-plugins", name)
+	if err != nil {
+		return "", err
+	}
+	readme := stringValue(item["readme"])
+	if readme == "" {
+		readme = stringValue(item["documentation"])
+	}
+	if readme == "" {
+		description := stringValue(item["description"])
+		if description != "" {
+			readme = "# " + name + "\n\n" + description
+		}
+	}
+	if readme == "" {
+		readme = "# " + name + "\n\nNo readme metadata is available yet for this plugin."
+	}
+	return readme, nil
+}
+
 func (s *Service) bootstrapDefaults(ctx context.Context) {
 	_, _ = s.k8sClient.UpsertResource(ctx, "services", "aigateway-console.dns", map[string]any{
-		"name":      "aigateway-console.dns",
-		"namespace": "aigateway-system",
-		"port":      8080,
-		"endpoints": []string{"aigateway-console.aigateway-system.svc.cluster.local:8080"},
+		"name":         "aigateway-console.dns",
+		"namespace":    "aigateway-system",
+		"port":         8080,
+		"endpoints":    []string{"aigateway-console.aigateway-system.svc.cluster.local:8080"},
+		"ingressClass": s.k8sClient.IngressClass(),
 	})
 	_, _ = s.k8sClient.UpsertResource(ctx, "proxy-servers", "default-http-proxy", map[string]any{
 		"name":           "default-http-proxy",
@@ -133,4 +206,18 @@ func pluginInstanceKind(scope, target string) string {
 		return fmt.Sprintf("%s-plugin-instances", scope)
 	}
 	return fmt.Sprintf("%s-plugin-instances:%s", scope, target)
+}
+
+func stringValue(value any) string {
+	if value == nil {
+		return ""
+	}
+	return strings.TrimSpace(fmt.Sprint(value))
+}
+
+func clonePayload(src map[string]any) map[string]any {
+	if src == nil {
+		return map[string]any{}
+	}
+	return clonePayloadMap(src)
 }

@@ -32,6 +32,70 @@
 - `P1`：done
 - `P2`：done
 - `P3`：doing
-- `P4`：todo
-- `P5`：todo
-- `P6`：todo
+- `P4`：doing（主链已完成，aftercare 中）
+- `P5`：doing（主链已完成，aftercare 中）
+- `P6`：done
+
+## 当前焦点
+
+- 主阶段：`P3 / P4 / P5 aftercare`
+- 当前重点：
+  - 继续把“控制面真相源回归”作为第一优先级，收口 `MCP / AI Route / Provider` 到真实 Higress 运行态对象，而不是 generic ConfigMap。
+  - 继续收口 `gateway` 域与旧 Java 在 `CRD / 注解 / 字段级语义` 上的差异。
+  - 继续把 `portal` 域从“真表已切换 + 部分 raw SQL”推进到更稳定的 `DAO / DO / Entity` 实用化形态。
+  - 稳定 `dev-redeploy / minikube-dev` 本地联调链路，保证 Go console / Portal / plugin-server 可持续冷启动。
+
+## 最近更新
+
+- `P6` 已完成：显式 `higress -> aigateway` 命名、接口、镜像、脚本、Helm 与文档收口已经落地。
+- `P3` 已补首批 Java parity 高频缺口：
+  - `/v1/wasm-plugins/:name/readme`
+  - `global/domain/route/service` plugin instance delete / service-scope 操作
+  - `MCP routeMetadata / ingressClass / Route-Service-Wasm` 首批深校验
+  - `routes / ai-routes / ai-providers` 已切到真实 `Ingress / ConfigMap / WasmPlugin` 读链，不再只依赖 `console.aigateway.io/type=resource`
+  - `MCP save strategy` 已完成收口：`DIRECT/REDIRECT_ROUTE` 的 `transportType / rewrite host / sse_path_suffix`、`consumer level` 注解回写、`OPEN_API / DATABASE` 异常分支、`default-mcp / route auth` 历史兼容清理，以及 `match_list / servers[]` 保留未知字段的 Java 更新语义都已对齐
+  - `provider runtime` 已补第二批字段级 parity：`openaiExtraCustomUrls` 多 IP static registry、`vertex-auth.internal` extra service source、`ai-route` service 引用跟随 provider 实际 service source
+  - `provider-specific endpoint` 本轮继续补齐：`openai / azure / qwen / zhipuai / claude` 的 endpoint 推导与 URL/域名严格校验，`claude/qwen/zhipuai/vertex/bedrock/ollama` 的保存前归一化也已前移到 gateway service
+  - `P3-CP-01` 已完成：`mcp-servers` 真实读链已切到 `Ingress + higress-config + McpBridge/registry + route auth/plugin instance`
+  - `P3-CP-02` 已完成：`mcp-servers` 保存/删除副作用已对齐 Java save strategies
+  - `P3-CP-05` 已完成：Portal/Jobs 已切到消费真实 `mcp-servers / ai-routes / ai-providers` 聚合结果
+  - `P3-CP-06` 已完成 real cluster smoke：`provider / ai-route / mcp-server` create-update-delete-cleanup 已在 `minikube / aigateway-system` 验证通过
+- `P3/P4/P5` 本轮功能闭环已补齐：
+  - `Plugin Management` 已接上 README、绑定删除、service-scope plugin instances
+  - `Consumer Management` 已接上 `/v1/consumers/:name` 只读详情
+  - `AI Dashboard` 已接上 `/v1/portal/stats/*`
+  - `System Settings` 已接上 `/system/jobs`
+- `P4` 已推进到 Portal 真表收口：
+  - 共享 schema 真相源已迁到 `aigateway-portal/backend/schema/shared`
+  - Console 只维护自有表，不再兜底创建共享表
+  - `Consumer / Org / Invite / Grants / Model Assets / Agent Catalog / AI Quota` 主链已切到 Portal 真表
+  - 当前处于 `aftercare`：继续收口 `DAO / DO / Entity` 实用化、契约测试与 `Portal Stats` 能力增强
+- `P5` 任务体系已可用：
+  - `portal-consumer-projection`
+  - `portal-consumer-level-auth-reconcile`
+  - `ai-sensitive-projection`
+  - `ai-plugin-execution-order-reconcile`
+  - 当前处于 `aftercare`：继续补失败重试、运行态观测与失败排查体验
+- 本地开发链路最近已补齐：
+  - `console` 镜像改为 monorepo 构建入口，兼容对 `aigateway-portal/backend` 的本地 `replace`
+  - `portal` 镜像构建 Go 版本已对齐 `go.mod` 的 `1.25`
+  - `console` readiness probe 已从 `/` 调整到 `/healthz/ready`，避免因匿名访问策略返回 `403`
+
+## 主要待办
+
+- `P3`
+  - 继续补 `K8s CRD / 注解 / 字段级` 对齐，而不只是 generic resource 可用。
+  - 继续收口 builtin/custom Wasm plugin metadata 与 schema/readme 的统一来源，减少对 `backend-java-legacy/` 的回退依赖。
+  - `MCP Server` 继续收口到 `Ingress + higress-config + McpBridge/registry + auth/plugin instance` 联合真相源。
+  - `MCP Server` 继续收口到更完整的 `Ingress + higress-config + McpBridge/registry + auth/plugin instance` 字段级语义，而不再只是 save strategy parity。
+  - `AI Route` 继续补齐 public/internal/fallback/plugin/EnvoyFilter 的完整写路径与删除清理。
+  - `Llm Provider` 继续补齐 `ai-proxy + ServiceSource + ACTIVE_PROVIDER_ID + ai-route resync` 的写侧副作用，以及剩余 provider-specific endpoint 规则。
+- `P4`
+  - 继续把 `portal service` 从 raw SQL 向 `DAO / DO / Entity` 收口。
+  - 补齐 `Consumer / Org / Invite / Model Assets / Agent Catalog / AI Quota / AI Sensitive` 契约测试。
+  - 继续把 `Portal Stats` 从表格查询推进到更完整的图表/导出能力。
+- `P5`
+  - 补失败重试与更完整的任务运行验证。
+  - 继续完善 jobs 的运行态观测和失败排查体验。
+- `P6` 后续收尾
+  - 历史归档名称仍保留 `backend-java-legacy/`，待 builtin plugin 资源正式迁入新目录后，再评估 legacy 目录退场顺序。

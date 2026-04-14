@@ -2,27 +2,32 @@ package cmd
 
 import (
 	"context"
+	"net/http"
+	"os"
+	"path"
+	"path/filepath"
+	"strings"
 
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
 	"github.com/gogf/gf/v2/os/gcmd"
 
-	dashboardcontroller "github.com/alibaba/aigateway-group/aigateway-console/backend/internal/controller/dashboard"
-	gatewaycontroller "github.com/alibaba/aigateway-group/aigateway-console/backend/internal/controller/gateway"
-	"github.com/alibaba/aigateway-group/aigateway-console/backend/internal/controller/healthz"
-	jobscontroller "github.com/alibaba/aigateway-group/aigateway-console/backend/internal/controller/jobs"
-	portalcontroller "github.com/alibaba/aigateway-group/aigateway-console/backend/internal/controller/portal"
-	sessioncontroller "github.com/alibaba/aigateway-group/aigateway-console/backend/internal/controller/session"
-	"github.com/alibaba/aigateway-group/aigateway-console/backend/internal/controller/system"
-	usercontroller "github.com/alibaba/aigateway-group/aigateway-console/backend/internal/controller/user"
-	"github.com/alibaba/aigateway-group/aigateway-console/backend/internal/middleware"
-	gatewaysvc "github.com/alibaba/aigateway-group/aigateway-console/backend/internal/service/gateway"
-	jobssvc "github.com/alibaba/aigateway-group/aigateway-console/backend/internal/service/jobs"
-	platformsvc "github.com/alibaba/aigateway-group/aigateway-console/backend/internal/service/platform"
-	portalsvc "github.com/alibaba/aigateway-group/aigateway-console/backend/internal/service/portal"
-	grafanaclient "github.com/alibaba/aigateway-group/aigateway-console/backend/utility/clients/grafana"
-	k8sclient "github.com/alibaba/aigateway-group/aigateway-console/backend/utility/clients/k8s"
-	portaldbclient "github.com/alibaba/aigateway-group/aigateway-console/backend/utility/clients/portaldb"
+	dashboardcontroller "github.com/wooveep/aigateway-console/backend/internal/controller/dashboard"
+	gatewaycontroller "github.com/wooveep/aigateway-console/backend/internal/controller/gateway"
+	"github.com/wooveep/aigateway-console/backend/internal/controller/healthz"
+	jobscontroller "github.com/wooveep/aigateway-console/backend/internal/controller/jobs"
+	portalcontroller "github.com/wooveep/aigateway-console/backend/internal/controller/portal"
+	sessioncontroller "github.com/wooveep/aigateway-console/backend/internal/controller/session"
+	"github.com/wooveep/aigateway-console/backend/internal/controller/system"
+	usercontroller "github.com/wooveep/aigateway-console/backend/internal/controller/user"
+	"github.com/wooveep/aigateway-console/backend/internal/middleware"
+	gatewaysvc "github.com/wooveep/aigateway-console/backend/internal/service/gateway"
+	jobssvc "github.com/wooveep/aigateway-console/backend/internal/service/jobs"
+	platformsvc "github.com/wooveep/aigateway-console/backend/internal/service/platform"
+	portalsvc "github.com/wooveep/aigateway-console/backend/internal/service/portal"
+	grafanaclient "github.com/wooveep/aigateway-console/backend/utility/clients/grafana"
+	k8sclient "github.com/wooveep/aigateway-console/backend/utility/clients/k8s"
+	portaldbclient "github.com/wooveep/aigateway-console/backend/utility/clients/portaldb"
 )
 
 var (
@@ -31,25 +36,10 @@ var (
 		Usage: "main",
 		Brief: "start http server",
 		Func: func(ctx context.Context, parser *gcmd.Parser) (err error) {
-			k8sService := k8sclient.New(k8sclient.Config{
-				Enabled:        g.Cfg().MustGet(ctx, "clients.k8s.enabled", false).Bool(),
-				Namespace:      g.Cfg().MustGet(ctx, "clients.k8s.namespace", "aigateway-system").String(),
-				KubectlBin:     g.Cfg().MustGet(ctx, "clients.k8s.kubectlBin", "kubectl").String(),
-				KubeconfigPath: g.Cfg().MustGet(ctx, "clients.k8s.kubeconfig", "").String(),
-				ResourcePrefix: g.Cfg().MustGet(ctx, "clients.k8s.resourcePrefix", "aigw-console").String(),
-			})
-			grafanaService := grafanaclient.New(grafanaclient.Config{
-				Enabled:  g.Cfg().MustGet(ctx, "clients.grafana.enabled", false).Bool(),
-				BaseURL:  g.Cfg().MustGet(ctx, "clients.grafana.baseURL", "").String(),
-				Username: g.Cfg().MustGet(ctx, "clients.grafana.username", "").String(),
-				Password: g.Cfg().MustGet(ctx, "clients.grafana.password", "").String(),
-			})
-			portalService := portaldbclient.New(portaldbclient.Config{
-				Enabled:     g.Cfg().MustGet(ctx, "clients.portaldb.enabled", false).Bool(),
-				Driver:      g.Cfg().MustGet(ctx, "clients.portaldb.driver", "").String(),
-				DSN:         g.Cfg().MustGet(ctx, "clients.portaldb.dsn", "").String(),
-				AutoMigrate: g.Cfg().MustGet(ctx, "clients.portaldb.autoMigrate", true).Bool(),
-			})
+			deps := loadRuntimeDependencies(ctx)
+			k8sService := k8sclient.New(deps.K8s)
+			grafanaService := grafanaclient.New(deps.Grafana)
+			portalService := portaldbclient.New(deps.Portal)
 
 			platformService := platformsvc.New(k8sService, grafanaService, portalService)
 			gatewayService := gatewaysvc.New(k8sService)
@@ -61,9 +51,12 @@ var (
 			}
 			s := g.Server()
 			s.Use(middleware.Trace, middleware.AccessLog, middleware.Auth(platformService))
-			s.BindHandler("/landing", func(r *ghttp.Request) {
-				r.Response.ServeFile("resource/public/html/index.html")
-			})
+			s.AddStaticPath("/assets", "resource/public/html/assets")
+			s.AddStaticPath("/mcp-templates", "resource/public/html/mcp-templates")
+			s.BindHandler("/", serveFrontendApp)
+			s.BindHandler("/landing", serveFrontendApp)
+			s.BindStatusHandler(http.StatusForbidden, serveFrontendStatusFallback)
+			s.BindStatusHandler(http.StatusNotFound, serveFrontendStatusFallback)
 			s.Group("/", func(group *ghttp.RouterGroup) {
 				group.Middleware(ghttp.MiddlewareHandlerResponse)
 				group.Bind(
@@ -86,3 +79,55 @@ var (
 		},
 	}
 )
+
+const (
+	frontendPublicDir = "resource/public/html"
+	frontendEntryFile = frontendPublicDir + "/index.html"
+)
+
+func serveFrontendApp(r *ghttp.Request) {
+	r.Response.ServeFile(frontendEntryFile)
+}
+
+func serveFrontendStatusFallback(r *ghttp.Request) {
+	if assetFile, ok := resolveFrontendPublicFile(r.URL.Path); ok {
+		r.Response.ClearBuffer()
+		r.Response.ServeFile(assetFile)
+		return
+	}
+	if middleware.IsFrontendPagePath(r.URL.Path) {
+		r.Response.ClearBuffer()
+		r.Response.ServeFile(frontendEntryFile)
+		return
+	}
+	r.Response.WriteStatus(r.Response.Status)
+}
+
+func resolveFrontendPublicFile(requestPath string) (string, bool) {
+	requestPath = strings.TrimSpace(requestPath)
+	if !middleware.IsFrontendStaticAssetPath(requestPath) {
+		return "", false
+	}
+
+	cleanPath := path.Clean("/" + requestPath)
+	if cleanPath == "/" {
+		return "", false
+	}
+
+	relativePath := strings.TrimPrefix(cleanPath, "/")
+	if relativePath == "" {
+		return "", false
+	}
+
+	candidates := []string{
+		filepath.Join(frontendPublicDir, filepath.FromSlash(relativePath)),
+		filepath.Join("..", "..", frontendPublicDir, filepath.FromSlash(relativePath)),
+	}
+	for _, filePath := range candidates {
+		info, err := os.Stat(filePath)
+		if err == nil && !info.IsDir() {
+			return filePath, true
+		}
+	}
+	return "", false
+}

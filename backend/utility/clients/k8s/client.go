@@ -18,7 +18,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/alibaba/aigateway-group/aigateway-console/backend/internal/consts"
+	"github.com/wooveep/aigateway-console/backend/internal/consts"
 )
 
 const (
@@ -41,10 +41,13 @@ type Config struct {
 	KubectlBin     string
 	KubeconfigPath string
 	ResourcePrefix string
+	IngressClass   string
 }
 
 type Client interface {
 	Healthy(ctx context.Context) error
+	Namespace() string
+	IngressClass() string
 	ReadSecret(ctx context.Context, name string) (map[string]string, error)
 	UpsertSecret(ctx context.Context, name string, data map[string]string) error
 	ReadConfigMap(ctx context.Context, name string) (map[string]string, error)
@@ -60,13 +63,16 @@ type RealClient struct {
 	kubectlBin     string
 	kubeconfigPath string
 	resourcePrefix string
+	ingressClass   string
 }
 
 type MemoryClient struct {
-	mu         sync.RWMutex
-	secrets    map[string]map[string]string
-	configMaps map[string]map[string]string
-	resources  map[string]map[string]map[string]any
+	mu           sync.RWMutex
+	secrets      map[string]map[string]string
+	configMaps   map[string]map[string]string
+	resources    map[string]map[string]map[string]any
+	namespace    string
+	ingressClass string
 }
 
 func New(cfg Config) Client {
@@ -76,16 +82,26 @@ func New(cfg Config) Client {
 			kubectlBin:     firstNonEmpty(cfg.KubectlBin, defaultKubectlBin),
 			kubeconfigPath: strings.TrimSpace(cfg.KubeconfigPath),
 			resourcePrefix: firstNonEmpty(cfg.ResourcePrefix, defaultResourcePrefix),
+			ingressClass:   firstNonEmpty(cfg.IngressClass, "aigateway"),
 		}
 	}
-	return NewMemoryClient()
+	return NewMemoryClient(Config{
+		Namespace:    cfg.Namespace,
+		IngressClass: cfg.IngressClass,
+	})
 }
 
-func NewMemoryClient() *MemoryClient {
+func NewMemoryClient(configs ...Config) *MemoryClient {
+	cfg := Config{}
+	if len(configs) > 0 {
+		cfg = configs[0]
+	}
 	client := &MemoryClient{
-		secrets:    map[string]map[string]string{},
-		configMaps: map[string]map[string]string{},
-		resources:  map[string]map[string]map[string]any{},
+		secrets:      map[string]map[string]string{},
+		configMaps:   map[string]map[string]string{},
+		resources:    map[string]map[string]map[string]any{},
+		namespace:    firstNonEmpty(cfg.Namespace, defaultK8sNamespace),
+		ingressClass: firstNonEmpty(cfg.IngressClass, "aigateway"),
 	}
 	client.configMaps[consts.DefaultConfigMapName] = map[string]string{
 		"resourceVersion": "1",
@@ -97,6 +113,8 @@ func NewMemoryClient() *MemoryClient {
 }
 
 func (c *MemoryClient) Healthy(ctx context.Context) error { return nil }
+func (c *MemoryClient) Namespace() string                 { return c.namespace }
+func (c *MemoryClient) IngressClass() string              { return c.ingressClass }
 
 func (c *MemoryClient) ReadSecret(ctx context.Context, name string) (map[string]string, error) {
 	c.mu.RLock()
@@ -192,6 +210,14 @@ func (c *RealClient) Healthy(ctx context.Context) error {
 	return err
 }
 
+func (c *RealClient) Namespace() string {
+	return c.namespace
+}
+
+func (c *RealClient) IngressClass() string {
+	return c.ingressClass
+}
+
 func (c *RealClient) ReadSecret(ctx context.Context, name string) (map[string]string, error) {
 	body, err := c.run(ctx, nil, "get", "secret", name, "-o", "json")
 	if err != nil {
@@ -264,6 +290,9 @@ func (c *RealClient) UpsertConfigMap(ctx context.Context, name string, data map[
 }
 
 func (c *RealClient) ListResources(ctx context.Context, kind string) ([]map[string]any, error) {
+	if isControlPlaneKind(kind) {
+		return c.listControlPlaneResources(ctx, kind)
+	}
 	kindSlug := labelValue(kind)
 	body, err := c.run(ctx, nil, "get", "configmap", "-l",
 		fmt.Sprintf("%s=%s,%s=%s", resourceConfigMapLabelKey, resourceConfigMapType, resourceConfigMapLabelKind, kindSlug),
@@ -294,6 +323,9 @@ func (c *RealClient) ListResources(ctx context.Context, kind string) ([]map[stri
 }
 
 func (c *RealClient) GetResource(ctx context.Context, kind, name string) (map[string]any, error) {
+	if isControlPlaneKind(kind) {
+		return c.getControlPlaneResource(ctx, kind, name)
+	}
 	body, err := c.run(ctx, nil, "get", "configmap", c.resourceConfigMapName(kind, name), "-o", "json")
 	if err != nil {
 		return nil, err
@@ -308,6 +340,9 @@ func (c *RealClient) GetResource(ctx context.Context, kind, name string) (map[st
 }
 
 func (c *RealClient) UpsertResource(ctx context.Context, kind, name string, data map[string]any) (map[string]any, error) {
+	if isControlPlaneKind(kind) {
+		return c.upsertControlPlaneResource(ctx, kind, name, data)
+	}
 	item := cloneMap(data)
 	item["name"] = name
 	if item["version"] == nil {
@@ -355,6 +390,9 @@ func (c *RealClient) UpsertResource(ctx context.Context, kind, name string, data
 }
 
 func (c *RealClient) DeleteResource(ctx context.Context, kind, name string) error {
+	if isControlPlaneKind(kind) {
+		return c.deleteControlPlaneResource(ctx, kind, name)
+	}
 	_, err := c.run(ctx, nil, "delete", "configmap", c.resourceConfigMapName(kind, name), "--ignore-not-found=false")
 	return err
 }

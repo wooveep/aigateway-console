@@ -2,6 +2,8 @@
 import { computed, onMounted, reactive, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import PageSection from '@/components/common/PageSection.vue';
+import PortalUnavailableState from '@/components/common/PortalUnavailableState.vue';
+import { usePortalAvailability } from '@/composables/usePortalAvailability';
 import ListToolbar from '@/components/common/ListToolbar.vue';
 import DrawerFooter from '@/components/common/DrawerFooter.vue';
 import DeleteConfirmModal from '@/components/common/DeleteConfirmModal.vue';
@@ -18,6 +20,7 @@ import {
 import { joinLines, splitLines } from '@/lib/portal';
 
 const { t } = useI18n();
+const { portalUnavailable } = usePortalAvailability();
 const loading = ref(false);
 const search = ref('');
 const rows = ref<any[]>([]);
@@ -48,6 +51,13 @@ const filtered = computed(() => rows.value.filter((item) => {
 }));
 
 async function load() {
+  if (portalUnavailable.value) {
+    rows.value = [];
+    options.value = [];
+    optionsLoadFailed.value = false;
+    loading.value = false;
+    return;
+  }
   loading.value = true;
   try {
     const [catalogs, opts] = await Promise.all([
@@ -119,29 +129,32 @@ onMounted(load);
 
 <template>
   <PageSection title="智能体目录管理">
-    <ListToolbar v-model:search="search" search-placeholder="搜索 Agent ID、显示名、MCP 服务" create-text="创建智能体目录" @refresh="load" @create="openDrawer()" />
-    <a-alert
-      v-if="optionsLoadFailed"
-      class="agent-catalog-page__alert"
-      type="warning"
-      show-icon
-      :message="t('agentCatalog.optionsLoadFailed')"
-    />
-    <a-table :data-source="filtered" :loading="loading" row-key="agentId" :scroll="{ x: 1100 }">
-      <a-table-column key="agentId" data-index="agentId" title="Agent ID" />
-      <a-table-column key="displayName" data-index="displayName" title="显示名" />
-      <a-table-column key="mcpServerName" data-index="mcpServerName" title="MCP 服务" />
-      <a-table-column key="status" title="状态">
-        <template #default="{ record }"><StatusTag :value="record.status" /></template>
-      </a-table-column>
-      <a-table-column key="publishedAt" data-index="publishedAt" title="发布时间" />
-      <a-table-column key="actions" title="操作" width="240">
-        <template #default="{ record }">
-          <a-button type="link" size="small" @click="toggleStatus(record)">{{ record.status === 'published' ? '下线' : '发布' }}</a-button>
-          <a-button type="link" size="small" @click="openDrawer(record)">编辑</a-button>
-        </template>
-      </a-table-column>
-    </a-table>
+    <PortalUnavailableState v-if="portalUnavailable" />
+    <template v-else>
+      <ListToolbar v-model:search="search" search-placeholder="搜索 Agent ID、显示名、MCP 服务" create-text="创建智能体目录" @refresh="load" @create="openDrawer()" />
+      <a-alert
+        v-if="optionsLoadFailed"
+        class="agent-catalog-page__alert"
+        type="warning"
+        show-icon
+        :message="t('agentCatalog.optionsLoadFailed')"
+      />
+      <a-table :data-source="filtered" :loading="loading" row-key="agentId" :scroll="{ x: 1100 }">
+        <a-table-column key="agentId" data-index="agentId" title="Agent ID" />
+        <a-table-column key="displayName" data-index="displayName" title="显示名" />
+        <a-table-column key="mcpServerName" data-index="mcpServerName" title="MCP 服务" />
+        <a-table-column key="status" title="状态">
+          <template #default="{ record }"><StatusTag :value="record.status" /></template>
+        </a-table-column>
+        <a-table-column key="publishedAt" data-index="publishedAt" title="发布时间" />
+        <a-table-column key="actions" title="操作" width="240">
+          <template #default="{ record }">
+            <a-button type="link" size="small" @click="toggleStatus(record)">{{ record.status === 'published' ? '下线' : '发布' }}</a-button>
+            <a-button type="link" size="small" @click="openDrawer(record)">编辑</a-button>
+          </template>
+        </a-table-column>
+      </a-table>
+    </template>
 
     <a-drawer v-model:open="drawerOpen" width="760" :title="editing ? '编辑智能体目录' : '创建智能体目录'">
       <a-form layout="vertical">

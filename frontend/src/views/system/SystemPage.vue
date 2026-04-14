@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import PageSection from '@/components/common/PageSection.vue';
 import { getAIGatewayConfig, getSystemInfo, updateAIGatewayConfig } from '@/services/system';
 import { showSuccess } from '@/lib/feedback';
 
+const router = useRouter();
 const { t } = useI18n();
 const loading = ref(false);
 const saving = ref(false);
@@ -42,6 +44,7 @@ onMounted(load);
   <div class="system-page">
     <PageSection :title="t('menu.systemSettings')">
       <template #actions>
+        <a-button @click="router.push('/system/jobs')">Jobs 运维</a-button>
         <a-button @click="load">{{ t('misc.refresh') }}</a-button>
       </template>
       <a-skeleton v-if="loading" active />

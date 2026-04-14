@@ -7,6 +7,9 @@ import { AntDesignVueResolver } from 'unplugin-vue-components/resolvers';
 import { defineConfig } from 'vite';
 
 const rootDir = fileURLToPath(new URL('.', import.meta.url));
+const devServerHost = process.env.AIGATEWAY_CONSOLE_DEV_HOST || '0.0.0.0';
+const devServerPort = Number(process.env.AIGATEWAY_CONSOLE_FRONTEND_PORT || 3000);
+const devApiTarget = process.env.AIGATEWAY_CONSOLE_DEV_API_TARGET || 'http://127.0.0.1:8080';
 
 // Vite 6 reads global Web Crypto during config resolution. The Maven-installed
 // Node 16 runtime may expose a partial `globalThis.crypto` without
@@ -30,12 +33,13 @@ export default defineConfig({
     },
   },
   server: {
-    host: '0.0.0.0',
-    port: 3000,
+    host: devServerHost,
+    port: devServerPort,
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:8080',
+        target: devApiTarget,
         changeOrigin: true,
+        rewrite: (requestPath) => requestPath.replace(/^\/api/, ''),
       },
     },
   },

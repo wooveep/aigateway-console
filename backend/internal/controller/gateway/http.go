@@ -6,7 +6,7 @@ import (
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
 
-	gatewaysvc "github.com/alibaba/aigateway-group/aigateway-console/backend/internal/service/gateway"
+	gatewaysvc "github.com/wooveep/aigateway-console/backend/internal/service/gateway"
 )
 
 func Bind(group *ghttp.RouterGroup, gatewayService *gatewaysvc.Service) {
@@ -53,15 +53,20 @@ func Bind(group *ghttp.RouterGroup, gatewayService *gatewaysvc.Service) {
 	})
 
 	group.GET("/v1/wasm-plugins/:name/config", func(r *ghttp.Request) {
-		name := r.GetRouter("name").String()
-		r.Response.WriteJsonExit(g.Map{
-			"success": true,
-			"data": map[string]any{
-				"name":   name,
-				"type":   "yaml",
-				"schema": map[string]any{},
-			},
-		})
+		item, err := gatewayService.GetWasmPluginConfig(r.Context(), r.GetRouter("name").String())
+		if err != nil {
+			r.Response.WriteStatusExit(404, g.Map{"success": false, "message": err.Error()})
+			return
+		}
+		r.Response.WriteJsonExit(g.Map{"success": true, "data": item})
+	})
+	group.GET("/v1/wasm-plugins/:name/readme", func(r *ghttp.Request) {
+		item, err := gatewayService.GetWasmPluginReadme(r.Context(), r.GetRouter("name").String())
+		if err != nil {
+			r.Response.WriteStatusExit(404, g.Map{"success": false, "message": err.Error()})
+			return
+		}
+		r.Response.WriteJsonExit(g.Map{"success": true, "data": item})
 	})
 
 	group.GET("/v1/global/plugin-instances/:pluginName", func(r *ghttp.Request) {
@@ -69,6 +74,9 @@ func Bind(group *ghttp.RouterGroup, gatewayService *gatewaysvc.Service) {
 	})
 	group.PUT("/v1/global/plugin-instances/:pluginName", func(r *ghttp.Request) {
 		savePluginInstance(r, gatewayService, "global", "", r.GetRouter("pluginName").String())
+	})
+	group.DELETE("/v1/global/plugin-instances/:pluginName", func(r *ghttp.Request) {
+		deletePluginInstance(r, gatewayService, "global", "", r.GetRouter("pluginName").String())
 	})
 
 	group.GET("/v1/routes/:name/plugin-instances", func(r *ghttp.Request) {
@@ -80,6 +88,9 @@ func Bind(group *ghttp.RouterGroup, gatewayService *gatewaysvc.Service) {
 	group.PUT("/v1/routes/:name/plugin-instances/:pluginName", func(r *ghttp.Request) {
 		savePluginInstance(r, gatewayService, "route", r.GetRouter("name").String(), r.GetRouter("pluginName").String())
 	})
+	group.DELETE("/v1/routes/:name/plugin-instances/:pluginName", func(r *ghttp.Request) {
+		deletePluginInstance(r, gatewayService, "route", r.GetRouter("name").String(), r.GetRouter("pluginName").String())
+	})
 
 	group.GET("/v1/domains/:name/plugin-instances", func(r *ghttp.Request) {
 		listPluginInstances(r, gatewayService, "domain", r.GetRouter("name").String())
@@ -89,6 +100,22 @@ func Bind(group *ghttp.RouterGroup, gatewayService *gatewaysvc.Service) {
 	})
 	group.PUT("/v1/domains/:name/plugin-instances/:pluginName", func(r *ghttp.Request) {
 		savePluginInstance(r, gatewayService, "domain", r.GetRouter("name").String(), r.GetRouter("pluginName").String())
+	})
+	group.DELETE("/v1/domains/:name/plugin-instances/:pluginName", func(r *ghttp.Request) {
+		deletePluginInstance(r, gatewayService, "domain", r.GetRouter("name").String(), r.GetRouter("pluginName").String())
+	})
+
+	group.GET("/v1/services/:name/plugin-instances", func(r *ghttp.Request) {
+		listPluginInstances(r, gatewayService, "service", r.GetRouter("name").String())
+	})
+	group.GET("/v1/services/:name/plugin-instances/:pluginName", func(r *ghttp.Request) {
+		getPluginInstance(r, gatewayService, "service", r.GetRouter("name").String(), r.GetRouter("pluginName").String())
+	})
+	group.PUT("/v1/services/:name/plugin-instances/:pluginName", func(r *ghttp.Request) {
+		savePluginInstance(r, gatewayService, "service", r.GetRouter("name").String(), r.GetRouter("pluginName").String())
+	})
+	group.DELETE("/v1/services/:name/plugin-instances/:pluginName", func(r *ghttp.Request) {
+		deletePluginInstance(r, gatewayService, "service", r.GetRouter("name").String(), r.GetRouter("pluginName").String())
 	})
 }
 
@@ -187,4 +214,13 @@ func savePluginInstance(r *ghttp.Request, gatewayService *gatewaysvc.Service, sc
 		return
 	}
 	r.Response.WriteJsonExit(g.Map{"success": true, "data": item})
+}
+
+func deletePluginInstance(r *ghttp.Request, gatewayService *gatewaysvc.Service, scope, target, pluginName string) {
+	if err := gatewayService.DeletePluginInstance(r.Context(), scope, target, pluginName); err != nil {
+		r.Response.WriteStatusExit(400, g.Map{"success": false, "message": err.Error()})
+		return
+	}
+	r.Response.WriteStatus(204)
+	r.ExitAll()
 }

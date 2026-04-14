@@ -9,9 +9,9 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/require"
 
-	portalsvc "github.com/alibaba/aigateway-group/aigateway-console/backend/internal/service/portal"
-	k8sclient "github.com/alibaba/aigateway-group/aigateway-console/backend/utility/clients/k8s"
-	portaldbclient "github.com/alibaba/aigateway-group/aigateway-console/backend/utility/clients/portaldb"
+	portalsvc "github.com/wooveep/aigateway-console/backend/internal/service/portal"
+	k8sclient "github.com/wooveep/aigateway-console/backend/utility/clients/k8s"
+	portaldbclient "github.com/wooveep/aigateway-console/backend/utility/clients/portaldb"
 )
 
 type stubPortal struct {
@@ -128,7 +128,7 @@ func TestTriggerPortalConsumerProjectionAndSkipDuplicateSnapshot(t *testing.T) {
 		))
 
 	service := New(
-		portaldbclient.NewFromDB(portaldbclient.Config{Enabled: true, Driver: "mysql"}, db),
+		portaldbclient.NewFromDB(portaldbclient.Config{Enabled: true, Driver: "mysql", AutoMigrate: true}, db),
 		stubPortal{
 			consumers: []portalsvc.ConsumerRecord{{
 				Name:              "demo",
@@ -163,17 +163,32 @@ func TestTriggerPortalConsumerProjectionAndSkipDuplicateSnapshot(t *testing.T) {
 }
 
 func expectJobSchema(mock sqlmock.Sqlmock) {
-	mock.ExpectExec("CREATE TABLE IF NOT EXISTS portal_departments").WillReturnResult(sqlmock.NewResult(0, 0))
-	mock.ExpectExec("CREATE TABLE IF NOT EXISTS portal_users").WillReturnResult(sqlmock.NewResult(0, 0))
-	mock.ExpectExec("CREATE TABLE IF NOT EXISTS portal_invite_code").WillReturnResult(sqlmock.NewResult(0, 0))
-	mock.ExpectExec("CREATE TABLE IF NOT EXISTS portal_asset_grant").WillReturnResult(sqlmock.NewResult(0, 0))
-	mock.ExpectExec("CREATE TABLE IF NOT EXISTS portal_model_asset").WillReturnResult(sqlmock.NewResult(0, 0))
-	mock.ExpectExec("CREATE TABLE IF NOT EXISTS portal_model_binding").WillReturnResult(sqlmock.NewResult(0, 0))
+	query := regexp.QuoteMeta(`
+		SELECT COUNT(1)
+		FROM information_schema.TABLES
+		WHERE TABLE_SCHEMA = DATABASE()
+		  AND TABLE_NAME = ?`)
+	for _, table := range []string{
+		"portal_user",
+		"portal_invite_code",
+		"org_department",
+		"org_account_membership",
+		"asset_grant",
+		"quota_policy_user",
+		"portal_model_asset",
+		"portal_model_binding",
+		"portal_agent_catalog",
+	} {
+		mock.ExpectQuery(query).
+			WithArgs(table).
+			WillReturnRows(sqlmock.NewRows([]string{"COUNT(1)"}).AddRow(1))
+	}
 	mock.ExpectExec("CREATE TABLE IF NOT EXISTS portal_model_binding_price_version").WillReturnResult(sqlmock.NewResult(0, 0))
-	mock.ExpectExec("CREATE TABLE IF NOT EXISTS portal_agent_catalog").WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectExec("CREATE TABLE IF NOT EXISTS portal_ai_sensitive_detect_rule").WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectExec("CREATE TABLE IF NOT EXISTS portal_ai_sensitive_replace_rule").WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectExec("CREATE TABLE IF NOT EXISTS portal_ai_sensitive_system_config").WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectExec("CREATE TABLE IF NOT EXISTS portal_ai_sensitive_block_audit").WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectExec("CREATE TABLE IF NOT EXISTS portal_ai_quota_balance").WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectExec("CREATE TABLE IF NOT EXISTS portal_ai_quota_schedule_rule").WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectExec("CREATE TABLE IF NOT EXISTS job_run_record").WillReturnResult(sqlmock.NewResult(0, 0))
 }

@@ -5,11 +5,14 @@ import { DashboardType, type DashboardInfo } from '@/interfaces/dashboard';
 import PageSection from '@/components/common/PageSection.vue';
 import { getDashboardInfo } from '@/services/dashboard';
 import { useI18n } from 'vue-i18n';
+import { usePortalAvailability } from '@/composables/usePortalAvailability';
 
 const NativeDashboardView = defineAsyncComponent(() => import('@/features/dashboard/NativeDashboardView.vue'));
+const PortalStatsPanel = defineAsyncComponent(() => import('@/features/dashboard/PortalStatsPanel.vue'));
 
 const route = useRoute();
 const { t } = useI18n();
+const { portalUnavailable } = usePortalAvailability();
 
 const loading = shallowRef(false);
 const dashboardInfo = shallowRef<DashboardInfo | null>(null);
@@ -53,6 +56,10 @@ watch(dashboardType, () => {
       <div v-else class="dashboard-page__empty">
         <a-empty :description="t('dashboard.noBuiltInDashboard')" />
       </div>
+    </PageSection>
+
+    <PageSection v-if="dashboardType === DashboardType.AI" title="Portal Stats">
+      <PortalStatsPanel :key="String(portalUnavailable)" />
     </PageSection>
   </div>
 </template>

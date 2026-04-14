@@ -23,6 +23,8 @@ const props = defineProps<{
   targetDetail?: Record<string, any> | null;
   loading?: boolean;
   instanceLoading?: boolean;
+  deleting?: boolean;
+  allowDelete?: boolean;
   configData?: any;
   instanceData?: any;
 }>();
@@ -31,6 +33,7 @@ const emit = defineEmits<{
   'update:open': [value: boolean];
   submitBuiltIn: [payload: Record<string, any>];
   submitPlugin: [payload: { enabled: boolean; rawConfigurations: string }];
+  deletePlugin: [];
 }>();
 
 const { locale } = useI18n();
@@ -197,7 +200,11 @@ function submit() {
         </a-tabs>
       </div>
     </a-skeleton>
-    <DrawerFooter @cancel="close" @confirm="submit" />
+    <DrawerFooter :loading="deleting" @cancel="close" @confirm="submit">
+      <template v-if="allowDelete" #extra>
+        <a-button danger :loading="deleting" @click="emit('deletePlugin')">删除当前绑定</a-button>
+      </template>
+    </DrawerFooter>
   </a-drawer>
 </template>
 

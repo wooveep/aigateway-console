@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import PageSection from '@/components/common/PageSection.vue';
 import ListToolbar from '@/components/common/ListToolbar.vue';
+import { buildPluginTargetPath, QueryType } from '@/plugins/visibility';
 import { getGatewayServices } from '@/services/service';
 
+const router = useRouter();
 const loading = ref(false);
 const search = ref('');
 const services = ref<any[]>([]);
@@ -37,6 +40,17 @@ onMounted(load);
       <a-table-column key="port" data-index="port" title="端口" />
       <a-table-column key="endpoints" title="端点">
         <template #default="{ record }">{{ (record.endpoints || []).join(', ') || '-' }}</template>
+      </a-table-column>
+      <a-table-column key="actions" title="操作" width="120" fixed="right">
+        <template #default="{ record }">
+          <a-button
+            type="link"
+            size="small"
+            @click="router.push(buildPluginTargetPath(QueryType.SERVICE, record.name))"
+          >
+            插件配置
+          </a-button>
+        </template>
       </a-table-column>
     </a-table>
   </PageSection>

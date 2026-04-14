@@ -6,7 +6,7 @@ import (
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
 
-	jobssvc "github.com/alibaba/aigateway-group/aigateway-console/backend/internal/service/jobs"
+	jobssvc "github.com/wooveep/aigateway-console/backend/internal/service/jobs"
 )
 
 func Bind(group *ghttp.RouterGroup, jobsService *jobssvc.Service) {

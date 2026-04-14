@@ -2,12 +2,13 @@ package portal
 
 import (
 	"errors"
+	"io"
 	"strings"
 
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
 
-	portalsvc "github.com/alibaba/aigateway-group/aigateway-console/backend/internal/service/portal"
+	portalsvc "github.com/wooveep/aigateway-console/backend/internal/service/portal"
 )
 
 func Bind(group *ghttp.RouterGroup, portalService *portalsvc.Service) {
@@ -247,6 +248,175 @@ func Bind(group *ghttp.RouterGroup, portalService *portalsvc.Service) {
 		writeJSON(r, item, err, 200)
 	})
 
+	group.GET("/v1/ai/quotas/menu-state", func(r *ghttp.Request) {
+		item, err := portalService.GetAIQuotaMenuState(r.Context())
+		writeJSON(r, item, err, 200)
+	})
+	group.GET("/v1/ai/quotas/routes", func(r *ghttp.Request) {
+		items, err := portalService.ListAIQuotaRoutes(r.Context())
+		writeJSON(r, items, err, 200)
+	})
+	group.GET("/v1/ai/quotas/routes/:routeName/consumers", func(r *ghttp.Request) {
+		items, err := portalService.ListAIQuotaConsumers(r.Context(), r.GetRouter("routeName").String())
+		writeJSON(r, items, err, 200)
+	})
+	group.PUT("/v1/ai/quotas/routes/:routeName/consumers/:consumerName/quota", func(r *ghttp.Request) {
+		var req struct {
+			Value int64 `json:"value"`
+		}
+		if err := r.Parse(&req); err != nil {
+			writeJSON(r, nil, err, 400)
+			return
+		}
+		item, err := portalService.RefreshAIQuota(r.Context(), r.GetRouter("routeName").String(), r.GetRouter("consumerName").String(), req.Value)
+		writeJSON(r, item, err, 200)
+	})
+	group.POST("/v1/ai/quotas/routes/:routeName/consumers/:consumerName/delta", func(r *ghttp.Request) {
+		var req struct {
+			Value int64 `json:"value"`
+		}
+		if err := r.Parse(&req); err != nil {
+			writeJSON(r, nil, err, 400)
+			return
+		}
+		item, err := portalService.DeltaAIQuota(r.Context(), r.GetRouter("routeName").String(), r.GetRouter("consumerName").String(), req.Value)
+		writeJSON(r, item, err, 200)
+	})
+	group.GET("/v1/ai/quotas/routes/:routeName/consumers/:consumerName/policy", func(r *ghttp.Request) {
+		item, err := portalService.GetAIQuotaUserPolicy(r.Context(), r.GetRouter("routeName").String(), r.GetRouter("consumerName").String())
+		writeJSON(r, item, err, 200)
+	})
+	group.PUT("/v1/ai/quotas/routes/:routeName/consumers/:consumerName/policy", func(r *ghttp.Request) {
+		var req portalsvc.AIQuotaUserPolicyRequest
+		if err := r.Parse(&req); err != nil {
+			writeJSON(r, nil, err, 400)
+			return
+		}
+		item, err := portalService.SaveAIQuotaUserPolicy(r.Context(), r.GetRouter("routeName").String(), r.GetRouter("consumerName").String(), req)
+		writeJSON(r, item, err, 200)
+	})
+	group.GET("/v1/ai/quotas/routes/:routeName/schedules", func(r *ghttp.Request) {
+		items, err := portalService.ListAIQuotaScheduleRules(r.Context(), r.GetRouter("routeName").String(), r.GetQuery("consumerName").String())
+		writeJSON(r, items, err, 200)
+	})
+	group.PUT("/v1/ai/quotas/routes/:routeName/schedules", func(r *ghttp.Request) {
+		var req portalsvc.AIQuotaScheduleRuleRequest
+		if err := r.Parse(&req); err != nil {
+			writeJSON(r, nil, err, 400)
+			return
+		}
+		item, err := portalService.SaveAIQuotaScheduleRule(r.Context(), r.GetRouter("routeName").String(), req)
+		writeJSON(r, item, err, 200)
+	})
+	group.DELETE("/v1/ai/quotas/routes/:routeName/schedules/:ruleId", func(r *ghttp.Request) {
+		if err := portalService.DeleteAIQuotaScheduleRule(r.Context(), r.GetRouter("routeName").String(), r.GetRouter("ruleId").String()); err != nil {
+			writeJSON(r, nil, err, 400)
+			return
+		}
+		r.Response.WriteStatus(204)
+		r.ExitAll()
+	})
+
+	group.GET("/v1/ai/sensitive-words/menu-state", func(r *ghttp.Request) {
+		item, err := portalService.GetAISensitiveMenuState(r.Context())
+		writeJSON(r, item, err, 200)
+	})
+	group.GET("/v1/ai/sensitive-words/status", func(r *ghttp.Request) {
+		item, err := portalService.GetAISensitiveStatus(r.Context())
+		writeJSON(r, item, err, 200)
+	})
+	group.POST("/v1/ai/sensitive-words/reconcile", func(r *ghttp.Request) {
+		item, err := portalService.ReconcileAISensitive(r.Context())
+		writeJSON(r, item, err, 200)
+	})
+	group.GET("/v1/ai/sensitive-words/detect-rules", func(r *ghttp.Request) {
+		items, err := portalService.ListAISensitiveDetectRules(r.Context())
+		writeJSON(r, items, err, 200)
+	})
+	group.POST("/v1/ai/sensitive-words/detect-rules", func(r *ghttp.Request) {
+		var req portalsvc.AISensitiveDetectRule
+		if err := r.Parse(&req); err != nil {
+			writeJSON(r, nil, err, 400)
+			return
+		}
+		item, err := portalService.SaveAISensitiveDetectRule(r.Context(), req)
+		writeJSON(r, item, err, 200)
+	})
+	group.PUT("/v1/ai/sensitive-words/detect-rules/:id", func(r *ghttp.Request) {
+		var req portalsvc.AISensitiveDetectRule
+		if err := r.Parse(&req); err != nil {
+			writeJSON(r, nil, err, 400)
+			return
+		}
+		req.ID = r.GetRouter("id").Int64()
+		item, err := portalService.SaveAISensitiveDetectRule(r.Context(), req)
+		writeJSON(r, item, err, 200)
+	})
+	group.DELETE("/v1/ai/sensitive-words/detect-rules/:id", func(r *ghttp.Request) {
+		if err := portalService.DeleteAISensitiveDetectRule(r.Context(), r.GetRouter("id").Int64()); err != nil {
+			writeJSON(r, nil, err, 400)
+			return
+		}
+		r.Response.WriteStatus(204)
+		r.ExitAll()
+	})
+	group.GET("/v1/ai/sensitive-words/replace-rules", func(r *ghttp.Request) {
+		items, err := portalService.ListAISensitiveReplaceRules(r.Context())
+		writeJSON(r, items, err, 200)
+	})
+	group.POST("/v1/ai/sensitive-words/replace-rules", func(r *ghttp.Request) {
+		var req portalsvc.AISensitiveReplaceRule
+		if err := r.Parse(&req); err != nil {
+			writeJSON(r, nil, err, 400)
+			return
+		}
+		item, err := portalService.SaveAISensitiveReplaceRule(r.Context(), req)
+		writeJSON(r, item, err, 200)
+	})
+	group.PUT("/v1/ai/sensitive-words/replace-rules/:id", func(r *ghttp.Request) {
+		var req portalsvc.AISensitiveReplaceRule
+		if err := r.Parse(&req); err != nil {
+			writeJSON(r, nil, err, 400)
+			return
+		}
+		req.ID = r.GetRouter("id").Int64()
+		item, err := portalService.SaveAISensitiveReplaceRule(r.Context(), req)
+		writeJSON(r, item, err, 200)
+	})
+	group.DELETE("/v1/ai/sensitive-words/replace-rules/:id", func(r *ghttp.Request) {
+		if err := portalService.DeleteAISensitiveReplaceRule(r.Context(), r.GetRouter("id").Int64()); err != nil {
+			writeJSON(r, nil, err, 400)
+			return
+		}
+		r.Response.WriteStatus(204)
+		r.ExitAll()
+	})
+	group.GET("/v1/ai/sensitive-words/audits", func(r *ghttp.Request) {
+		items, err := portalService.ListAISensitiveAudits(r.Context(), portalsvc.AISensitiveAuditQuery{
+			ConsumerName: r.GetQuery("consumerName").String(),
+			DisplayName:  r.GetQuery("displayName").String(),
+			RouteName:    r.GetQuery("routeName").String(),
+			MatchType:    r.GetQuery("matchType").String(),
+			StartTime:    r.GetQuery("startTime").String(),
+			EndTime:      r.GetQuery("endTime").String(),
+			Limit:        r.GetQuery("limit").Int(),
+		})
+		writeJSON(r, items, err, 200)
+	})
+	group.GET("/v1/ai/sensitive-words/system-config", func(r *ghttp.Request) {
+		item, err := portalService.GetAISensitiveSystemConfig(r.Context())
+		writeJSON(r, item, err, 200)
+	})
+	group.PUT("/v1/ai/sensitive-words/system-config", func(r *ghttp.Request) {
+		var req portalsvc.AISensitiveSystemConfig
+		if err := r.Parse(&req); err != nil {
+			writeJSON(r, nil, err, 400)
+			return
+		}
+		item, err := portalService.SaveAISensitiveSystemConfig(r.Context(), req)
+		writeJSON(r, item, err, 200)
+	})
+
 	group.GET("/v1/org/departments/tree", func(r *ghttp.Request) {
 		items, err := portalService.ListDepartmentTree(r.Context())
 		writeJSON(r, items, err, 200)
@@ -334,6 +504,42 @@ func Bind(group *ghttp.RouterGroup, portalService *portalsvc.Service) {
 		item, err := portalService.UpdateAccountStatus(r.Context(), r.GetRouter("consumerName").String(), req.Status)
 		writeJSON(r, item, err, 200)
 	})
+	group.GET("/v1/org/template", func(r *ghttp.Request) {
+		content, err := portalService.DownloadOrgTemplate(r.Context())
+		if err != nil {
+			writeJSON(r, nil, err, 400)
+			return
+		}
+		writeWorkbook(r, "organization-template.xlsx", content)
+	})
+	group.GET("/v1/org/export", func(r *ghttp.Request) {
+		content, err := portalService.ExportOrganizationWorkbook(r.Context())
+		if err != nil {
+			writeJSON(r, nil, err, 400)
+			return
+		}
+		writeWorkbook(r, "organization-export.xlsx", content)
+	})
+	group.POST("/v1/org/import", func(r *ghttp.Request) {
+		file := r.GetUploadFile("file")
+		if file == nil {
+			writeJSON(r, nil, errors.New("import file cannot be empty"), 400)
+			return
+		}
+		reader, err := file.Open()
+		if err != nil {
+			writeJSON(r, nil, err, 400)
+			return
+		}
+		defer reader.Close()
+		content, err := io.ReadAll(reader)
+		if err != nil {
+			writeJSON(r, nil, err, 400)
+			return
+		}
+		item, err := portalService.ImportOrganizationWorkbook(r.Context(), content)
+		writeJSON(r, item, err, 200)
+	})
 
 	group.POST("/v1/portal/invite-codes", func(r *ghttp.Request) {
 		var req struct {
@@ -365,6 +571,39 @@ func Bind(group *ghttp.RouterGroup, portalService *portalsvc.Service) {
 		item, err := portalService.UpdateInviteCodeStatus(r.Context(), r.GetRouter("code").String(), req.Status)
 		writeJSON(r, item, err, 200)
 	})
+	group.GET("/v1/portal/stats/usage", func(r *ghttp.Request) {
+		items, err := portalService.ListUsageStats(r.Context(), portalsvc.UsageStatsQuery{
+			From: optionalInt64Query(r, "from"),
+			To:   optionalInt64Query(r, "to"),
+		})
+		writeJSON(r, items, err, 200)
+	})
+	group.GET("/v1/portal/stats/usage-events", func(r *ghttp.Request) {
+		items, err := portalService.ListUsageEvents(r.Context(), portalsvc.UsageEventsQuery{
+			From:            optionalInt64Query(r, "from"),
+			To:              optionalInt64Query(r, "to"),
+			ConsumerName:    r.GetQuery("consumerName").String(),
+			DepartmentID:    r.GetQuery("departmentId").String(),
+			IncludeChildren: optionalBoolQuery(r, "includeChildren"),
+			APIKeyID:        r.GetQuery("apiKeyId").String(),
+			ModelID:         r.GetQuery("modelId").String(),
+			RouteName:       r.GetQuery("routeName").String(),
+			RequestStatus:   r.GetQuery("requestStatus").String(),
+			UsageStatus:     r.GetQuery("usageStatus").String(),
+			PageNum:         r.GetQuery("pageNum").Int(),
+			PageSize:        r.GetQuery("pageSize").Int(),
+		})
+		writeJSON(r, items, err, 200)
+	})
+	group.GET("/v1/portal/stats/department-bills", func(r *ghttp.Request) {
+		items, err := portalService.ListDepartmentBills(r.Context(), portalsvc.DepartmentBillsQuery{
+			From:            optionalInt64Query(r, "from"),
+			To:              optionalInt64Query(r, "to"),
+			DepartmentID:    r.GetQuery("departmentId").String(),
+			IncludeChildren: optionalBoolQuery(r, "includeChildren"),
+		})
+		writeJSON(r, items, err, 200)
+	})
 }
 
 func writeJSON(r *ghttp.Request, data any, err error, successStatus int) {
@@ -392,4 +631,28 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func optionalInt64Query(r *ghttp.Request, key string) *int64 {
+	raw := strings.TrimSpace(r.GetQuery(key).String())
+	if raw == "" {
+		return nil
+	}
+	value := r.GetQuery(key).Int64()
+	return &value
+}
+
+func optionalBoolQuery(r *ghttp.Request, key string) *bool {
+	raw := strings.TrimSpace(r.GetQuery(key).String())
+	if raw == "" {
+		return nil
+	}
+	value := r.GetQuery(key).Bool()
+	return &value
+}
+
+func writeWorkbook(r *ghttp.Request, filename string, content []byte) {
+	r.Response.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	r.Response.Header().Set("Content-Disposition", "attachment; filename=\""+filename+"\"")
+	r.Response.WriteExit(content)
 }

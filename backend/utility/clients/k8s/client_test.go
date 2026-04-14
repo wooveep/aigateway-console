@@ -31,7 +31,7 @@ func TestMemoryClientResourceCRUD(t *testing.T) {
 func TestConfigMapRenderRoundTrip(t *testing.T) {
 	rendered, err := RenderConfigMapYAML("demo", map[string]string{
 		"resourceVersion": "2",
-		"higress":         "enabled: true\n",
+		"aigateway":       "enabled: true\n",
 		"mesh":            "defaultConfig: {}\n",
 		"meshNetworks":    "networks: {}\n",
 	})

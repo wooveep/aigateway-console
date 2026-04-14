@@ -7,8 +7,9 @@ type ConfigReq struct {
 }
 
 type ConfigRes struct {
-	Module                string   `json:"module"`
-	ServerAddress         string   `json:"serverAddress"`
-	ExplicitRenameTargets []string `json:"explicitRenameTargets"`
-	ContractDirectories   []string `json:"contractDirectories"`
+	Module                string         `json:"module"`
+	ServerAddress         string         `json:"serverAddress"`
+	ExplicitRenameTargets []string       `json:"explicitRenameTargets"`
+	ContractDirectories   []string       `json:"contractDirectories"`
+	Properties            map[string]any `json:"properties,omitempty"`
 }

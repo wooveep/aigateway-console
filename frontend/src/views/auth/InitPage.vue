@@ -4,9 +4,11 @@ import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import LanguageSwitcher from '@/components/app/LanguageSwitcher.vue';
 import { initialize } from '@/services/system';
+import { useAppStore } from '@/stores/app';
 import { showError, showSuccess } from '@/lib/feedback';
 
 const router = useRouter();
+const appStore = useAppStore();
 const { t } = useI18n();
 const loading = ref(false);
 
@@ -31,6 +33,7 @@ async function submit() {
         password: formState.password,
       },
     });
+    await appStore.bootstrap(true);
     showSuccess(t('init.initSuccess'));
     router.replace('/login');
   } catch {

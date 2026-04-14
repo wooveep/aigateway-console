@@ -39,7 +39,8 @@ const filtered = computed(() => rows.value.filter((item) => {
 async function load() {
   loading.value = true;
   try {
-    rows.value = await listMcpServers({ pageNum: 1, pageSize: 100 }).catch(() => []);
+    const result = await listMcpServers({ pageNum: 1, pageSize: 100 }).catch(() => ({ data: [] }));
+    rows.value = Array.isArray(result) ? result : (result.data || []);
   } finally {
     loading.value = false;
   }

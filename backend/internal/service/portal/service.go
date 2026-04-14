@@ -2,9 +2,7 @@ package portal
 
 import (
 	"context"
-	"crypto/sha256"
 	"database/sql"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"slices"
@@ -14,9 +12,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
 
-	k8sclient "github.com/alibaba/aigateway-group/aigateway-console/backend/utility/clients/k8s"
-	portaldbclient "github.com/alibaba/aigateway-group/aigateway-console/backend/utility/clients/portaldb"
+	k8sclient "github.com/wooveep/aigateway-console/backend/utility/clients/k8s"
+	portaldbclient "github.com/wooveep/aigateway-console/backend/utility/clients/portaldb"
 )
 
 var (
@@ -24,6 +23,8 @@ var (
 	allowedStatuses      = []string{"active", "disabled", "pending"}
 	allowedUserLevels    = []string{"normal", "plus", "pro", "ultra"}
 )
+
+const orgRootDepartmentID = "root"
 
 type departmentRef struct {
 	name   string
@@ -46,25 +47,30 @@ type Service struct {
 }
 
 type ConsumerRecord struct {
-	Name              string   `json:"name"`
-	Department        string   `json:"department,omitempty"`
-	PortalStatus      string   `json:"portalStatus,omitempty"`
-	PortalDisplayName string   `json:"portalDisplayName,omitempty"`
-	PortalEmail       string   `json:"portalEmail,omitempty"`
-	PortalUserSource  string   `json:"portalUserSource,omitempty"`
-	PortalUserLevel   string   `json:"portalUserLevel,omitempty"`
-	PortalTempPassword string  `json:"portalTempPassword,omitempty"`
-	Credentials       []string `json:"credentials,omitempty"`
+	Name               string     `json:"name"`
+	Department         string     `json:"department,omitempty"`
+	DepartmentID       string     `json:"departmentId,omitempty"`
+	DepartmentPath     string     `json:"departmentPath,omitempty"`
+	PortalStatus       string     `json:"portalStatus,omitempty"`
+	PortalDisplayName  string     `json:"portalDisplayName,omitempty"`
+	PortalEmail        string     `json:"portalEmail,omitempty"`
+	PortalUserSource   string     `json:"portalUserSource,omitempty"`
+	PortalUserLevel    string     `json:"portalUserLevel,omitempty"`
+	PortalTempPassword string     `json:"portalTempPassword,omitempty"`
+	Credentials        []string   `json:"credentials,omitempty"`
+	CreatedAt          *time.Time `json:"createdAt,omitempty"`
+	UpdatedAt          *time.Time `json:"updatedAt,omitempty"`
+	LastLoginAt        *time.Time `json:"lastLoginAt,omitempty"`
 }
 
 type ConsumerMutation struct {
-	Name             string `json:"name"`
-	Department       string `json:"department"`
-	PortalStatus     string `json:"portalStatus"`
+	Name              string `json:"name"`
+	Department        string `json:"department"`
+	PortalStatus      string `json:"portalStatus"`
 	PortalDisplayName string `json:"portalDisplayName"`
-	PortalEmail      string `json:"portalEmail"`
-	PortalUserLevel  string `json:"portalUserLevel"`
-	PortalPassword   string `json:"portalPassword"`
+	PortalEmail       string `json:"portalEmail"`
+	PortalUserLevel   string `json:"portalUserLevel"`
+	PortalPassword    string `json:"portalPassword"`
 }
 
 type ResetPasswordResult struct {
@@ -74,49 +80,49 @@ type ResetPasswordResult struct {
 }
 
 type OrgDepartmentNode struct {
-	DepartmentID      string              `json:"departmentId"`
-	Name              string              `json:"name"`
-	ParentDepartmentID string             `json:"parentDepartmentId,omitempty"`
-	AdminConsumerName string              `json:"adminConsumerName,omitempty"`
-	Level             int                 `json:"level,omitempty"`
-	MemberCount       int                 `json:"memberCount,omitempty"`
-	Children          []*OrgDepartmentNode `json:"children,omitempty"`
+	DepartmentID       string               `json:"departmentId"`
+	Name               string               `json:"name"`
+	ParentDepartmentID string               `json:"parentDepartmentId,omitempty"`
+	AdminConsumerName  string               `json:"adminConsumerName,omitempty"`
+	Level              int                  `json:"level,omitempty"`
+	MemberCount        int                  `json:"memberCount,omitempty"`
+	Children           []*OrgDepartmentNode `json:"children,omitempty"`
 }
 
 type DepartmentMutation struct {
-	Name              string `json:"name"`
+	Name               string `json:"name"`
 	ParentDepartmentID string `json:"parentDepartmentId"`
-	AdminConsumerName string `json:"adminConsumerName"`
-	AdminDisplayName  string `json:"adminDisplayName"`
-	AdminEmail        string `json:"adminEmail"`
-	AdminUserLevel    string `json:"adminUserLevel"`
-	AdminPassword     string `json:"adminPassword"`
+	AdminConsumerName  string `json:"adminConsumerName"`
+	AdminDisplayName   string `json:"adminDisplayName"`
+	AdminEmail         string `json:"adminEmail"`
+	AdminUserLevel     string `json:"adminUserLevel"`
+	AdminPassword      string `json:"adminPassword"`
 }
 
 type OrgAccountRecord struct {
-	ConsumerName      string     `json:"consumerName"`
-	DisplayName       string     `json:"displayName,omitempty"`
-	Email             string     `json:"email,omitempty"`
-	Status            string     `json:"status,omitempty"`
-	UserLevel         string     `json:"userLevel,omitempty"`
-	Source            string     `json:"source,omitempty"`
-	DepartmentID      string     `json:"departmentId,omitempty"`
-	DepartmentName    string     `json:"departmentName,omitempty"`
-	DepartmentPath    string     `json:"departmentPath,omitempty"`
-	ParentConsumerName string    `json:"parentConsumerName,omitempty"`
-	IsDepartmentAdmin bool       `json:"isDepartmentAdmin,omitempty"`
-	LastLoginAt       *time.Time `json:"lastLoginAt,omitempty"`
-	TempPassword      string     `json:"tempPassword,omitempty"`
+	ConsumerName       string     `json:"consumerName"`
+	DisplayName        string     `json:"displayName,omitempty"`
+	Email              string     `json:"email,omitempty"`
+	Status             string     `json:"status,omitempty"`
+	UserLevel          string     `json:"userLevel,omitempty"`
+	Source             string     `json:"source,omitempty"`
+	DepartmentID       string     `json:"departmentId,omitempty"`
+	DepartmentName     string     `json:"departmentName,omitempty"`
+	DepartmentPath     string     `json:"departmentPath,omitempty"`
+	ParentConsumerName string     `json:"parentConsumerName,omitempty"`
+	IsDepartmentAdmin  bool       `json:"isDepartmentAdmin,omitempty"`
+	LastLoginAt        *time.Time `json:"lastLoginAt,omitempty"`
+	TempPassword       string     `json:"tempPassword,omitempty"`
 }
 
 type AccountMutation struct {
-	ConsumerName      string `json:"consumerName"`
-	DisplayName       string `json:"displayName"`
-	Email             string `json:"email"`
-	UserLevel         string `json:"userLevel"`
-	Password          string `json:"password"`
-	Status            string `json:"status"`
-	DepartmentID      string `json:"departmentId"`
+	ConsumerName       string `json:"consumerName"`
+	DisplayName        string `json:"displayName"`
+	Email              string `json:"email"`
+	UserLevel          string `json:"userLevel"`
+	Password           string `json:"password"`
+	Status             string `json:"status"`
+	DepartmentID       string `json:"departmentId"`
 	ParentConsumerName string `json:"parentConsumerName"`
 }
 
@@ -176,10 +182,11 @@ func (s *Service) ListConsumers(ctx context.Context) ([]ConsumerRecord, error) {
 	}
 
 	rows, err := db.QueryContext(ctx, `
-		SELECT u.consumer_name, u.display_name, u.email, u.status, u.user_level, u.source, d.name, u.temp_password
-		FROM portal_users u
-		LEFT JOIN portal_departments d ON d.department_id = u.department_id AND d.deleted = 0
-		WHERE u.deleted = 0
+		SELECT u.consumer_name, u.display_name, u.email, u.status, u.user_level, u.source, d.department_id, d.name, d.path
+		FROM portal_user u
+		LEFT JOIN org_account_membership m ON m.consumer_name = u.consumer_name
+		LEFT JOIN org_department d ON d.department_id = m.department_id AND d.status = 'active'
+		WHERE COALESCE(u.is_deleted, 0) = 0
 		ORDER BY u.consumer_name ASC`)
 	if err != nil {
 		return nil, portaldbclient.WrapExecError("list consumers", err)
@@ -196,8 +203,9 @@ func (s *Service) ListConsumers(ctx context.Context) ([]ConsumerRecord, error) {
 			&item.PortalStatus,
 			&item.PortalUserLevel,
 			&item.PortalUserSource,
+			&item.DepartmentID,
 			&item.Department,
-			&item.PortalTempPassword,
+			&item.DepartmentPath,
 		); err != nil {
 			return nil, err
 		}
@@ -218,10 +226,12 @@ func (s *Service) GetConsumer(ctx context.Context, consumerName string) (*Consum
 
 	var item ConsumerRecord
 	err = db.QueryRowContext(ctx, `
-		SELECT u.consumer_name, u.display_name, u.email, u.status, u.user_level, u.source, d.name, u.temp_password
-		FROM portal_users u
-		LEFT JOIN portal_departments d ON d.department_id = u.department_id AND d.deleted = 0
-		WHERE u.deleted = 0 AND u.consumer_name = ?`, name).
+		SELECT u.consumer_name, u.display_name, u.email, u.status, u.user_level, u.source,
+			d.department_id, d.name, d.path, u.created_at, u.updated_at, u.last_login_at
+		FROM portal_user u
+		LEFT JOIN org_account_membership m ON m.consumer_name = u.consumer_name
+		LEFT JOIN org_department d ON d.department_id = m.department_id AND d.status = 'active'
+		WHERE COALESCE(u.is_deleted, 0) = 0 AND u.consumer_name = ?`, name).
 		Scan(
 			&item.Name,
 			&item.PortalDisplayName,
@@ -229,8 +239,12 @@ func (s *Service) GetConsumer(ctx context.Context, consumerName string) (*Consum
 			&item.PortalStatus,
 			&item.PortalUserLevel,
 			&item.PortalUserSource,
+			&item.DepartmentID,
 			&item.Department,
-			&item.PortalTempPassword,
+			&item.DepartmentPath,
+			&item.CreatedAt,
+			&item.UpdatedAt,
+			&item.LastLoginAt,
 		)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -238,7 +252,43 @@ func (s *Service) GetConsumer(ctx context.Context, consumerName string) (*Consum
 		}
 		return nil, portaldbclient.WrapExecError("get consumer", err)
 	}
+	item.Credentials = s.listMaskedConsumerCredentials(ctx, db, name)
 	return &item, nil
+}
+
+func (s *Service) listMaskedConsumerCredentials(ctx context.Context, db *sql.DB, consumerName string) []string {
+	rows, err := db.QueryContext(ctx, `
+		SELECT raw_key
+		FROM portal_api_key
+		WHERE consumer_name = ? AND status = 'active' AND deleted_at IS NULL
+		ORDER BY id ASC`, consumerName)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+
+	items := make([]string, 0)
+	for rows.Next() {
+		var rawKey string
+		if err := rows.Scan(&rawKey); err != nil {
+			return items
+		}
+		if masked := maskPortalCredential(rawKey); masked != "" {
+			items = append(items, masked)
+		}
+	}
+	return items
+}
+
+func maskPortalCredential(raw string) string {
+	normalized := strings.TrimSpace(raw)
+	if normalized == "" {
+		return ""
+	}
+	if len(normalized) <= 8 {
+		return "****"
+	}
+	return normalized[:4] + "****" + normalized[len(normalized)-4:]
 }
 
 func (s *Service) SaveConsumer(ctx context.Context, mutation ConsumerMutation, create bool) (*ConsumerRecord, error) {
@@ -276,54 +326,70 @@ func (s *Service) SaveConsumer(ctx context.Context, mutation ConsumerMutation, c
 		return nil, err
 	}
 	passwordHash := ""
-	tempPassword := ""
 	if strings.TrimSpace(mutation.PortalPassword) != "" {
-		passwordHash = hashPassword(mutation.PortalPassword)
+		passwordHash, err = hashPassword(mutation.PortalPassword)
+		if err != nil {
+			return nil, err
+		}
 	} else if create {
-		tempPassword = newTempPassword()
-		passwordHash = hashPassword(tempPassword)
+		passwordHash, err = hashPassword(newTempPassword())
+		if err != nil {
+			return nil, err
+		}
+	}
+	insertPasswordHash := passwordHash
+	if create && insertPasswordHash == "" {
+		insertPasswordHash, err = hashPassword(newTempPassword())
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if create {
 		_, err = tx.ExecContext(ctx, `
-			INSERT INTO portal_users (
-				consumer_name, display_name, email, status, user_level, source, password_hash, temp_password, department_id
-			) VALUES (?, ?, ?, ?, ?, 'console', ?, ?, ?)`,
+			INSERT INTO portal_user (
+				consumer_name, display_name, email, status, user_level, source, password_hash
+			) VALUES (?, ?, ?, ?, ?, 'console', ?)`,
 			name,
-			trimOrNil(mutation.PortalDisplayName),
-			trimOrNil(mutation.PortalEmail),
+			firstNonEmpty(strings.TrimSpace(mutation.PortalDisplayName), name),
+			firstNonEmpty(strings.TrimSpace(mutation.PortalEmail), ""),
 			status,
 			userLevel,
-			nullIfEmpty(passwordHash),
-			nullIfEmpty(tempPassword),
-			nullIfEmpty(departmentID),
+			insertPasswordHash,
 		)
 	} else {
 		query := `
-			UPDATE portal_users
+			UPDATE portal_user
 			SET display_name = COALESCE(?, display_name),
 				email = COALESCE(?, email),
 				status = ?,
 				user_level = ?,
-				department_id = COALESCE(?, department_id),
 				updated_at = CURRENT_TIMESTAMP`
 		args := []any{
 			trimOrNil(mutation.PortalDisplayName),
 			trimOrNil(mutation.PortalEmail),
 			status,
 			userLevel,
-			trimOrNil(departmentID),
 		}
 		if passwordHash != "" {
-			query += `, password_hash = ?, temp_password = ?`
-			args = append(args, passwordHash, nullIfEmpty(tempPassword))
+			query += `, password_hash = ?`
+			args = append(args, passwordHash)
 		}
-		query += ` WHERE consumer_name = ? AND deleted = 0`
+		query += ` WHERE consumer_name = ? AND COALESCE(is_deleted, 0) = 0`
 		args = append(args, name)
 		_, err = tx.ExecContext(ctx, query, args...)
 	}
 	if err != nil {
 		return nil, portaldbclient.WrapExecError("save consumer", err)
+	}
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO org_account_membership (consumer_name, department_id, parent_consumer_name)
+		VALUES (?, ?, NULL)
+		ON DUPLICATE KEY UPDATE department_id = VALUES(department_id), updated_at = CURRENT_TIMESTAMP`,
+		name,
+		nullIfEmpty(departmentID),
+	); err != nil {
+		return nil, portaldbclient.WrapExecError("save consumer membership", err)
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
@@ -351,8 +417,8 @@ func (s *Service) DeleteConsumer(ctx context.Context, consumerName string) error
 	}
 
 	result, err := db.ExecContext(ctx, `
-		UPDATE portal_users SET deleted = 1, updated_at = CURRENT_TIMESTAMP
-		WHERE consumer_name = ? AND deleted = 0`, name)
+		UPDATE portal_user SET is_deleted = 1, deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+		WHERE consumer_name = ? AND COALESCE(is_deleted, 0) = 0`, name)
 	if err != nil {
 		return portaldbclient.WrapExecError("delete consumer", err)
 	}
@@ -375,8 +441,8 @@ func (s *Service) UpdateConsumerStatus(ctx context.Context, consumerName, status
 	normalized := normalizeStatus(status, false)
 
 	result, err := db.ExecContext(ctx, `
-		UPDATE portal_users SET status = ?, updated_at = CURRENT_TIMESTAMP
-		WHERE consumer_name = ? AND deleted = 0`, normalized, name)
+		UPDATE portal_user SET status = ?, updated_at = CURRENT_TIMESTAMP
+		WHERE consumer_name = ? AND COALESCE(is_deleted, 0) = 0`, normalized, name)
 	if err != nil {
 		return nil, err
 	}
@@ -401,12 +467,15 @@ func (s *Service) ResetPassword(ctx context.Context, consumerName string) (*Rese
 	}
 
 	tempPassword := newTempPassword()
+	passwordHash, err := hashPassword(tempPassword)
+	if err != nil {
+		return nil, err
+	}
 	result, err := db.ExecContext(ctx, `
-		UPDATE portal_users
-		SET temp_password = ?, password_hash = ?, updated_at = CURRENT_TIMESTAMP
-		WHERE consumer_name = ? AND deleted = 0`,
-		tempPassword,
-		hashPassword(tempPassword),
+		UPDATE portal_user
+		SET password_hash = ?, updated_at = CURRENT_TIMESTAMP
+		WHERE consumer_name = ? AND COALESCE(is_deleted, 0) = 0`,
+		passwordHash,
 		name,
 	)
 	if err != nil {
@@ -453,9 +522,9 @@ func (s *Service) ListDepartmentTree(ctx context.Context) ([]*OrgDepartmentNode,
 
 	rows, err := db.QueryContext(ctx, `
 		SELECT department_id, name, parent_department_id, admin_consumer_name
-		FROM portal_departments
-		WHERE deleted = 0
-		ORDER BY name ASC`)
+		FROM org_department
+		WHERE status = 'active' AND department_id <> ?
+		ORDER BY name ASC`, orgRootDepartmentID)
 	if err != nil {
 		return nil, err
 	}
@@ -465,9 +534,15 @@ func (s *Service) ListDepartmentTree(ctx context.Context) ([]*OrgDepartmentNode,
 	order := make([]string, 0)
 	for rows.Next() {
 		node := &OrgDepartmentNode{}
-		if err := rows.Scan(&node.DepartmentID, &node.Name, &node.ParentDepartmentID, &node.AdminConsumerName); err != nil {
+		var (
+			parentID          sql.NullString
+			adminConsumerName sql.NullString
+		)
+		if err := rows.Scan(&node.DepartmentID, &node.Name, &parentID, &adminConsumerName); err != nil {
 			return nil, err
 		}
+		node.ParentDepartmentID = parentID.String
+		node.AdminConsumerName = adminConsumerName.String
 		nodes[node.DepartmentID] = node
 		order = append(order, node.DepartmentID)
 	}
@@ -511,13 +586,19 @@ func (s *Service) CreateDepartment(ctx context.Context, mutation DepartmentMutat
 	}
 
 	id := "dept-" + strings.ToLower(strings.ReplaceAll(uuid.NewString()[:8], "-", ""))
+	path, level, err := s.resolveDepartmentPlacement(ctx, db, mutation.ParentDepartmentID, name)
+	if err != nil {
+		return nil, err
+	}
 	if _, err := db.ExecContext(ctx, `
-		INSERT INTO portal_departments (department_id, name, parent_department_id, admin_consumer_name)
-		VALUES (?, ?, ?, ?)`,
+		INSERT INTO org_department (department_id, name, parent_department_id, admin_consumer_name, path, level, sort_order, status)
+		VALUES (?, ?, ?, ?, ?, ?, 0, 'active')`,
 		id,
 		name,
-		trimOrNil(mutation.ParentDepartmentID),
+		nullIfEmpty(strings.TrimSpace(mutation.ParentDepartmentID)),
 		trimOrNil(mutation.AdminConsumerName),
+		path,
+		level,
 	); err != nil {
 		return nil, err
 	}
@@ -538,11 +619,11 @@ func (s *Service) UpdateDepartment(ctx context.Context, departmentID string, mut
 	}
 
 	result, err := db.ExecContext(ctx, `
-		UPDATE portal_departments
+		UPDATE org_department
 		SET name = COALESCE(?, name),
 			admin_consumer_name = COALESCE(?, admin_consumer_name),
 			updated_at = CURRENT_TIMESTAMP
-		WHERE department_id = ? AND deleted = 0`,
+		WHERE department_id = ? AND status = 'active'`,
 		trimOrNil(mutation.Name),
 		trimOrNil(mutation.AdminConsumerName),
 		id,
@@ -585,12 +666,25 @@ func (s *Service) MoveDepartment(ctx context.Context, departmentID, parentDepart
 			return nil, errors.New("department move would create a cycle")
 		}
 	}
+	current, err := s.getDepartment(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if current == nil {
+		return nil, fmt.Errorf("department not found: %s", id)
+	}
+	path, level, err := s.resolveDepartmentPlacement(ctx, db, parentID, current.Name)
+	if err != nil {
+		return nil, err
+	}
 
 	result, err := db.ExecContext(ctx, `
-		UPDATE portal_departments
-		SET parent_department_id = ?, updated_at = CURRENT_TIMESTAMP
-		WHERE department_id = ? AND deleted = 0`,
+		UPDATE org_department
+		SET parent_department_id = ?, path = ?, level = ?, updated_at = CURRENT_TIMESTAMP
+		WHERE department_id = ? AND status = 'active'`,
 		nullIfEmpty(parentID),
+		path,
+		level,
 		id,
 	)
 	if err != nil {
@@ -617,8 +711,8 @@ func (s *Service) DeleteDepartment(ctx context.Context, departmentID string) err
 	}
 	var childCount int
 	if err := db.QueryRowContext(ctx, `
-		SELECT COUNT(1) FROM portal_departments
-		WHERE parent_department_id = ? AND deleted = 0`, id).Scan(&childCount); err != nil {
+		SELECT COUNT(1) FROM org_department
+		WHERE parent_department_id = ? AND status = 'active'`, id).Scan(&childCount); err != nil {
 		return err
 	}
 	if childCount > 0 {
@@ -626,8 +720,10 @@ func (s *Service) DeleteDepartment(ctx context.Context, departmentID string) err
 	}
 	var memberCount int
 	if err := db.QueryRowContext(ctx, `
-		SELECT COUNT(1) FROM portal_users
-		WHERE department_id = ? AND deleted = 0`, id).Scan(&memberCount); err != nil {
+		SELECT COUNT(1)
+		FROM org_account_membership m
+		INNER JOIN portal_user u ON u.consumer_name = m.consumer_name
+		WHERE m.department_id = ? AND COALESCE(u.is_deleted, 0) = 0`, id).Scan(&memberCount); err != nil {
 		return err
 	}
 	if memberCount > 0 {
@@ -635,9 +731,9 @@ func (s *Service) DeleteDepartment(ctx context.Context, departmentID string) err
 	}
 
 	result, err := db.ExecContext(ctx, `
-		UPDATE portal_departments
-		SET deleted = 1, updated_at = CURRENT_TIMESTAMP
-		WHERE department_id = ? AND deleted = 0`, id)
+		UPDATE org_department
+		SET status = 'deleted', updated_at = CURRENT_TIMESTAMP
+		WHERE department_id = ? AND status = 'active'`, id)
 	if err != nil {
 		return err
 	}
@@ -659,10 +755,12 @@ func (s *Service) ListAccounts(ctx context.Context) ([]OrgAccountRecord, error) 
 	}
 
 	rows, err := db.QueryContext(ctx, `
-		SELECT consumer_name, display_name, email, status, user_level, source, department_id,
-			parent_consumer_name, is_department_admin, last_login_at, temp_password
-		FROM portal_users
-		WHERE deleted = 0
+		SELECT u.consumer_name, u.display_name, u.email, u.status, u.user_level, u.source, m.department_id,
+			m.parent_consumer_name, CASE WHEN d.admin_consumer_name = u.consumer_name THEN 1 ELSE 0 END, u.last_login_at
+		FROM portal_user u
+		LEFT JOIN org_account_membership m ON m.consumer_name = u.consumer_name
+		LEFT JOIN org_department d ON d.department_id = m.department_id
+		WHERE COALESCE(u.is_deleted, 0) = 0
 		ORDER BY consumer_name ASC`)
 	if err != nil {
 		return nil, err
@@ -675,7 +773,6 @@ func (s *Service) ListAccounts(ctx context.Context) ([]OrgAccountRecord, error) 
 		var departmentID sql.NullString
 		var parentName sql.NullString
 		var lastLogin sql.NullTime
-		var tempPassword sql.NullString
 		if err := rows.Scan(
 			&item.ConsumerName,
 			&item.DisplayName,
@@ -687,7 +784,6 @@ func (s *Service) ListAccounts(ctx context.Context) ([]OrgAccountRecord, error) 
 			&parentName,
 			&item.IsDepartmentAdmin,
 			&lastLogin,
-			&tempPassword,
 		); err != nil {
 			return nil, err
 		}
@@ -696,7 +792,6 @@ func (s *Service) ListAccounts(ctx context.Context) ([]OrgAccountRecord, error) 
 		if lastLogin.Valid {
 			item.LastLoginAt = &lastLogin.Time
 		}
-		item.TempPassword = tempPassword.String
 		item.DepartmentName = departmentNames[item.DepartmentID]
 		item.DepartmentPath = departmentPaths[item.DepartmentID]
 		items = append(items, item)
@@ -723,10 +818,12 @@ func (s *Service) CreateAccount(ctx context.Context, mutation AccountMutation) (
 	status := normalizeStatus(mutation.Status, true)
 	userLevel := normalizeUserLevel(mutation.UserLevel)
 	password := strings.TrimSpace(mutation.Password)
-	tempPassword := ""
 	if password == "" {
-		tempPassword = newTempPassword()
-		password = tempPassword
+		password = newTempPassword()
+	}
+	passwordHash, err := hashPassword(password)
+	if err != nil {
+		return nil, err
 	}
 	if mutation.DepartmentID != "" {
 		if dept, err := s.getDepartment(ctx, mutation.DepartmentID); err != nil {
@@ -736,21 +833,37 @@ func (s *Service) CreateAccount(ctx context.Context, mutation AccountMutation) (
 		}
 	}
 
-	_, err = db.ExecContext(ctx, `
-		INSERT INTO portal_users (
-			consumer_name, display_name, email, status, user_level, source, password_hash, temp_password, department_id, parent_consumer_name
-		) VALUES (?, ?, ?, ?, ?, 'console', ?, ?, ?, ?)`,
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO portal_user (
+			consumer_name, display_name, email, status, user_level, source, password_hash
+		) VALUES (?, ?, ?, ?, ?, 'console', ?)`,
 		name,
-		trimOrNil(mutation.DisplayName),
-		trimOrNil(mutation.Email),
+		firstNonEmpty(strings.TrimSpace(mutation.DisplayName), name),
+		firstNonEmpty(strings.TrimSpace(mutation.Email), ""),
 		status,
 		userLevel,
-		hashPassword(password),
-		nullIfEmpty(tempPassword),
-		trimOrNil(mutation.DepartmentID),
-		trimOrNil(mutation.ParentConsumerName),
+		passwordHash,
 	)
 	if err != nil {
+		return nil, err
+	}
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO org_account_membership (consumer_name, department_id, parent_consumer_name)
+		VALUES (?, ?, ?)
+		ON DUPLICATE KEY UPDATE department_id = VALUES(department_id), parent_consumer_name = VALUES(parent_consumer_name), updated_at = CURRENT_TIMESTAMP`,
+		name,
+		nullIfEmpty(strings.TrimSpace(mutation.DepartmentID)),
+		nullIfEmpty(strings.TrimSpace(mutation.ParentConsumerName)),
+	); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 	if err := s.hook.AfterWrite(ctx, "org-account-create"); err != nil {
@@ -770,36 +883,55 @@ func (s *Service) UpdateAccount(ctx context.Context, consumerName string, mutati
 	}
 
 	query := `
-		UPDATE portal_users
+		UPDATE portal_user
 		SET display_name = COALESCE(?, display_name),
 			email = COALESCE(?, email),
 			status = ?,
 			user_level = ?,
-			department_id = COALESCE(?, department_id),
-			parent_consumer_name = COALESCE(?, parent_consumer_name),
 			updated_at = CURRENT_TIMESTAMP`
 	args := []any{
 		trimOrNil(mutation.DisplayName),
 		trimOrNil(mutation.Email),
 		normalizeStatus(mutation.Status, false),
 		normalizeUserLevel(mutation.UserLevel),
-		trimOrNil(mutation.DepartmentID),
-		trimOrNil(mutation.ParentConsumerName),
 	}
 	if strings.TrimSpace(mutation.Password) != "" {
-		query += `, password_hash = ?, temp_password = NULL`
-		args = append(args, hashPassword(mutation.Password))
+		passwordHash, hashErr := hashPassword(mutation.Password)
+		if hashErr != nil {
+			return nil, hashErr
+		}
+		query += `, password_hash = ?`
+		args = append(args, passwordHash)
 	}
-	query += ` WHERE consumer_name = ? AND deleted = 0`
+	query += ` WHERE consumer_name = ? AND COALESCE(is_deleted, 0) = 0`
 	args = append(args, name)
 
-	result, err := db.ExecContext(ctx, query, args...)
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	result, err := tx.ExecContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
 	affected, _ := result.RowsAffected()
 	if affected == 0 {
 		return nil, fmt.Errorf("consumer not found: %s", name)
+	}
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO org_account_membership (consumer_name, department_id, parent_consumer_name)
+		VALUES (?, ?, ?)
+		ON DUPLICATE KEY UPDATE department_id = VALUES(department_id), parent_consumer_name = VALUES(parent_consumer_name), updated_at = CURRENT_TIMESTAMP`,
+		name,
+		nullIfEmpty(strings.TrimSpace(mutation.DepartmentID)),
+		nullIfEmpty(strings.TrimSpace(mutation.ParentConsumerName)),
+	); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
 	}
 	if err := s.hook.AfterWrite(ctx, "org-account-update"); err != nil {
 		return nil, err
@@ -825,20 +957,17 @@ func (s *Service) UpdateAccountAssignment(ctx context.Context, consumerName, dep
 	}
 
 	result, err := db.ExecContext(ctx, `
-		UPDATE portal_users
-		SET department_id = ?, parent_consumer_name = ?, updated_at = CURRENT_TIMESTAMP
-		WHERE consumer_name = ? AND deleted = 0`,
+		INSERT INTO org_account_membership (consumer_name, department_id, parent_consumer_name)
+		VALUES (?, ?, ?)
+		ON DUPLICATE KEY UPDATE department_id = VALUES(department_id), parent_consumer_name = VALUES(parent_consumer_name), updated_at = CURRENT_TIMESTAMP`,
+		name,
 		nullIfEmpty(strings.TrimSpace(departmentID)),
 		nullIfEmpty(strings.TrimSpace(parentConsumerName)),
-		name,
 	)
 	if err != nil {
 		return nil, err
 	}
-	affected, _ := result.RowsAffected()
-	if affected == 0 {
-		return nil, fmt.Errorf("consumer not found: %s", name)
-	}
+	_, _ = result.RowsAffected()
 	if err := s.hook.AfterWrite(ctx, "org-account-assignment"); err != nil {
 		return nil, err
 	}
@@ -856,9 +985,9 @@ func (s *Service) UpdateAccountStatus(ctx context.Context, consumerName, status 
 	}
 
 	result, err := db.ExecContext(ctx, `
-		UPDATE portal_users
+		UPDATE portal_user
 		SET status = ?, updated_at = CURRENT_TIMESTAMP
-		WHERE consumer_name = ? AND deleted = 0`,
+		WHERE consumer_name = ? AND COALESCE(is_deleted, 0) = 0`,
 		normalizeStatus(status, false),
 		name,
 	)
@@ -997,7 +1126,7 @@ func (s *Service) consumerExists(ctx context.Context, queryable interface {
 }, consumerName string) (bool, error) {
 	var count int
 	if err := queryable.QueryRowContext(ctx,
-		`SELECT COUNT(1) FROM portal_users WHERE consumer_name = ? AND deleted = 0`,
+		`SELECT COUNT(1) FROM portal_user WHERE consumer_name = ? AND COALESCE(is_deleted, 0) = 0`,
 		consumerName,
 	).Scan(&count); err != nil {
 		return false, err
@@ -1014,7 +1143,7 @@ func (s *Service) lookupDepartmentIDByName(ctx context.Context, queryable interf
 	}
 	var departmentID string
 	err := queryable.QueryRowContext(ctx,
-		`SELECT department_id FROM portal_departments WHERE name = ? AND deleted = 0 LIMIT 1`,
+		`SELECT department_id FROM org_department WHERE name = ? AND status = 'active' LIMIT 1`,
 		name,
 	).Scan(&departmentID)
 	if err != nil {
@@ -1062,8 +1191,8 @@ func (s *Service) getAccount(ctx context.Context, consumerName string) (*OrgAcco
 func (s *Service) isDepartmentAdmin(ctx context.Context, db *sql.DB, consumerName string) (bool, error) {
 	var count int
 	if err := db.QueryRowContext(ctx, `
-		SELECT COUNT(1) FROM portal_departments
-		WHERE admin_consumer_name = ? AND deleted = 0`, consumerName).Scan(&count); err != nil {
+		SELECT COUNT(1) FROM org_department
+		WHERE admin_consumer_name = ? AND status = 'active'`, consumerName).Scan(&count); err != nil {
 		return false, err
 	}
 	return count > 0, nil
@@ -1071,10 +1200,11 @@ func (s *Service) isDepartmentAdmin(ctx context.Context, db *sql.DB, consumerNam
 
 func (s *Service) departmentMemberCounts(ctx context.Context, db *sql.DB) (map[string]int, error) {
 	rows, err := db.QueryContext(ctx, `
-		SELECT department_id, COUNT(1)
-		FROM portal_users
-		WHERE deleted = 0 AND department_id IS NOT NULL AND department_id <> ''
-		GROUP BY department_id`)
+		SELECT m.department_id, COUNT(1)
+		FROM org_account_membership m
+		INNER JOIN portal_user u ON u.consumer_name = m.consumer_name
+		WHERE COALESCE(u.is_deleted, 0) = 0 AND m.department_id IS NOT NULL AND m.department_id <> '' AND m.department_id <> ?
+		GROUP BY m.department_id`, orgRootDepartmentID)
 	if err != nil {
 		return nil, err
 	}
@@ -1104,33 +1234,63 @@ func (s *Service) resolveDepartmentLevel(nodes map[string]*OrgDepartmentNode, de
 
 func (s *Service) departmentMaps(ctx context.Context, db *sql.DB) (map[string]string, map[string]string, error) {
 	rows, err := db.QueryContext(ctx, `
-		SELECT department_id, name, parent_department_id
-		FROM portal_departments
-		WHERE deleted = 0`)
+		SELECT department_id, name, parent_department_id, path
+		FROM org_department
+		WHERE status = 'active' AND department_id <> ?`, orgRootDepartmentID)
 	if err != nil {
 		return nil, nil, err
 	}
 	defer rows.Close()
 
 	departments := map[string]departmentRef{}
+	paths := map[string]string{}
 	for rows.Next() {
-		var id, name, parent string
-		if err := rows.Scan(&id, &name, &parent); err != nil {
+		var id, name, parent, path string
+		if err := rows.Scan(&id, &name, &parent, &path); err != nil {
 			return nil, nil, err
 		}
 		departments[id] = departmentRef{name: name, parent: parent}
+		paths[id] = strings.TrimSpace(path)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, nil, err
 	}
 
 	names := map[string]string{}
-	paths := map[string]string{}
 	for id, item := range departments {
 		names[id] = item.name
-		paths[id] = buildDepartmentPath(departments, id)
+		if strings.TrimSpace(paths[id]) == "" {
+			paths[id] = buildDepartmentPath(departments, id)
+		}
 	}
 	return names, paths, nil
+}
+
+func (s *Service) resolveDepartmentPlacement(ctx context.Context, db *sql.DB, parentDepartmentID, name string) (string, int, error) {
+	parentID := strings.TrimSpace(parentDepartmentID)
+	if parentID == "" || parentID == orgRootDepartmentID {
+		return strings.TrimSpace(name), 1, nil
+	}
+	var (
+		parentPath  string
+		parentLevel int
+	)
+	if err := db.QueryRowContext(ctx, `
+		SELECT path, level
+		FROM org_department
+		WHERE department_id = ? AND status = 'active'`,
+		parentID,
+	).Scan(&parentPath, &parentLevel); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", 0, fmt.Errorf("parent department not found: %s", parentID)
+		}
+		return "", 0, err
+	}
+	parentPath = strings.TrimSpace(parentPath)
+	if parentPath == "" {
+		parentPath = parentID
+	}
+	return parentPath + " / " + strings.TrimSpace(name), parentLevel + 1, nil
 }
 
 func (s *Service) isDepartmentDescendant(ctx context.Context, db *sql.DB, candidateParentID, departmentID string) bool {
@@ -1142,8 +1302,8 @@ func (s *Service) isDepartmentDescendant(ctx context.Context, db *sql.DB, candid
 		var next sql.NullString
 		if err := db.QueryRowContext(ctx, `
 			SELECT parent_department_id
-			FROM portal_departments
-			WHERE department_id = ? AND deleted = 0`, current).Scan(&next); err != nil {
+			FROM org_department
+			WHERE department_id = ? AND status = 'active'`, current).Scan(&next); err != nil {
 			return false
 		}
 		current = next.String
@@ -1239,9 +1399,12 @@ func nullIfEmpty(value string) any {
 	return value
 }
 
-func hashPassword(password string) string {
-	sum := sha256.Sum256([]byte(password))
-	return hex.EncodeToString(sum[:])
+func hashPassword(password string) (string, error) {
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+	return string(bytes), nil
 }
 
 func newTempPassword() string {

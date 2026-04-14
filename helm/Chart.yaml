@@ -4,5 +4,5 @@ description: Management console for AIGateway
 type: application
 version: 2.2.0
 sources:
-  - https://github.com/alibaba/aigateway-group/aigateway-console
+  - https://github.com/wooveep/aigateway-console
 appVersion: "2.2.0"

@@ -13,6 +13,105 @@ AIGateway Console 用于管理 AIGateway 的配置规则及其他开箱即用的
 
 ## 本地启动
 
+### 推荐仓库级入口
+
+优先使用仓库根目录脚本，而不是手工拼接构建/部署命令：
+
+```bash
+cd /path/to/aigateway-group
+python3 ./scripts/aigateway-dev.py show
+python3 ./scripts/aigateway-dev.py check-connectivity
+python3 ./scripts/aigateway-dev.py build --components console
+./start.sh dev
+```
+
+如果你准备本地源码运行 `console` 或 `portal`，推荐先只把集群里的核心依赖拉起来：
+
+```bash
+python3 ./scripts/aigateway-dev.py minikube-dev --core-only
+```
+
+这会保留 `mysql / redis / controller / plugin-server / gateway / pilot`，同时在 Helm 层禁用集群内的
+`aigateway-console` 与 `aigateway-portal`，避免和本地源码进程抢端口、抢镜像验证入口。
+
+`console` 本地前后端一键启动：
+
+```bash
+cd aigateway-console
+./start.sh
+```
+
+默认会使用：
+
+```text
+backend  -> http://127.0.0.1:18081
+frontend -> http://127.0.0.1:3001
+mysql    -> 127.0.0.1:3306
+grafana  -> http://127.0.0.1:3000
+```
+
+这些默认值与仓库级 `minikube-dev --core-only` + port-forward 约定对齐，避免和集群内 `8080 / 8081`
+入口冲突。常用覆盖参数：
+
+```text
+CONSOLE_BACKEND_PORT
+CONSOLE_FRONTEND_PORT
+CONSOLE_LISTEN_ADDR
+PORTAL_MYSQL_HOST / PORTAL_MYSQL_PORT / PORTAL_MYSQL_USER / PORTAL_MYSQL_PASSWORD / PORTAL_MYSQL_DATABASE
+AIGATEWAY_CONSOLE_GRAFANA_SERVICE / AIGATEWAY_CONSOLE_GRAFANA_PORT / AIGATEWAY_CONSOLE_GRAFANA_PATH
+```
+
+当前 `console` 镜像链路已经固定为：
+
+```text
+frontend npm run build
+-> backend/resource/public/html
+-> backend/Dockerfile
+-> aigateway/console:<tag>
+```
+
+如果是本地源码直跑，并且需要验证 `Organization / Model Assets / Agent Catalog / AI Sensitive`
+这些 Portal 相关页面，还需要额外提供可用的 Portal DB 配置：
+
+```text
+clients.portaldb.enabled=true
+AIGATEWAY_CONSOLE_PORTALDB_DSN=<your dsn>
+```
+
+如果是 K8S / Helm 部署，Console 现在会优先从 Helm 注入的结构化依赖配置自动发现并连接：
+
+```text
+PORTAL_MYSQL_HOST / PORTAL_MYSQL_PORT / PORTAL_MYSQL_USER / PORTAL_MYSQL_PASSWORD / PORTAL_MYSQL_DATABASE
+AIGATEWAY_CONSOLE_GRAFANA_SERVICE / AIGATEWAY_CONSOLE_GRAFANA_PORT / AIGATEWAY_CONSOLE_GRAFANA_PATH
+AIGATEWAY_CONSOLE_NAMESPACE / AIGATEWAY_CONSOLE_CLUSTER_DOMAIN
+```
+
+`helm/dev-mode.yaml` 里的 `dev.portForward` 只负责把集群里的服务暴露到本机端口，不参与 Console
+后端依赖发现。
+
+未提供 `portaldb` 时，Console 现在会进入“Portal 功能不可用但页面不报错”的降级模式；
+对应页面会显示 `Portal database is unavailable`，而不是连续弹出 `503` 错误框。
+
+仓库级开发脚本默认还会把常用依赖暴露到本机，便于 Console 联调：
+
+```text
+127.0.0.1:8080   aigateway-console
+127.0.0.1:8081   aigateway-portal
+127.0.0.1:3000   aigateway-console-grafana
+127.0.0.1:9090   aigateway-console-prometheus
+127.0.0.1:3100   aigateway-console-loki
+127.0.0.1:3306   mysql-server
+127.0.0.1:6379   redis-stack-server
+127.0.0.1:8888   aigateway-controller
+127.0.0.1:18080  aigateway-plugin-server
+```
+
+推荐在联调前先跑一次：
+
+```bash
+python3 ./scripts/aigateway-dev.py check-connectivity
+```
+
 ### 前端项目
 
 #### 第一步、配置 Node 环境

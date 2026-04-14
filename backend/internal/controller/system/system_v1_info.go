@@ -3,7 +3,7 @@ package system
 import (
 	"context"
 
-	v1 "github.com/alibaba/aigateway-group/aigateway-console/backend/api/system/v1"
+	v1 "github.com/wooveep/aigateway-console/backend/api/system/v1"
 )
 
 func (c *ControllerV1) Info(ctx context.Context, req *v1.InfoReq) (res *v1.InfoRes, err error) {

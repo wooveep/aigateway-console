@@ -9,6 +9,7 @@ import (
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
+	portalshared "higress-portal-backend/schema/shared"
 )
 
 var ErrUnavailable = errors.New("portal database is unavailable")
@@ -26,6 +27,7 @@ type Client interface {
 	DB() *sql.DB
 	Driver() string
 	EnsureSchema(ctx context.Context) error
+	MigrateLegacyData(ctx context.Context) error
 }
 
 type FakeClient struct {
@@ -82,6 +84,7 @@ func (c *FakeClient) Driver() string                    { return normalizeDriver
 func (c *FakeClient) EnsureSchema(ctx context.Context) error {
 	return ErrUnavailable
 }
+func (c *FakeClient) MigrateLegacyData(ctx context.Context) error { return ErrUnavailable }
 
 func (c *SQLClient) Healthy(ctx context.Context) error {
 	if c.err != nil {
@@ -109,78 +112,14 @@ func (c *SQLClient) EnsureSchema(ctx context.Context) error {
 	if c.db == nil {
 		return ErrUnavailable
 	}
+	if err := c.ensureSharedSchemaAvailable(ctx); err != nil {
+		return err
+	}
+	if !c.config.AutoMigrate {
+		return nil
+	}
 
 	ddl := []string{
-		`CREATE TABLE IF NOT EXISTS portal_departments (
-			department_id VARCHAR(64) PRIMARY KEY,
-			name VARCHAR(255) NOT NULL,
-			parent_department_id VARCHAR(64) NULL,
-			admin_consumer_name VARCHAR(255) NULL,
-			deleted TINYINT NOT NULL DEFAULT 0,
-			created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-		)`,
-		`CREATE TABLE IF NOT EXISTS portal_users (
-			consumer_name VARCHAR(255) PRIMARY KEY,
-			display_name VARCHAR(255) NULL,
-			email VARCHAR(255) NULL,
-			status VARCHAR(32) NOT NULL DEFAULT 'pending',
-			user_level VARCHAR(32) NOT NULL DEFAULT 'normal',
-			source VARCHAR(64) NOT NULL DEFAULT 'console',
-			password_hash VARCHAR(255) NULL,
-			temp_password VARCHAR(255) NULL,
-			department_id VARCHAR(64) NULL,
-			parent_consumer_name VARCHAR(255) NULL,
-			is_department_admin TINYINT NOT NULL DEFAULT 0,
-			last_login_at TIMESTAMP NULL,
-			deleted TINYINT NOT NULL DEFAULT 0,
-			created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-		)`,
-		`CREATE TABLE IF NOT EXISTS portal_invite_code (
-			invite_code VARCHAR(64) PRIMARY KEY,
-			status VARCHAR(32) NOT NULL DEFAULT 'active',
-			expires_at TIMESTAMP NULL,
-			used_by_consumer VARCHAR(255) NULL,
-			used_at TIMESTAMP NULL,
-			created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-		)`,
-		`CREATE TABLE IF NOT EXISTS portal_asset_grant (
-			id BIGINT PRIMARY KEY AUTO_INCREMENT,
-			asset_type VARCHAR(64) NOT NULL,
-			asset_id VARCHAR(255) NOT NULL,
-			subject_type VARCHAR(64) NOT NULL,
-			subject_id VARCHAR(255) NOT NULL,
-			created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-		)`,
-		`CREATE TABLE IF NOT EXISTS portal_model_asset (
-			asset_id VARCHAR(255) PRIMARY KEY,
-			canonical_name VARCHAR(255) NOT NULL,
-			display_name VARCHAR(255) NOT NULL,
-			intro TEXT NULL,
-			tags_json TEXT NULL,
-			capabilities_json TEXT NULL,
-			created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-		)`,
-		`CREATE TABLE IF NOT EXISTS portal_model_binding (
-			binding_id VARCHAR(255) PRIMARY KEY,
-			asset_id VARCHAR(255) NOT NULL,
-			model_id VARCHAR(255) NOT NULL,
-			provider_name VARCHAR(255) NOT NULL,
-			target_model VARCHAR(255) NOT NULL,
-			protocol VARCHAR(64) NOT NULL DEFAULT 'openai/v1',
-			endpoint TEXT NULL,
-			status VARCHAR(32) NOT NULL DEFAULT 'draft',
-			published_at TIMESTAMP NULL,
-			unpublished_at TIMESTAMP NULL,
-			pricing_json TEXT NULL,
-			limits_json TEXT NULL,
-			created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-		)`,
 		`CREATE TABLE IF NOT EXISTS portal_model_binding_price_version (
 			version_id BIGINT PRIMARY KEY AUTO_INCREMENT,
 			asset_id VARCHAR(255) NOT NULL,
@@ -190,25 +129,6 @@ func (c *SQLClient) EnsureSchema(ctx context.Context) error {
 			effective_from TIMESTAMP NULL,
 			effective_to TIMESTAMP NULL,
 			pricing_json TEXT NULL,
-			created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-		)`,
-		`CREATE TABLE IF NOT EXISTS portal_agent_catalog (
-			agent_id VARCHAR(255) PRIMARY KEY,
-			canonical_name VARCHAR(255) NOT NULL,
-			display_name VARCHAR(255) NOT NULL,
-			intro TEXT NULL,
-			description TEXT NULL,
-			icon_url TEXT NULL,
-			tags_json TEXT NULL,
-			mcp_server_name VARCHAR(255) NULL,
-			status VARCHAR(32) NOT NULL DEFAULT 'draft',
-			tool_count INT NOT NULL DEFAULT 0,
-			transport_types_json TEXT NULL,
-			resource_summary TEXT NULL,
-			prompt_summary TEXT NULL,
-			published_at TIMESTAMP NULL,
-			unpublished_at TIMESTAMP NULL,
 			created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 		)`,
@@ -257,6 +177,27 @@ func (c *SQLClient) EnsureSchema(ctx context.Context) error {
 			provider_id BIGINT NULL,
 			cost_usd VARCHAR(64) NULL
 		)`,
+		`CREATE TABLE IF NOT EXISTS portal_ai_quota_balance (
+			route_name VARCHAR(255) NOT NULL,
+			consumer_name VARCHAR(255) NOT NULL,
+			quota BIGINT NOT NULL DEFAULT 0,
+			created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (route_name, consumer_name)
+		)`,
+		`CREATE TABLE IF NOT EXISTS portal_ai_quota_schedule_rule (
+			id VARCHAR(64) PRIMARY KEY,
+			route_name VARCHAR(255) NOT NULL,
+			consumer_name VARCHAR(255) NOT NULL,
+			action VARCHAR(32) NOT NULL,
+			cron VARCHAR(255) NOT NULL,
+			value BIGINT NOT NULL DEFAULT 0,
+			enabled TINYINT NOT NULL DEFAULT 1,
+			last_applied_at TIMESTAMP NULL,
+			last_error TEXT NULL,
+			created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+		)`,
 		`CREATE TABLE IF NOT EXISTS job_run_record (
 			id BIGINT PRIMARY KEY AUTO_INCREMENT,
 			job_name VARCHAR(255) NOT NULL,
@@ -279,6 +220,179 @@ func (c *SQLClient) EnsureSchema(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+func (c *SQLClient) MigrateLegacyData(ctx context.Context) error {
+	if c.db == nil {
+		return ErrUnavailable
+	}
+	if err := c.ensureSharedSchemaAvailable(ctx); err != nil {
+		return err
+	}
+
+	if exists, err := c.tableExists(ctx, "portal_users"); err != nil {
+		return err
+	} else if exists {
+		if err := c.migrateLegacyUsers(ctx); err != nil {
+			return err
+		}
+	}
+	if exists, err := c.tableExists(ctx, "portal_departments"); err != nil {
+		return err
+	} else if exists {
+		if err := c.migrateLegacyDepartments(ctx); err != nil {
+			return err
+		}
+	}
+	if exists, err := c.tableExists(ctx, "portal_asset_grant"); err != nil {
+		return err
+	} else if exists {
+		if err := c.migrateLegacyAssetGrants(ctx); err != nil {
+			return err
+		}
+	}
+	if exists, err := c.tableExists(ctx, "portal_ai_quota_user_policy"); err != nil {
+		return err
+	} else if exists {
+		if err := c.migrateLegacyQuotaPolicies(ctx); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *SQLClient) ensureSharedSchemaAvailable(ctx context.Context) error {
+	for _, table := range portalshared.RequiredTables() {
+		ok, err := c.tableExists(ctx, table)
+		if err != nil {
+			return WrapExecError("check shared schema", err)
+		}
+		if !ok {
+			return fmt.Errorf("shared portal schema table is missing: %s", table)
+		}
+	}
+	return nil
+}
+
+func (c *SQLClient) tableExists(ctx context.Context, table string) (bool, error) {
+	var count int
+	err := c.db.QueryRowContext(ctx, `
+		SELECT COUNT(1)
+		FROM information_schema.TABLES
+		WHERE TABLE_SCHEMA = DATABASE()
+		  AND TABLE_NAME = ?`, table).Scan(&count)
+	return count > 0, err
+}
+
+func (c *SQLClient) migrateLegacyUsers(ctx context.Context) error {
+	statement := `
+		INSERT INTO portal_user (
+			consumer_name, display_name, email, password_hash, status, source, user_level, is_deleted, deleted_at, last_login_at
+		)
+		SELECT
+			u.consumer_name,
+			COALESCE(NULLIF(u.display_name, ''), u.consumer_name),
+			COALESCE(u.email, ''),
+			COALESCE(u.password_hash, ''),
+			COALESCE(NULLIF(u.status, ''), 'pending'),
+			COALESCE(NULLIF(u.source, ''), 'console'),
+			COALESCE(NULLIF(u.user_level, ''), 'normal'),
+			COALESCE(u.deleted, 0),
+			CASE WHEN COALESCE(u.deleted, 0) = 1 THEN CURRENT_TIMESTAMP ELSE NULL END,
+			u.last_login_at
+		FROM portal_users u
+		ON DUPLICATE KEY UPDATE
+			display_name = VALUES(display_name),
+			email = VALUES(email),
+			password_hash = VALUES(password_hash),
+			status = VALUES(status),
+			source = VALUES(source),
+			user_level = VALUES(user_level),
+			is_deleted = VALUES(is_deleted),
+			deleted_at = VALUES(deleted_at),
+			last_login_at = VALUES(last_login_at)`
+	if _, err := c.db.ExecContext(ctx, statement); err != nil {
+		return WrapExecError("migrate legacy users", err)
+	}
+
+	membershipStatement := `
+		INSERT INTO org_account_membership (consumer_name, department_id, parent_consumer_name)
+		SELECT consumer_name, NULLIF(department_id, ''), NULLIF(parent_consumer_name, '')
+		FROM portal_users
+		ON DUPLICATE KEY UPDATE
+			department_id = VALUES(department_id),
+			parent_consumer_name = VALUES(parent_consumer_name)`
+	_, err := c.db.ExecContext(ctx, membershipStatement)
+	return WrapExecError("migrate legacy memberships", err)
+}
+
+func (c *SQLClient) migrateLegacyDepartments(ctx context.Context) error {
+	statement := `
+		INSERT INTO org_department (
+			department_id, name, parent_department_id, admin_consumer_name, path, level, sort_order, status
+		)
+		SELECT
+			d.department_id,
+			d.name,
+			NULLIF(d.parent_department_id, ''),
+			NULLIF(d.admin_consumer_name, ''),
+			COALESCE(NULLIF(d.name, ''), d.department_id),
+			1,
+			0,
+			CASE WHEN COALESCE(d.deleted, 0) = 1 THEN 'deleted' ELSE 'active' END
+		FROM portal_departments d
+		ON DUPLICATE KEY UPDATE
+			name = VALUES(name),
+			parent_department_id = VALUES(parent_department_id),
+			admin_consumer_name = VALUES(admin_consumer_name),
+			status = VALUES(status),
+			updated_at = CURRENT_TIMESTAMP`
+	_, err := c.db.ExecContext(ctx, statement)
+	return WrapExecError("migrate legacy departments", err)
+}
+
+func (c *SQLClient) migrateLegacyAssetGrants(ctx context.Context) error {
+	statement := `
+		INSERT INTO asset_grant (asset_type, asset_id, subject_type, subject_id)
+		SELECT asset_type, asset_id, subject_type, subject_id
+		FROM portal_asset_grant
+		GROUP BY asset_type, asset_id, subject_type, subject_id
+		ON DUPLICATE KEY UPDATE
+			updated_at = CURRENT_TIMESTAMP`
+	_, err := c.db.ExecContext(ctx, statement)
+	return WrapExecError("migrate legacy asset grants", err)
+}
+
+func (c *SQLClient) migrateLegacyQuotaPolicies(ctx context.Context) error {
+	statement := `
+		INSERT INTO quota_policy_user (
+			consumer_name, limit_total_micro_yuan, limit_5h_micro_yuan, limit_daily_micro_yuan,
+			daily_reset_mode, daily_reset_time, limit_weekly_micro_yuan, limit_monthly_micro_yuan, cost_reset_at
+		)
+		SELECT
+			consumer_name,
+			MAX(limit_total),
+			MAX(limit_5h),
+			MAX(limit_daily),
+			SUBSTRING_INDEX(GROUP_CONCAT(daily_reset_mode ORDER BY updated_at DESC), ',', 1),
+			SUBSTRING_INDEX(GROUP_CONCAT(daily_reset_time ORDER BY updated_at DESC), ',', 1),
+			MAX(limit_weekly),
+			MAX(limit_monthly),
+			MAX(cost_reset_at)
+		FROM portal_ai_quota_user_policy
+		GROUP BY consumer_name
+		ON DUPLICATE KEY UPDATE
+			limit_total_micro_yuan = VALUES(limit_total_micro_yuan),
+			limit_5h_micro_yuan = VALUES(limit_5h_micro_yuan),
+			limit_daily_micro_yuan = VALUES(limit_daily_micro_yuan),
+			daily_reset_mode = VALUES(daily_reset_mode),
+			daily_reset_time = VALUES(daily_reset_time),
+			limit_weekly_micro_yuan = VALUES(limit_weekly_micro_yuan),
+			limit_monthly_micro_yuan = VALUES(limit_monthly_micro_yuan),
+			cost_reset_at = VALUES(cost_reset_at),
+			updated_at = CURRENT_TIMESTAMP`
+	_, err := c.db.ExecContext(ctx, statement)
+	return WrapExecError("migrate legacy quota policies", err)
 }
 
 func normalizeDriver(driver, dsn string) string {

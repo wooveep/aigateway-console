@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	k8sclient "github.com/alibaba/aigateway-group/aigateway-console/backend/utility/clients/k8s"
+	k8sclient "github.com/wooveep/aigateway-console/backend/utility/clients/k8s"
 )
 
 var (
@@ -53,22 +53,22 @@ type ModelAssetCapabilities struct {
 }
 
 type ModelBindingPricing struct {
-	Currency                                 string   `json:"currency,omitempty"`
-	InputCostPerToken                        *float64 `json:"inputCostPerToken,omitempty"`
-	OutputCostPerToken                       *float64 `json:"outputCostPerToken,omitempty"`
-	InputCostPerRequest                      *float64 `json:"inputCostPerRequest,omitempty"`
-	CacheCreationInputTokenCost              *float64 `json:"cacheCreationInputTokenCost,omitempty"`
-	CacheCreationInputTokenCostAbove1hr      *float64 `json:"cacheCreationInputTokenCostAbove1hr,omitempty"`
-	CacheReadInputTokenCost                  *float64 `json:"cacheReadInputTokenCost,omitempty"`
-	InputCostPerTokenAbove200kTokens         *float64 `json:"inputCostPerTokenAbove200kTokens,omitempty"`
-	OutputCostPerTokenAbove200kTokens        *float64 `json:"outputCostPerTokenAbove200kTokens,omitempty"`
+	Currency                                   string   `json:"currency,omitempty"`
+	InputCostPerToken                          *float64 `json:"inputCostPerToken,omitempty"`
+	OutputCostPerToken                         *float64 `json:"outputCostPerToken,omitempty"`
+	InputCostPerRequest                        *float64 `json:"inputCostPerRequest,omitempty"`
+	CacheCreationInputTokenCost                *float64 `json:"cacheCreationInputTokenCost,omitempty"`
+	CacheCreationInputTokenCostAbove1hr        *float64 `json:"cacheCreationInputTokenCostAbove1hr,omitempty"`
+	CacheReadInputTokenCost                    *float64 `json:"cacheReadInputTokenCost,omitempty"`
+	InputCostPerTokenAbove200kTokens           *float64 `json:"inputCostPerTokenAbove200kTokens,omitempty"`
+	OutputCostPerTokenAbove200kTokens          *float64 `json:"outputCostPerTokenAbove200kTokens,omitempty"`
 	CacheCreationInputTokenCostAbove200kTokens *float64 `json:"cacheCreationInputTokenCostAbove200kTokens,omitempty"`
-	CacheReadInputTokenCostAbove200kTokens   *float64 `json:"cacheReadInputTokenCostAbove200kTokens,omitempty"`
-	OutputCostPerImage                       *float64 `json:"outputCostPerImage,omitempty"`
-	OutputCostPerImageToken                  *float64 `json:"outputCostPerImageToken,omitempty"`
-	InputCostPerImage                        *float64 `json:"inputCostPerImage,omitempty"`
-	InputCostPerImageToken                   *float64 `json:"inputCostPerImageToken,omitempty"`
-	SupportsPromptCaching                    bool     `json:"supportsPromptCaching,omitempty"`
+	CacheReadInputTokenCostAbove200kTokens     *float64 `json:"cacheReadInputTokenCostAbove200kTokens,omitempty"`
+	OutputCostPerImage                         *float64 `json:"outputCostPerImage,omitempty"`
+	OutputCostPerImageToken                    *float64 `json:"outputCostPerImageToken,omitempty"`
+	InputCostPerImage                          *float64 `json:"inputCostPerImage,omitempty"`
+	InputCostPerImageToken                     *float64 `json:"inputCostPerImageToken,omitempty"`
+	SupportsPromptCaching                      bool     `json:"supportsPromptCaching,omitempty"`
 }
 
 type ModelBindingLimits struct {
@@ -78,45 +78,45 @@ type ModelBindingLimits struct {
 }
 
 type ModelBindingPriceVersion struct {
-	VersionID    int64               `json:"versionId"`
-	ModelID      string              `json:"modelId"`
-	Currency     string              `json:"currency,omitempty"`
-	Status       string              `json:"status,omitempty"`
-	Active       bool                `json:"active,omitempty"`
-	EffectiveFrom *time.Time         `json:"effectiveFrom,omitempty"`
-	EffectiveTo  *time.Time          `json:"effectiveTo,omitempty"`
-	CreatedAt    *time.Time          `json:"createdAt,omitempty"`
-	UpdatedAt    *time.Time          `json:"updatedAt,omitempty"`
-	Pricing      *ModelBindingPricing `json:"pricing,omitempty"`
+	VersionID     int64                `json:"versionId"`
+	ModelID       string               `json:"modelId"`
+	Currency      string               `json:"currency,omitempty"`
+	Status        string               `json:"status,omitempty"`
+	Active        bool                 `json:"active,omitempty"`
+	EffectiveFrom *time.Time           `json:"effectiveFrom,omitempty"`
+	EffectiveTo   *time.Time           `json:"effectiveTo,omitempty"`
+	CreatedAt     *time.Time           `json:"createdAt,omitempty"`
+	UpdatedAt     *time.Time           `json:"updatedAt,omitempty"`
+	Pricing       *ModelBindingPricing `json:"pricing,omitempty"`
 }
 
 type ModelAssetBinding struct {
-	BindingID    string               `json:"bindingId"`
-	AssetID      string               `json:"assetId,omitempty"`
-	ModelID      string               `json:"modelId,omitempty"`
-	ProviderName string               `json:"providerName,omitempty"`
-	TargetModel  string               `json:"targetModel,omitempty"`
-	Protocol     string               `json:"protocol,omitempty"`
-	Endpoint     string               `json:"endpoint,omitempty"`
-	Status       string               `json:"status,omitempty"`
-	PublishedAt  *time.Time           `json:"publishedAt,omitempty"`
-	UnpublishedAt *time.Time          `json:"unpublishedAt,omitempty"`
-	CreatedAt    *time.Time           `json:"createdAt,omitempty"`
-	UpdatedAt    *time.Time           `json:"updatedAt,omitempty"`
-	Pricing      *ModelBindingPricing `json:"pricing,omitempty"`
-	Limits       *ModelBindingLimits  `json:"limits,omitempty"`
+	BindingID     string               `json:"bindingId"`
+	AssetID       string               `json:"assetId,omitempty"`
+	ModelID       string               `json:"modelId,omitempty"`
+	ProviderName  string               `json:"providerName,omitempty"`
+	TargetModel   string               `json:"targetModel,omitempty"`
+	Protocol      string               `json:"protocol,omitempty"`
+	Endpoint      string               `json:"endpoint,omitempty"`
+	Status        string               `json:"status,omitempty"`
+	PublishedAt   *time.Time           `json:"publishedAt,omitempty"`
+	UnpublishedAt *time.Time           `json:"unpublishedAt,omitempty"`
+	CreatedAt     *time.Time           `json:"createdAt,omitempty"`
+	UpdatedAt     *time.Time           `json:"updatedAt,omitempty"`
+	Pricing       *ModelBindingPricing `json:"pricing,omitempty"`
+	Limits        *ModelBindingLimits  `json:"limits,omitempty"`
 }
 
 type ModelAsset struct {
-	AssetID      string                  `json:"assetId"`
-	CanonicalName string                 `json:"canonicalName,omitempty"`
-	DisplayName  string                  `json:"displayName,omitempty"`
-	Intro        string                  `json:"intro,omitempty"`
-	CreatedAt    *time.Time              `json:"createdAt,omitempty"`
-	UpdatedAt    *time.Time              `json:"updatedAt,omitempty"`
-	Tags         []string                `json:"tags,omitempty"`
-	Capabilities *ModelAssetCapabilities `json:"capabilities,omitempty"`
-	Bindings     []ModelAssetBinding     `json:"bindings,omitempty"`
+	AssetID       string                  `json:"assetId"`
+	CanonicalName string                  `json:"canonicalName,omitempty"`
+	DisplayName   string                  `json:"displayName,omitempty"`
+	Intro         string                  `json:"intro,omitempty"`
+	CreatedAt     *time.Time              `json:"createdAt,omitempty"`
+	UpdatedAt     *time.Time              `json:"updatedAt,omitempty"`
+	Tags          []string                `json:"tags,omitempty"`
+	Capabilities  *ModelAssetCapabilities `json:"capabilities,omitempty"`
+	Bindings      []ModelAssetBinding     `json:"bindings,omitempty"`
 }
 
 type AgentCatalogOptionServer struct {
@@ -159,7 +159,7 @@ func (s *Service) ListAssetGrants(ctx context.Context, assetType, assetID string
 	}
 	rows, err := db.QueryContext(ctx, `
 		SELECT asset_type, asset_id, subject_type, subject_id
-		FROM portal_asset_grant
+		FROM asset_grant
 		WHERE asset_type = ? AND asset_id = ?
 		ORDER BY subject_type, subject_id`, strings.TrimSpace(assetType), strings.TrimSpace(assetID))
 	if err != nil {
@@ -195,7 +195,7 @@ func (s *Service) ReplaceAssetGrants(ctx context.Context, assetType, assetID str
 	}
 	defer tx.Rollback()
 
-	if _, err := tx.ExecContext(ctx, `DELETE FROM portal_asset_grant WHERE asset_type = ? AND asset_id = ?`, normalizedType, normalizedID); err != nil {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM asset_grant WHERE asset_type = ? AND asset_id = ?`, normalizedType, normalizedID); err != nil {
 		return nil, err
 	}
 	for _, item := range grants {
@@ -209,7 +209,7 @@ func (s *Service) ReplaceAssetGrants(ctx context.Context, assetType, assetID str
 			return nil, fmt.Errorf("invalid grant subject: %s/%s", record.SubjectType, record.SubjectID)
 		}
 		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO portal_asset_grant (asset_type, asset_id, subject_type, subject_id)
+			INSERT INTO asset_grant (asset_type, asset_id, subject_type, subject_id)
 			VALUES (?, ?, ?, ?)`,
 			record.AssetType, record.AssetID, record.SubjectType, record.SubjectID,
 		); err != nil {
@@ -232,7 +232,7 @@ func (s *Service) ListModelAssets(ctx context.Context) ([]ModelAsset, error) {
 	}
 
 	rows, err := db.QueryContext(ctx, `
-		SELECT asset_id, canonical_name, display_name, intro, tags_json, capabilities_json, created_at, updated_at
+		SELECT asset_id, canonical_name, display_name, intro, tags_json, modalities_json, features_json, request_kinds_json, created_at, updated_at
 		FROM portal_model_asset
 		ORDER BY asset_id`)
 	if err != nil {
@@ -268,7 +268,7 @@ func (s *Service) GetModelAsset(ctx context.Context, assetID string) (*ModelAsse
 		return nil, err
 	}
 	row := db.QueryRowContext(ctx, `
-		SELECT asset_id, canonical_name, display_name, intro, tags_json, capabilities_json, created_at, updated_at
+		SELECT asset_id, canonical_name, display_name, intro, tags_json, modalities_json, features_json, request_kinds_json, created_at, updated_at
 		FROM portal_model_asset
 		WHERE asset_id = ?`, strings.TrimSpace(assetID))
 	item, err := scanModelAsset(row)
@@ -307,29 +307,23 @@ func (s *Service) GetModelAssetOptions(ctx context.Context) (*ModelAssetOptions,
 			continue
 		}
 		models := make([]ProviderModelOption, 0)
-		if rawModels, ok := provider["models"].([]any); ok {
-			for _, raw := range rawModels {
-				record, ok := raw.(map[string]any)
-				if !ok {
-					continue
-				}
-				modelID := strings.TrimSpace(fmt.Sprint(record["modelId"]))
-				targetModel := strings.TrimSpace(fmt.Sprint(record["targetModel"]))
-				if modelID == "" {
-					modelID = strings.TrimSpace(fmt.Sprint(record["name"]))
-				}
-				if targetModel == "" {
-					targetModel = modelID
-				}
-				if modelID == "" {
-					continue
-				}
-				models = append(models, ProviderModelOption{
-					ModelID:     modelID,
-					TargetModel: targetModel,
-					Label:       firstNonEmpty(strings.TrimSpace(fmt.Sprint(record["label"])), modelID),
-				})
+		for _, record := range providerModelRecords(provider["models"]) {
+			modelID := strings.TrimSpace(fmt.Sprint(record["modelId"]))
+			targetModel := strings.TrimSpace(fmt.Sprint(record["targetModel"]))
+			if modelID == "" {
+				modelID = strings.TrimSpace(fmt.Sprint(record["name"]))
 			}
+			if targetModel == "" {
+				targetModel = modelID
+			}
+			if modelID == "" {
+				continue
+			}
+			models = append(models, ProviderModelOption{
+				ModelID:     modelID,
+				TargetModel: targetModel,
+				Label:       firstNonEmpty(strings.TrimSpace(fmt.Sprint(record["label"])), modelID),
+			})
 		}
 		options.ProviderModels = append(options.ProviderModels, ProviderModelCatalog{
 			ProviderName: name,
@@ -342,6 +336,25 @@ func (s *Service) GetModelAssetOptions(ctx context.Context) (*ModelAssetOptions,
 	return options, nil
 }
 
+func providerModelRecords(value any) []map[string]any {
+	switch typed := value.(type) {
+	case []map[string]any:
+		return typed
+	case []any:
+		result := make([]map[string]any, 0, len(typed))
+		for _, item := range typed {
+			record, ok := item.(map[string]any)
+			if !ok {
+				continue
+			}
+			result = append(result, record)
+		}
+		return result
+	default:
+		return nil
+	}
+}
+
 func (s *Service) CreateModelAsset(ctx context.Context, asset ModelAsset) (*ModelAsset, error) {
 	db, err := s.db(ctx)
 	if err != nil {
@@ -352,14 +365,17 @@ func (s *Service) CreateModelAsset(ctx context.Context, asset ModelAsset) (*Mode
 		return nil, err
 	}
 	if _, err := db.ExecContext(ctx, `
-		INSERT INTO portal_model_asset (asset_id, canonical_name, display_name, intro, tags_json, capabilities_json)
-		VALUES (?, ?, ?, ?, ?, ?)`,
+		INSERT INTO portal_model_asset (
+			asset_id, canonical_name, display_name, intro, tags_json, modalities_json, features_json, request_kinds_json
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 		normalized.AssetID,
 		normalized.CanonicalName,
 		normalized.DisplayName,
 		nullIfEmpty(normalized.Intro),
 		mustJSONString(normalized.Tags),
-		mustJSONString(normalized.Capabilities),
+		mustJSONString(normalized.Capabilities.Modalities),
+		mustJSONString(normalized.Capabilities.Features),
+		mustJSONString(normalized.Capabilities.RequestKinds),
 	); err != nil {
 		return nil, err
 	}
@@ -384,13 +400,15 @@ func (s *Service) UpdateModelAsset(ctx context.Context, assetID string, asset Mo
 	}
 	if _, err := db.ExecContext(ctx, `
 		UPDATE portal_model_asset
-		SET canonical_name = ?, display_name = ?, intro = ?, tags_json = ?, capabilities_json = ?, updated_at = CURRENT_TIMESTAMP
+		SET canonical_name = ?, display_name = ?, intro = ?, tags_json = ?, modalities_json = ?, features_json = ?, request_kinds_json = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE asset_id = ?`,
 		normalized.CanonicalName,
 		normalized.DisplayName,
 		nullIfEmpty(normalized.Intro),
 		mustJSONString(normalized.Tags),
-		mustJSONString(normalized.Capabilities),
+		mustJSONString(normalized.Capabilities.Modalities),
+		mustJSONString(normalized.Capabilities.Features),
+		mustJSONString(normalized.Capabilities.RequestKinds),
 		id,
 	); err != nil {
 		return nil, err
@@ -415,17 +433,19 @@ func (s *Service) CreateModelBinding(ctx context.Context, assetID string, bindin
 	}
 	if _, err := db.ExecContext(ctx, `
 		INSERT INTO portal_model_binding (
-			binding_id, asset_id, model_id, provider_name, target_model, protocol, endpoint, status, pricing_json, limits_json
-		) VALUES (?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?)`,
+			binding_id, asset_id, model_id, provider_name, target_model, protocol, endpoint, pricing_json, rpm, tpm, context_window, status
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft')`,
 		normalized.BindingID,
 		assetID,
 		normalized.ModelID,
 		normalized.ProviderName,
 		normalized.TargetModel,
 		firstNonEmpty(normalized.Protocol, "openai/v1"),
-		nullIfEmpty(normalized.Endpoint),
+		firstNonEmpty(normalized.Endpoint, "-"),
 		mustJSONString(normalized.Pricing),
-		mustJSONString(normalized.Limits),
+		intOrNil(normalized.Limits, func(l ModelBindingLimits) *int { return l.RPM }),
+		intOrNil(normalized.Limits, func(l ModelBindingLimits) *int { return l.TPM }),
+		intOrNil(normalized.Limits, func(l ModelBindingLimits) *int { return l.ContextWindow }),
 	); err != nil {
 		return nil, err
 	}
@@ -446,16 +466,18 @@ func (s *Service) UpdateModelBinding(ctx context.Context, assetID, bindingID str
 	}
 	if _, err := db.ExecContext(ctx, `
 		UPDATE portal_model_binding
-		SET model_id = ?, provider_name = ?, target_model = ?, protocol = ?, endpoint = ?, pricing_json = ?, limits_json = ?,
+		SET model_id = ?, provider_name = ?, target_model = ?, protocol = ?, endpoint = ?, pricing_json = ?, rpm = ?, tpm = ?, context_window = ?,
 			updated_at = CURRENT_TIMESTAMP
 		WHERE asset_id = ? AND binding_id = ?`,
 		normalized.ModelID,
 		normalized.ProviderName,
 		normalized.TargetModel,
 		firstNonEmpty(normalized.Protocol, "openai/v1"),
-		nullIfEmpty(normalized.Endpoint),
+		firstNonEmpty(normalized.Endpoint, "-"),
 		mustJSONString(normalized.Pricing),
-		mustJSONString(normalized.Limits),
+		intOrNil(normalized.Limits, func(l ModelBindingLimits) *int { return l.RPM }),
+		intOrNil(normalized.Limits, func(l ModelBindingLimits) *int { return l.TPM }),
+		intOrNil(normalized.Limits, func(l ModelBindingLimits) *int { return l.ContextWindow }),
 		strings.TrimSpace(assetID),
 		strings.TrimSpace(bindingID),
 	); err != nil {
@@ -707,15 +729,15 @@ func (s *Service) CreateAgentCatalog(ctx context.Context, asset AgentCatalogReco
 		normalized.AgentID,
 		normalized.CanonicalName,
 		normalized.DisplayName,
-		nullIfEmpty(normalized.Intro),
-		nullIfEmpty(normalized.Description),
-		nullIfEmpty(normalized.IconURL),
+		firstNonEmpty(normalized.Intro, ""),
+		firstNonEmpty(normalized.Description, ""),
+		firstNonEmpty(normalized.IconURL, ""),
 		mustJSONString(normalized.Tags),
-		nullIfEmpty(normalized.McpServerName),
+		firstNonEmpty(normalized.McpServerName, ""),
 		normalized.ToolCount,
 		mustJSONString(normalized.TransportTypes),
-		nullIfEmpty(normalized.ResourceSummary),
-		nullIfEmpty(normalized.PromptSummary),
+		firstNonEmpty(normalized.ResourceSummary, ""),
+		firstNonEmpty(normalized.PromptSummary, ""),
 	); err != nil {
 		return nil, err
 	}
@@ -749,15 +771,15 @@ func (s *Service) UpdateAgentCatalog(ctx context.Context, agentID string, asset 
 		WHERE agent_id = ?`,
 		normalized.CanonicalName,
 		normalized.DisplayName,
-		nullIfEmpty(normalized.Intro),
-		nullIfEmpty(normalized.Description),
-		nullIfEmpty(normalized.IconURL),
+		firstNonEmpty(normalized.Intro, ""),
+		firstNonEmpty(normalized.Description, ""),
+		firstNonEmpty(normalized.IconURL, ""),
 		mustJSONString(normalized.Tags),
-		nullIfEmpty(normalized.McpServerName),
+		firstNonEmpty(normalized.McpServerName, ""),
 		normalized.ToolCount,
 		mustJSONString(normalized.TransportTypes),
-		nullIfEmpty(normalized.ResourceSummary),
-		nullIfEmpty(normalized.PromptSummary),
+		firstNonEmpty(normalized.ResourceSummary, ""),
+		firstNonEmpty(normalized.PromptSummary, ""),
 		strings.TrimSpace(agentID),
 	); err != nil {
 		return nil, err
@@ -814,7 +836,7 @@ func (s *Service) UnpublishAgentCatalog(ctx context.Context, agentID string) (*A
 func (s *Service) listBindingsByAsset(ctx context.Context, db *sql.DB, assetID string) ([]ModelAssetBinding, error) {
 	rows, err := db.QueryContext(ctx, `
 		SELECT binding_id, asset_id, model_id, provider_name, target_model, protocol, endpoint, status,
-			published_at, unpublished_at, pricing_json, limits_json, created_at, updated_at
+			published_at, unpublished_at, pricing_json, rpm, tpm, context_window, created_at, updated_at
 		FROM portal_model_binding
 		WHERE asset_id = ?
 		ORDER BY binding_id`, assetID)
@@ -837,7 +859,7 @@ func (s *Service) listBindingsByAsset(ctx context.Context, db *sql.DB, assetID s
 func (s *Service) listAllBindings(ctx context.Context, db *sql.DB) (map[string][]ModelAssetBinding, error) {
 	rows, err := db.QueryContext(ctx, `
 		SELECT binding_id, asset_id, model_id, provider_name, target_model, protocol, endpoint, status,
-			published_at, unpublished_at, pricing_json, limits_json, created_at, updated_at
+			published_at, unpublished_at, pricing_json, rpm, tpm, context_window, created_at, updated_at
 		FROM portal_model_binding
 		ORDER BY asset_id, binding_id`)
 	if err != nil {
@@ -863,7 +885,7 @@ func (s *Service) getBinding(ctx context.Context, assetID, bindingID string) (*M
 	}
 	row := db.QueryRowContext(ctx, `
 		SELECT binding_id, asset_id, model_id, provider_name, target_model, protocol, endpoint, status,
-			published_at, unpublished_at, pricing_json, limits_json, created_at, updated_at
+			published_at, unpublished_at, pricing_json, rpm, tpm, context_window, created_at, updated_at
 		FROM portal_model_binding
 		WHERE asset_id = ? AND binding_id = ?`,
 		strings.TrimSpace(assetID), strings.TrimSpace(bindingID))
@@ -927,17 +949,22 @@ func scanModelAsset(scanner interface{ Scan(...any) error }) (ModelAsset, error)
 		item             ModelAsset
 		intro            sql.NullString
 		tagsJSON         sql.NullString
-		capabilitiesJSON sql.NullString
+		modalitiesJSON   sql.NullString
+		featuresJSON     sql.NullString
+		requestKindsJSON sql.NullString
 		createdAt        sql.NullTime
 		updatedAt        sql.NullTime
 	)
-	if err := scanner.Scan(&item.AssetID, &item.CanonicalName, &item.DisplayName, &intro, &tagsJSON, &capabilitiesJSON, &createdAt, &updatedAt); err != nil {
+	if err := scanner.Scan(&item.AssetID, &item.CanonicalName, &item.DisplayName, &intro, &tagsJSON, &modalitiesJSON, &featuresJSON, &requestKindsJSON, &createdAt, &updatedAt); err != nil {
 		return ModelAsset{}, err
 	}
 	item.Intro = intro.String
 	item.Tags = parseJSONStringList(tagsJSON.String)
-	item.Capabilities = &ModelAssetCapabilities{}
-	_ = json.Unmarshal([]byte(defaultJSON(capabilitiesJSON.String, `{}`)), item.Capabilities)
+	item.Capabilities = &ModelAssetCapabilities{
+		Modalities:   parseJSONStringList(modalitiesJSON.String),
+		Features:     parseJSONStringList(featuresJSON.String),
+		RequestKinds: parseJSONStringList(requestKindsJSON.String),
+	}
 	if createdAt.Valid {
 		item.CreatedAt = &createdAt.Time
 	}
@@ -949,18 +976,20 @@ func scanModelAsset(scanner interface{ Scan(...any) error }) (ModelAsset, error)
 
 func scanModelBinding(scanner interface{ Scan(...any) error }) (ModelAssetBinding, error) {
 	var (
-		item        ModelAssetBinding
-		endpoint    sql.NullString
-		pricingJSON sql.NullString
-		limitsJSON  sql.NullString
-		publishedAt sql.NullTime
+		item          ModelAssetBinding
+		endpoint      sql.NullString
+		pricingJSON   sql.NullString
+		rpm           sql.NullInt64
+		tpm           sql.NullInt64
+		contextWindow sql.NullInt64
+		publishedAt   sql.NullTime
 		unpublishedAt sql.NullTime
-		createdAt   sql.NullTime
-		updatedAt   sql.NullTime
+		createdAt     sql.NullTime
+		updatedAt     sql.NullTime
 	)
 	if err := scanner.Scan(
 		&item.BindingID, &item.AssetID, &item.ModelID, &item.ProviderName, &item.TargetModel, &item.Protocol, &endpoint, &item.Status,
-		&publishedAt, &unpublishedAt, &pricingJSON, &limitsJSON, &createdAt, &updatedAt,
+		&publishedAt, &unpublishedAt, &pricingJSON, &rpm, &tpm, &contextWindow, &createdAt, &updatedAt,
 	); err != nil {
 		return ModelAssetBinding{}, err
 	}
@@ -969,9 +998,20 @@ func scanModelBinding(scanner interface{ Scan(...any) error }) (ModelAssetBindin
 		item.Pricing = &ModelBindingPricing{}
 		_ = json.Unmarshal([]byte(pricingJSON.String), item.Pricing)
 	}
-	if limitsJSON.String != "" {
+	if rpm.Valid || tpm.Valid || contextWindow.Valid {
 		item.Limits = &ModelBindingLimits{}
-		_ = json.Unmarshal([]byte(limitsJSON.String), item.Limits)
+		if rpm.Valid {
+			value := int(rpm.Int64)
+			item.Limits.RPM = &value
+		}
+		if tpm.Valid {
+			value := int(tpm.Int64)
+			item.Limits.TPM = &value
+		}
+		if contextWindow.Valid {
+			value := int(contextWindow.Int64)
+			item.Limits.ContextWindow = &value
+		}
 	}
 	if publishedAt.Valid {
 		item.PublishedAt = &publishedAt.Time
@@ -990,13 +1030,13 @@ func scanModelBinding(scanner interface{ Scan(...any) error }) (ModelAssetBindin
 
 func scanBindingPriceVersion(scanner interface{ Scan(...any) error }) (ModelBindingPriceVersion, error) {
 	var (
-		item         ModelBindingPriceVersion
-		pricingJSON  sql.NullString
-		active       bool
+		item          ModelBindingPriceVersion
+		pricingJSON   sql.NullString
+		active        bool
 		effectiveFrom sql.NullTime
-		effectiveTo  sql.NullTime
-		createdAt    sql.NullTime
-		updatedAt    sql.NullTime
+		effectiveTo   sql.NullTime
+		createdAt     sql.NullTime
+		updatedAt     sql.NullTime
 	)
 	if err := scanner.Scan(&item.VersionID, &item.Status, &active, &effectiveFrom, &effectiveTo, &pricingJSON, &createdAt, &updatedAt); err != nil {
 		return ModelBindingPriceVersion{}, err
@@ -1153,6 +1193,17 @@ func anySliceToStringSlice(items []any) []string {
 		}
 	}
 	return values
+}
+
+func intOrNil(limits *ModelBindingLimits, pick func(ModelBindingLimits) *int) any {
+	if limits == nil {
+		return nil
+	}
+	value := pick(*limits)
+	if value == nil {
+		return nil
+	}
+	return *value
 }
 
 func mustJSONString(value any) string {

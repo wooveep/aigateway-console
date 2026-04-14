@@ -16,11 +16,11 @@ import (
 
 	"github.com/gogf/gf/v2/os/gcron"
 
-	internaljob "github.com/alibaba/aigateway-group/aigateway-console/backend/internal/job"
-	gatewaysvc "github.com/alibaba/aigateway-group/aigateway-console/backend/internal/service/gateway"
-	portalsvc "github.com/alibaba/aigateway-group/aigateway-console/backend/internal/service/portal"
-	k8sclient "github.com/alibaba/aigateway-group/aigateway-console/backend/utility/clients/k8s"
-	portaldbclient "github.com/alibaba/aigateway-group/aigateway-console/backend/utility/clients/portaldb"
+	internaljob "github.com/wooveep/aigateway-console/backend/internal/job"
+	gatewaysvc "github.com/wooveep/aigateway-console/backend/internal/service/gateway"
+	portalsvc "github.com/wooveep/aigateway-console/backend/internal/service/portal"
+	k8sclient "github.com/wooveep/aigateway-console/backend/utility/clients/k8s"
+	portaldbclient "github.com/wooveep/aigateway-console/backend/utility/clients/portaldb"
 )
 
 const (

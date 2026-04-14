@@ -3,7 +3,7 @@ package system
 import (
 	"context"
 
-	v1 "github.com/alibaba/aigateway-group/aigateway-console/backend/api/system/v1"
+	v1 "github.com/wooveep/aigateway-console/backend/api/system/v1"
 )
 
 type ISystemV1 interface {

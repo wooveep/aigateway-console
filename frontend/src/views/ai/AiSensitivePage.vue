@@ -2,6 +2,8 @@
 import { onMounted, reactive, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import PageSection from '@/components/common/PageSection.vue';
+import PortalUnavailableState from '@/components/common/PortalUnavailableState.vue';
+import { usePortalAvailability } from '@/composables/usePortalAvailability';
 import { showSuccess } from '@/lib/feedback';
 import {
   deleteAiSensitiveDetectRule,
@@ -17,6 +19,7 @@ import {
 } from '@/services/ai-sensitive';
 
 const { t } = useI18n();
+const { portalUnavailable } = usePortalAvailability();
 const status = ref<any>({});
 const detectRules = ref<any[]>([]);
 const replaceRules = ref<any[]>([]);
@@ -36,6 +39,16 @@ const auditQuery = reactive({
 });
 
 async function load() {
+  if (portalUnavailable.value) {
+    status.value = {};
+    detectRules.value = [];
+    replaceRules.value = [];
+    Object.assign(systemConfig, {
+      systemDenyEnabled: false,
+      dictionaryText: '',
+    });
+    return;
+  }
   const [nextStatus, nextDetect, nextReplace, nextSystem] = await Promise.all([
     getAiSensitiveStatus().catch(() => ({})),
     getAiSensitiveDetectRules().catch(() => []),
@@ -49,6 +62,10 @@ async function load() {
 }
 
 async function queryAudits() {
+  if (portalUnavailable.value) {
+    audits.value = [];
+    return;
+  }
   audits.value = await getAiSensitiveAudits({
     consumerName: auditQuery.consumerName || undefined,
     routeName: auditQuery.routeName || undefined,
@@ -101,89 +118,95 @@ onMounted(async () => {
 
 <template>
   <div class="ai-sensitive-page">
-    <PageSection :title="t('menu.aiSensitiveManagement')">
-      <div class="ai-sensitive-page__stats">
-        <article class="ai-sensitive-page__stat">
-          <span>{{ t('aiSensitive.status.detectRuleCount') }}</span>
-          <strong>{{ status.detectRuleCount || 0 }}</strong>
-        </article>
-        <article class="ai-sensitive-page__stat">
-          <span>{{ t('aiSensitive.status.replaceRuleCount') }}</span>
-          <strong>{{ status.replaceRuleCount || 0 }}</strong>
-        </article>
-        <article class="ai-sensitive-page__stat">
-          <span>{{ t('aiSensitive.status.auditRecordCount') }}</span>
-          <strong>{{ status.auditRecordCount || 0 }}</strong>
-        </article>
-        <article class="ai-sensitive-page__stat">
-          <span>{{ t('aiSensitive.status.systemDenyEnabled') }}</span>
-          <strong>{{ status.systemDenyEnabled ? 'ON' : 'OFF' }}</strong>
-        </article>
-      </div>
+    <PageSection v-if="portalUnavailable" :title="t('menu.aiSensitiveManagement')">
+      <PortalUnavailableState />
     </PageSection>
 
-    <PageSection :title="t('menu.aiSensitiveManagement')">
-      <a-tabs>
-        <a-tab-pane key="detect" :tab="t('aiSensitive.tabs.detect')">
-          <a-button type="primary" @click="openEditor('detect')">{{ t('aiSensitive.actions.addDetectRule') }}</a-button>
-          <a-table :data-source="detectRules" row-key="id" size="small" style="margin-top: 12px">
-            <a-table-column key="pattern" data-index="pattern" :title="t('aiSensitive.fields.pattern')" />
-            <a-table-column key="matchType" data-index="matchType" :title="t('aiSensitive.fields.matchType')" />
-            <a-table-column key="priority" data-index="priority" :title="t('aiSensitive.fields.priority')" />
-            <a-table-column key="enabled" data-index="enabled" :title="t('aiSensitive.fields.enabled')" />
-            <a-table-column key="actions" :title="t('misc.actions')" width="180">
-              <template #default="{ record }">
-                <a-button type="link" size="small" @click="openEditor('detect', record)">{{ t('misc.edit') }}</a-button>
-                <a-button type="link" size="small" danger @click="removeDetect(record)">{{ t('misc.delete') }}</a-button>
-              </template>
-            </a-table-column>
-          </a-table>
-        </a-tab-pane>
+    <template v-else>
+      <PageSection :title="t('menu.aiSensitiveManagement')">
+        <div class="ai-sensitive-page__stats">
+          <article class="ai-sensitive-page__stat">
+            <span>{{ t('aiSensitive.status.detectRuleCount') }}</span>
+            <strong>{{ status.detectRuleCount || 0 }}</strong>
+          </article>
+          <article class="ai-sensitive-page__stat">
+            <span>{{ t('aiSensitive.status.replaceRuleCount') }}</span>
+            <strong>{{ status.replaceRuleCount || 0 }}</strong>
+          </article>
+          <article class="ai-sensitive-page__stat">
+            <span>{{ t('aiSensitive.status.auditRecordCount') }}</span>
+            <strong>{{ status.auditRecordCount || 0 }}</strong>
+          </article>
+          <article class="ai-sensitive-page__stat">
+            <span>{{ t('aiSensitive.status.systemDenyEnabled') }}</span>
+            <strong>{{ status.systemDenyEnabled ? 'ON' : 'OFF' }}</strong>
+          </article>
+        </div>
+      </PageSection>
 
-        <a-tab-pane key="replace" :tab="t('aiSensitive.tabs.replace')">
-          <a-button type="primary" @click="openEditor('replace')">{{ t('aiSensitive.actions.addReplaceRule') }}</a-button>
-          <a-table :data-source="replaceRules" row-key="id" size="small" style="margin-top: 12px">
-            <a-table-column key="pattern" data-index="pattern" :title="t('aiSensitive.fields.pattern')" />
-            <a-table-column key="replaceType" data-index="replaceType" :title="t('aiSensitive.fields.replaceType')" />
-            <a-table-column key="replaceValue" data-index="replaceValue" :title="t('aiSensitive.fields.replaceValue')" />
-            <a-table-column key="enabled" data-index="enabled" :title="t('aiSensitive.fields.enabled')" />
-            <a-table-column key="actions" :title="t('misc.actions')" width="180">
-              <template #default="{ record }">
-                <a-button type="link" size="small" @click="openEditor('replace', record)">{{ t('misc.edit') }}</a-button>
-                <a-button type="link" size="small" danger @click="removeReplace(record)">{{ t('misc.delete') }}</a-button>
-              </template>
-            </a-table-column>
-          </a-table>
-        </a-tab-pane>
+      <PageSection :title="t('menu.aiSensitiveManagement')">
+        <a-tabs>
+          <a-tab-pane key="detect" :tab="t('aiSensitive.tabs.detect')">
+            <a-button type="primary" @click="openEditor('detect')">{{ t('aiSensitive.actions.addDetectRule') }}</a-button>
+            <a-table :data-source="detectRules" row-key="id" size="small" style="margin-top: 12px">
+              <a-table-column key="pattern" data-index="pattern" :title="t('aiSensitive.fields.pattern')" />
+              <a-table-column key="matchType" data-index="matchType" :title="t('aiSensitive.fields.matchType')" />
+              <a-table-column key="priority" data-index="priority" :title="t('aiSensitive.fields.priority')" />
+              <a-table-column key="enabled" data-index="enabled" :title="t('aiSensitive.fields.enabled')" />
+              <a-table-column key="actions" :title="t('misc.actions')" width="180">
+                <template #default="{ record }">
+                  <a-button type="link" size="small" @click="openEditor('detect', record)">{{ t('misc.edit') }}</a-button>
+                  <a-button type="link" size="small" danger @click="removeDetect(record)">{{ t('misc.delete') }}</a-button>
+                </template>
+              </a-table-column>
+            </a-table>
+          </a-tab-pane>
 
-        <a-tab-pane key="audit" :tab="t('aiSensitive.tabs.audit')">
-          <div class="ai-sensitive-page__audit-bar">
-            <a-input v-model:value="auditQuery.consumerName" :placeholder="t('aiSensitive.placeholders.consumerName')" />
-            <a-input v-model:value="auditQuery.routeName" :placeholder="t('aiSensitive.placeholders.routeName')" />
-            <a-button type="primary" @click="queryAudits">{{ t('misc.search') }}</a-button>
-          </div>
-          <a-table :data-source="audits" row-key="id" size="small" :scroll="{ x: 980 }">
-            <a-table-column key="requestId" data-index="requestId" :title="t('aiSensitive.fields.requestId')" />
-            <a-table-column key="consumerName" data-index="consumerName" :title="t('aiSensitive.fields.consumerName')" />
-            <a-table-column key="routeName" data-index="routeName" :title="t('aiSensitive.fields.routeName')" />
-            <a-table-column key="matchedRule" data-index="matchedRule" :title="t('aiSensitive.fields.matchedRule')" />
-            <a-table-column key="matchedExcerpt" data-index="matchedExcerpt" :title="t('aiSensitive.fields.matchedExcerpt')" />
-          </a-table>
-        </a-tab-pane>
+          <a-tab-pane key="replace" :tab="t('aiSensitive.tabs.replace')">
+            <a-button type="primary" @click="openEditor('replace')">{{ t('aiSensitive.actions.addReplaceRule') }}</a-button>
+            <a-table :data-source="replaceRules" row-key="id" size="small" style="margin-top: 12px">
+              <a-table-column key="pattern" data-index="pattern" :title="t('aiSensitive.fields.pattern')" />
+              <a-table-column key="replaceType" data-index="replaceType" :title="t('aiSensitive.fields.replaceType')" />
+              <a-table-column key="replaceValue" data-index="replaceValue" :title="t('aiSensitive.fields.replaceValue')" />
+              <a-table-column key="enabled" data-index="enabled" :title="t('aiSensitive.fields.enabled')" />
+              <a-table-column key="actions" :title="t('misc.actions')" width="180">
+                <template #default="{ record }">
+                  <a-button type="link" size="small" @click="openEditor('replace', record)">{{ t('misc.edit') }}</a-button>
+                  <a-button type="link" size="small" danger @click="removeReplace(record)">{{ t('misc.delete') }}</a-button>
+                </template>
+              </a-table-column>
+            </a-table>
+          </a-tab-pane>
 
-        <a-tab-pane key="system" :tab="t('aiSensitive.systemConfig.title')">
-          <a-form layout="vertical">
-            <a-form-item :label="t('aiSensitive.systemConfig.enabled')">
-              <a-switch v-model:checked="systemConfig.systemDenyEnabled" />
-            </a-form-item>
-            <a-form-item :label="t('aiSensitive.systemConfig.title')">
-              <a-textarea v-model:value="systemConfig.dictionaryText" :rows="16" />
-            </a-form-item>
-            <a-button type="primary" @click="saveSystemConfig">{{ t('misc.save') }}</a-button>
-          </a-form>
-        </a-tab-pane>
-      </a-tabs>
-    </PageSection>
+          <a-tab-pane key="audit" :tab="t('aiSensitive.tabs.audit')">
+            <div class="ai-sensitive-page__audit-bar">
+              <a-input v-model:value="auditQuery.consumerName" :placeholder="t('aiSensitive.placeholders.consumerName')" />
+              <a-input v-model:value="auditQuery.routeName" :placeholder="t('aiSensitive.placeholders.routeName')" />
+              <a-button type="primary" @click="queryAudits">{{ t('misc.search') }}</a-button>
+            </div>
+            <a-table :data-source="audits" row-key="id" size="small" :scroll="{ x: 980 }">
+              <a-table-column key="requestId" data-index="requestId" :title="t('aiSensitive.fields.requestId')" />
+              <a-table-column key="consumerName" data-index="consumerName" :title="t('aiSensitive.fields.consumerName')" />
+              <a-table-column key="routeName" data-index="routeName" :title="t('aiSensitive.fields.routeName')" />
+              <a-table-column key="matchedRule" data-index="matchedRule" :title="t('aiSensitive.fields.matchedRule')" />
+              <a-table-column key="matchedExcerpt" data-index="matchedExcerpt" :title="t('aiSensitive.fields.matchedExcerpt')" />
+            </a-table>
+          </a-tab-pane>
+
+          <a-tab-pane key="system" :tab="t('aiSensitive.systemConfig.title')">
+            <a-form layout="vertical">
+              <a-form-item :label="t('aiSensitive.systemConfig.enabled')">
+                <a-switch v-model:checked="systemConfig.systemDenyEnabled" />
+              </a-form-item>
+              <a-form-item :label="t('aiSensitive.systemConfig.title')">
+                <a-textarea v-model:value="systemConfig.dictionaryText" :rows="16" />
+              </a-form-item>
+              <a-button type="primary" @click="saveSystemConfig">{{ t('misc.save') }}</a-button>
+            </a-form>
+          </a-tab-pane>
+        </a-tabs>
+      </PageSection>
+    </template>
 
     <a-drawer v-model:open="editorOpen" :title="t('misc.edit')" width="620">
       <a-textarea v-model:value="editorJson" :rows="24" spellcheck="false" />

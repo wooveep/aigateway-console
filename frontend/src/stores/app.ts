@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { SYSTEM_INITIALIZED } from '@/interfaces/config';
+import { PORTAL_ENABLED, PORTAL_HEALTHY, SYSTEM_INITIALIZED } from '@/interfaces/config';
 import type { UserInfo } from '@/interfaces/user';
 import { getConfigs, getSystemInfo } from '@/services/system';
 import { fetchUserInfo, logout } from '@/services/user';
@@ -24,6 +24,8 @@ export const useAppStore = defineStore('app', {
     isInitialized: (state) => Boolean(state.config?.[SYSTEM_INITIALIZED]),
     isAuthenticated: (state) => Boolean(state.currentUser?.username),
     displayName: (state) => state.currentUser?.displayName || state.currentUser?.username || 'Admin',
+    portalEnabled: (state) => Boolean(state.config?.[PORTAL_ENABLED]),
+    portalHealthy: (state) => Boolean(state.config?.[PORTAL_HEALTHY]),
   },
   actions: {
     async bootstrap(force = false) {

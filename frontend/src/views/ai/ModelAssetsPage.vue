@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onMounted, ref } from 'vue';
 import PageSection from '@/components/common/PageSection.vue';
+import PortalUnavailableState from '@/components/common/PortalUnavailableState.vue';
+import { usePortalAvailability } from '@/composables/usePortalAvailability';
 import ListToolbar from '@/components/common/ListToolbar.vue';
 import { showConfirm, showSuccess, showWarning } from '@/lib/feedback';
 import {
@@ -30,6 +32,7 @@ const ModelAssetDrawer = defineAsyncComponent(() => import('@/features/model-ass
 const ModelBindingDrawer = defineAsyncComponent(() => import('@/features/model-assets/ModelBindingDrawer.vue'));
 const ModelBindingHistoryDrawer = defineAsyncComponent(() => import('@/features/model-assets/ModelBindingHistoryDrawer.vue'));
 const ModelBindingGrantDrawer = defineAsyncComponent(() => import('@/features/model-assets/ModelBindingGrantDrawer.vue'));
+const { portalUnavailable } = usePortalAvailability();
 
 const loading = ref(false);
 const search = ref('');
@@ -89,6 +92,12 @@ const departmentOptions = computed(() => flattenDepartmentOptions(departments.va
 const userLevelOptions = computed(() => USER_LEVELS.map((item) => ({ label: `等级 ${item}`, value: item })));
 
 async function loadAssets() {
+  if (portalUnavailable.value) {
+    assets.value = [];
+    selectedAssetId.value = '';
+    loading.value = false;
+    return;
+  }
   loading.value = true;
   try {
     const result = await getModelAssets().catch(() => []);
@@ -103,6 +112,16 @@ async function loadAssets() {
 }
 
 async function loadSupportData() {
+  if (portalUnavailable.value) {
+    providers.value = [];
+    assetOptions.value = {
+      capabilities: { modalities: [], features: [], requestKinds: [] },
+      providerModels: [],
+    };
+    accounts.value = [];
+    departments.value = [];
+    return;
+  }
   const [nextProviders, nextAssetOptions, nextAccounts, nextDepartments] = await Promise.all([
     getLlmProviders().catch(() => []),
     getModelAssetOptions().catch(() => ({ capabilities: { modalities: [], features: [], requestKinds: [] }, providerModels: [] })),
@@ -264,102 +283,108 @@ onMounted(async () => {
 
 <template>
   <div class="model-assets-page">
-    <PageSection title="模型资产管理">
-      <ListToolbar
-        v-model:search="search"
-        search-placeholder="搜索资产 ID、标准名、显示名"
-        create-text="创建模型资产"
-        @refresh="loadAssets"
-        @create="openAssetDrawer()"
-      />
-      <a-table
-        :data-source="filteredAssets"
-        :loading="loading"
-        row-key="assetId"
-        :scroll="{ x: 920 }"
-        :row-class-name="(record) => record.assetId === selectedAssetId ? 'model-assets-page__selected-row' : ''"
-        :custom-row="(record) => ({ onClick: () => { selectedAssetId = record.assetId; } })"
-      >
-        <a-table-column key="displayName" title="展示名">
-          <template #default="{ record }">{{ record.displayName || record.canonicalName || record.assetId }}</template>
-        </a-table-column>
-        <a-table-column key="canonicalName" data-index="canonicalName" title="规范名" />
-        <a-table-column key="tags" title="标签">
-          <template #default="{ record }">
-            <a-space wrap size="small">
-              <a-tag v-for="tag in record.tags || []" :key="tag">{{ tag }}</a-tag>
-            </a-space>
-          </template>
-        </a-table-column>
-        <a-table-column key="bindings" title="绑定数" width="100">
-          <template #default="{ record }">{{ record.bindings?.length || 0 }}</template>
-        </a-table-column>
-        <a-table-column key="actions" title="操作" width="120">
-          <template #default="{ record }">
-            <a-button type="link" size="small" @click.stop="openAssetDrawer(record)">编辑</a-button>
-          </template>
-        </a-table-column>
-      </a-table>
+    <PageSection v-if="portalUnavailable" title="模型资产管理">
+      <PortalUnavailableState />
     </PageSection>
 
-    <PageSection :title="selectedAsset ? `发布绑定 · ${selectedAsset.displayName || selectedAsset.assetId}` : '发布绑定'">
-      <template #actions>
-        <a-space>
-          <a-button :disabled="!selectedAsset" @click="selectedAsset && openAssetDrawer(selectedAsset)">编辑资产</a-button>
-          <a-button type="primary" :disabled="!selectedAsset" @click="openBindingDrawer()">新建绑定</a-button>
-        </a-space>
-      </template>
-
-      <a-empty v-if="!selectedAsset" description="还没有模型资产，先创建一个资产。" />
-
-      <template v-else>
-        <div class="model-assets-page__summary">
-          <article class="model-assets-page__summary-card">
-            <span>简介</span>
-            <strong>{{ selectedAsset.intro || '-' }}</strong>
-          </article>
-          <article class="model-assets-page__summary-card">
-            <span>能力</span>
-            <strong>
-              模态：{{ selectedAsset.capabilities?.modalities?.join(', ') || '-' }}；
-              特性：{{ selectedAsset.capabilities?.features?.join(', ') || '-' }}；
-              请求类型：{{ selectedAsset.capabilities?.requestKinds?.join(', ') || '-' }}
-            </strong>
-          </article>
-        </div>
-
-        <a-table :data-source="selectedBindings" row-key="bindingId" :scroll="{ x: 1160 }">
-          <a-table-column key="modelId" data-index="modelId" title="模型 ID" />
-          <a-table-column key="providerName" data-index="providerName" title="Provider" />
-          <a-table-column key="targetModel" data-index="targetModel" title="目标模型" />
-          <a-table-column key="status" title="状态" width="120">
-            <template #default="{ record }">
-              <a-tag :color="statusColorMap[record.status] || 'default'">{{ record.status || 'draft' }}</a-tag>
-            </template>
+    <template v-else>
+      <PageSection title="模型资产管理">
+        <ListToolbar
+          v-model:search="search"
+          search-placeholder="搜索资产 ID、标准名、显示名"
+          create-text="创建模型资产"
+          @refresh="loadAssets"
+          @create="openAssetDrawer()"
+        />
+        <a-table
+          :data-source="filteredAssets"
+          :loading="loading"
+          row-key="assetId"
+          :scroll="{ x: 920 }"
+          :row-class-name="(record) => record.assetId === selectedAssetId ? 'model-assets-page__selected-row' : ''"
+          :custom-row="(record) => ({ onClick: () => { selectedAssetId = record.assetId; } })"
+        >
+          <a-table-column key="displayName" title="展示名">
+            <template #default="{ record }">{{ record.displayName || record.canonicalName || record.assetId }}</template>
           </a-table-column>
-          <a-table-column key="pricing" title="当前草稿价格">
-            <template #default="{ record }">{{ describePricing(record.pricing) }}</template>
-          </a-table-column>
-          <a-table-column key="actions" title="操作" width="320" fixed="right">
+          <a-table-column key="canonicalName" data-index="canonicalName" title="规范名" />
+          <a-table-column key="tags" title="标签">
             <template #default="{ record }">
               <a-space wrap size="small">
-                <a-button type="link" size="small" @click="openBindingDrawer(record)">编辑</a-button>
-                <a-button type="link" size="small" @click="toggleBinding(record)">{{ record.status === 'published' ? '下架' : '发布' }}</a-button>
-                <a-button type="link" size="small" @click="openGrantDrawer(record)">授权</a-button>
-                <a-button type="link" size="small" @click="openHistoryDrawer(record)">价格历史</a-button>
+                <a-tag v-for="tag in record.tags || []" :key="tag">{{ tag }}</a-tag>
               </a-space>
             </template>
           </a-table-column>
+          <a-table-column key="bindings" title="绑定数" width="100">
+            <template #default="{ record }">{{ record.bindings?.length || 0 }}</template>
+          </a-table-column>
+          <a-table-column key="actions" title="操作" width="120">
+            <template #default="{ record }">
+              <a-button type="link" size="small" @click.stop="openAssetDrawer(record)">编辑</a-button>
+            </template>
+          </a-table-column>
         </a-table>
-      </template>
-    </PageSection>
+      </PageSection>
 
-    <PageSection title="授权上下文">
-      <div class="model-assets-page__stats">
-        <article class="model-assets-page__stat"><span>账号数</span><strong>{{ accounts.length }}</strong></article>
-        <article class="model-assets-page__stat"><span>部门树节点</span><strong>{{ departments.length }}</strong></article>
-      </div>
-    </PageSection>
+      <PageSection :title="selectedAsset ? `发布绑定 · ${selectedAsset.displayName || selectedAsset.assetId}` : '发布绑定'">
+        <template #actions>
+          <a-space>
+            <a-button :disabled="!selectedAsset" @click="selectedAsset && openAssetDrawer(selectedAsset)">编辑资产</a-button>
+            <a-button type="primary" :disabled="!selectedAsset" @click="openBindingDrawer()">新建绑定</a-button>
+          </a-space>
+        </template>
+
+        <a-empty v-if="!selectedAsset" description="还没有模型资产，先创建一个资产。" />
+
+        <template v-else>
+          <div class="model-assets-page__summary">
+            <article class="model-assets-page__summary-card">
+              <span>简介</span>
+              <strong>{{ selectedAsset.intro || '-' }}</strong>
+            </article>
+            <article class="model-assets-page__summary-card">
+              <span>能力</span>
+              <strong>
+                模态：{{ selectedAsset.capabilities?.modalities?.join(', ') || '-' }}；
+                特性：{{ selectedAsset.capabilities?.features?.join(', ') || '-' }}；
+                请求类型：{{ selectedAsset.capabilities?.requestKinds?.join(', ') || '-' }}
+              </strong>
+            </article>
+          </div>
+
+          <a-table :data-source="selectedBindings" row-key="bindingId" :scroll="{ x: 1160 }">
+            <a-table-column key="modelId" data-index="modelId" title="模型 ID" />
+            <a-table-column key="providerName" data-index="providerName" title="Provider" />
+            <a-table-column key="targetModel" data-index="targetModel" title="目标模型" />
+            <a-table-column key="status" title="状态" width="120">
+              <template #default="{ record }">
+                <a-tag :color="statusColorMap[record.status] || 'default'">{{ record.status || 'draft' }}</a-tag>
+              </template>
+            </a-table-column>
+            <a-table-column key="pricing" title="当前草稿价格">
+              <template #default="{ record }">{{ describePricing(record.pricing) }}</template>
+            </a-table-column>
+            <a-table-column key="actions" title="操作" width="320" fixed="right">
+              <template #default="{ record }">
+                <a-space wrap size="small">
+                  <a-button type="link" size="small" @click="openBindingDrawer(record)">编辑</a-button>
+                  <a-button type="link" size="small" @click="toggleBinding(record)">{{ record.status === 'published' ? '下架' : '发布' }}</a-button>
+                  <a-button type="link" size="small" @click="openGrantDrawer(record)">授权</a-button>
+                  <a-button type="link" size="small" @click="openHistoryDrawer(record)">价格历史</a-button>
+                </a-space>
+              </template>
+            </a-table-column>
+          </a-table>
+        </template>
+      </PageSection>
+
+      <PageSection title="授权上下文">
+        <div class="model-assets-page__stats">
+          <article class="model-assets-page__stat"><span>账号数</span><strong>{{ accounts.length }}</strong></article>
+          <article class="model-assets-page__stat"><span>部门树节点</span><strong>{{ departments.length }}</strong></article>
+        </div>
+      </PageSection>
+    </template>
 
     <ModelAssetDrawer
       v-model:open="assetDrawerOpen"

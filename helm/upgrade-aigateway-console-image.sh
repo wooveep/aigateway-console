@@ -3,7 +3,7 @@ set -eu
 
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 ROOT_DIR="$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd)"
-IMAGE_NAME="${IMAGE_NAME:-aigateway-console:ai-quota-menu}"
+IMAGE_NAME="${IMAGE_NAME:-aigateway/console:dev}"
 RELEASE_NAME="${RELEASE_NAME:-aigateway}"
 NAMESPACE="${NAMESPACE:-aigateway-system}"
 CONSOLE_DEPLOYMENT_NAME="${CONSOLE_DEPLOYMENT_NAME:-aigateway-console}"

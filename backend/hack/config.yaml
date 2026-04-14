@@ -17,18 +17,19 @@ server:
 
 clients:
   k8s:
-    enabled: false
+    enabled: true
     namespace: "aigateway-system"
     kubectlBin: "kubectl"
     kubeconfig: ""
     resourcePrefix: "aigw-console"
+    ingressClass: "aigateway"
   portaldb:
     enabled: false
     driver: "mysql"
     dsn: ""
-    autoMigrate: true
+    autoMigrate: false
   grafana:
-    enabled: false
-    baseURL: ""
+    enabled: true
+    baseURL: "http://127.0.0.1:3000"
     username: ""
     password: ""

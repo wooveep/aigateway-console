@@ -1,8 +1,12 @@
 import { ModelAsset, ModelAssetBinding, ModelAssetOptions, ModelBindingPriceVersion } from '@/interfaces/model-asset';
-import request from './request';
+import request, { RequestOptions } from './request';
+
+const QUIET_PORTAL_REQUEST_OPTIONS: RequestOptions = {
+  skipErrorModal: true,
+};
 
 export const getModelAssets = (): Promise<ModelAsset[]> => {
-  return request.get<any, ModelAsset[]>('/v1/ai/model-assets');
+  return request.get<any, ModelAsset[]>('/v1/ai/model-assets', QUIET_PORTAL_REQUEST_OPTIONS);
 };
 
 export const getModelAsset = (assetId: string): Promise<ModelAsset> => {

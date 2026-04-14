@@ -5,6 +5,7 @@ type PluginIdentity = Partial<Pick<WasmPluginData, 'name' | 'key' | 'category'>>
 export const QueryType = {
   ROUTE: 'route',
   DOMAIN: 'domain',
+  SERVICE: 'service',
   AI_ROUTE: 'aiRoute',
 } as const;
 
@@ -12,6 +13,7 @@ export const PluginVisibilityScope = {
   GLOBAL: 'global',
   ROUTE: QueryType.ROUTE,
   DOMAIN: QueryType.DOMAIN,
+  SERVICE: QueryType.SERVICE,
   AI_ROUTE: QueryType.AI_ROUTE,
 } as const;
 
@@ -75,6 +77,15 @@ const VISIBLE_PLUGIN_NAMES_BY_SCOPE: PluginVisibilityConfig = {
     [PluginVisibilityCategory.O11Y]: [],
     [PluginVisibilityCategory.CUSTOM]: [],
   },
+  [PluginVisibilityScope.SERVICE]: {
+    [PluginVisibilityCategory.AI]: ['ai-data-masking', 'ai-quota', 'ai-statistics'],
+    [PluginVisibilityCategory.AUTH]: [],
+    [PluginVisibilityCategory.SECURITY]: [],
+    [PluginVisibilityCategory.TRAFFIC]: [],
+    [PluginVisibilityCategory.TRANSFORM]: [],
+    [PluginVisibilityCategory.O11Y]: [],
+    [PluginVisibilityCategory.CUSTOM]: [],
+  },
   [PluginVisibilityScope.AI_ROUTE]: {
     [PluginVisibilityCategory.ROUTE]: [],
     [PluginVisibilityCategory.AI]: ['ai-data-masking', 'ai-quota', 'ai-statistics'],
@@ -97,6 +108,9 @@ export function buildPluginTargetPath(type?: string | null, name?: string | null
   if (type === QueryType.DOMAIN) {
     return `/domain/config?type=domain&name=${encodeURIComponent(name)}`;
   }
+  if (type === QueryType.SERVICE) {
+    return `/service/config?type=service&name=${encodeURIComponent(name)}`;
+  }
   if (type === QueryType.AI_ROUTE) {
     return `/ai/route/config?type=aiRoute&name=${encodeURIComponent(name)}`;
   }
@@ -109,6 +123,9 @@ export function resolvePluginVisibilityScope(queryType?: string): PluginVisibili
   }
   if (queryType === QueryType.DOMAIN) {
     return PluginVisibilityScope.DOMAIN;
+  }
+  if (queryType === QueryType.SERVICE) {
+    return PluginVisibilityScope.SERVICE;
   }
   if (queryType === QueryType.AI_ROUTE) {
     return PluginVisibilityScope.AI_ROUTE;

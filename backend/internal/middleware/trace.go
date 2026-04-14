@@ -5,7 +5,7 @@ import (
 	"github.com/gogf/gf/v2/net/ghttp"
 	"github.com/google/uuid"
 
-	"github.com/alibaba/aigateway-group/aigateway-console/backend/internal/consts"
+	"github.com/wooveep/aigateway-console/backend/internal/consts"
 )
 
 func Trace(r *ghttp.Request) {

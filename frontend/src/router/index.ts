@@ -22,6 +22,10 @@ router.beforeEach(async (to) => {
     return `/init`;
   }
 
+  if (appStore.isInitialized && to.path === '/init') {
+    return '/login';
+  }
+
   if (appStore.isInitialized && !appStore.isAuthenticated && to.meta.auth) {
     return `/login?redirect=${encodeURIComponent(to.fullPath)}`;
   }

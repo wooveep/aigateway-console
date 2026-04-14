@@ -6,7 +6,7 @@ import (
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
 
-	"github.com/alibaba/aigateway-group/aigateway-console/backend/internal/consts"
+	"github.com/wooveep/aigateway-console/backend/internal/consts"
 )
 
 func AccessLog(r *ghttp.Request) {

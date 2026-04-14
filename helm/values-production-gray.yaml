@@ -33,7 +33,7 @@ pluginServer:
 certmanager:
   image:
     repository: aigateway
-    tag: v1.11.0
+    tag: dev-20260327030541
 
 portalDatabase:
   enabled: false

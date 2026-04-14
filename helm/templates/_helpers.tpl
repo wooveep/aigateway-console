@@ -40,6 +40,15 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 {{- end }}
 
+{{- define "aigateway-console.clusterDomain" -}}
+{{- .Values.global.proxy.clusterDomain | default "cluster.local" -}}
+{{- end }}
+
+{{- define "aigateway-console.serviceHost" -}}
+{{- $ctx := .context -}}
+{{- printf "%s.%s.svc.%s" .service $ctx.Release.Namespace (include "aigateway-console.clusterDomain" $ctx) -}}
+{{- end }}
+
 {{/*
 Admin Password
 */}}
@@ -103,6 +112,6 @@ Create the default plugin server URL pattern.
 {{- if .Values.pluginServer.urlPattern -}}
 {{- .Values.pluginServer.urlPattern -}}
 {{- else -}}
-{{- printf "http://%s.%s.svc/plugins/${name}/${version}/plugin.wasm" (.Values.pluginServer.serviceName | default "aigateway-plugin-server") .Release.Namespace -}}
+{{- printf "http://%s/plugins/${name}/${version}/plugin.wasm" (include "aigateway-console.serviceHost" (dict "context" . "service" (.Values.pluginServer.serviceName | default "aigateway-plugin-server"))) -}}
 {{- end -}}
 {{- end }}

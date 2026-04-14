@@ -109,6 +109,11 @@ export const routes: RouteRecordRaw[] = [
     meta: { titleKey: 'menu.serviceList', auth: true, navKey: 'service' },
   },
   {
+    path: '/service/config',
+    component: () => import('@/views/plugin/PluginPage.vue'),
+    meta: { titleKey: 'menu.pluginManagement', auth: true, navKey: 'service' },
+  },
+  {
     path: '/route',
     component: () => import('@/views/gateway/RoutePage.vue'),
     meta: { titleKey: 'menu.routeConfig', auth: true, navKey: 'route' },
@@ -146,6 +151,11 @@ export const routes: RouteRecordRaw[] = [
   {
     path: '/system',
     component: () => import('@/views/system/SystemPage.vue'),
+    meta: { titleKey: 'menu.systemSettings', auth: true, navKey: 'system' },
+  },
+  {
+    path: '/system/jobs',
+    component: () => import('@/views/system/SystemJobsPage.vue'),
     meta: { titleKey: 'menu.systemSettings', auth: true, navKey: 'system' },
   },
   {

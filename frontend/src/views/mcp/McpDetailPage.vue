@@ -18,7 +18,8 @@ async function load() {
     return;
   }
   record.value = await getMcpServer(name).catch(() => null);
-  consumers.value = await listMcpConsumers({ mcpServerName: name, pageNum: 1, pageSize: 200 }).catch(() => []);
+  const result = await listMcpConsumers({ mcpServerName: name, pageNum: 1, pageSize: 200 }).catch(() => ({ data: [] }));
+  consumers.value = Array.isArray(result) ? result : (result.data || []);
 }
 
 watch(() => route.fullPath, load);

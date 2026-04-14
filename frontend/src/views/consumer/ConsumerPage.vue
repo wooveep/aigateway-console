@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
 import PageSection from '@/components/common/PageSection.vue';
+import PortalUnavailableState from '@/components/common/PortalUnavailableState.vue';
 import StatusTag from '@/components/common/StatusTag.vue';
+import { usePortalAvailability } from '@/composables/usePortalAvailability';
 import { showCopyValueModal, showError, showSuccess } from '@/lib/feedback';
 import { formatDateTimeDisplay } from '@/utils/time';
 import { useI18n } from 'vue-i18n';
-import type { InviteCodeRecord } from '@/interfaces/consumer';
+import type { ConsumerDetail, InviteCodeRecord } from '@/interfaces/consumer';
 import type { OrgAccountRecord, OrgDepartmentNode } from '@/interfaces/org';
 import {
   createOrgAccount,
@@ -19,11 +21,13 @@ import {
   createInviteCode,
   disableInviteCode,
   enableInviteCode,
+  getConsumerDetail,
   listInviteCodes,
   resetConsumerPassword,
 } from '@/services/consumer';
 
 const { t } = useI18n();
+const { portalUnavailable } = usePortalAvailability();
 
 const loading = ref(false);
 const inviteLoading = ref(false);
@@ -36,7 +40,10 @@ const inviteCodes = ref<InviteCodeRecord[]>([]);
 const selectedDepartmentId = ref<string>();
 const accountModalOpen = ref(false);
 const departmentModalOpen = ref(false);
+const detailOpen = ref(false);
+const detailLoading = ref(false);
 const editingAccount = ref<OrgAccountRecord | null>(null);
+const consumerDetail = ref<ConsumerDetail | null>(null);
 
 const accountFormRef = ref();
 const departmentFormRef = ref();
@@ -123,6 +130,14 @@ function resolveUserLevelText(level?: string) {
 }
 
 async function load() {
+  if (portalUnavailable.value) {
+    departments.value = [];
+    accounts.value = [];
+    inviteCodes.value = [];
+    loading.value = false;
+    inviteLoading.value = false;
+    return;
+  }
   loading.value = true;
   inviteLoading.value = true;
   try {
@@ -245,6 +260,42 @@ async function handleStatus(record: OrgAccountRecord, status: 'active' | 'disabl
   }
 }
 
+async function openConsumerDetail(record: OrgAccountRecord) {
+  detailOpen.value = true;
+  detailLoading.value = true;
+  consumerDetail.value = null;
+  try {
+    consumerDetail.value = await getConsumerDetail(record.consumerName);
+  } catch {
+    showError('加载 Consumer 详情失败');
+  } finally {
+    detailLoading.value = false;
+  }
+}
+
+function resolveCredentialList(detail?: ConsumerDetail | null) {
+  if (!detail?.credentials || !Array.isArray(detail.credentials)) {
+    return [];
+  }
+  return detail.credentials
+    .flatMap((item) => {
+      if (!item) {
+        return [];
+      }
+      if (typeof item === 'string') {
+        return [item];
+      }
+      if (Array.isArray((item as any).values)) {
+        return (item as any).values;
+      }
+      if ((item as any).value) {
+        return [(item as any).value];
+      }
+      return [];
+    })
+    .filter((item) => String(item || '').trim() !== '');
+}
+
 async function handleInviteStatus(record: InviteCodeRecord, status: 'active' | 'disabled') {
   try {
     if (status === 'active') {
@@ -280,124 +331,131 @@ onMounted(load);
 
 <template>
   <div class="consumer-page">
-    <div class="consumer-page__layout">
-      <PageSection :title="t('consumer.departmentTree')" subtle>
+    <PageSection v-if="portalUnavailable" :title="t('menu.consumerManagement')">
+      <PortalUnavailableState />
+    </PageSection>
+
+    <template v-else>
+      <div class="consumer-page__layout">
+        <PageSection :title="t('consumer.departmentTree')" subtle>
+          <template #actions>
+            <a-button size="small" @click="openCreateDepartment">{{ t('consumer.createDepartment') }}</a-button>
+          </template>
+
+          <a-tree
+            :tree-data="departmentTreeData"
+            block-node
+            @select="handleDepartmentSelect"
+          />
+        </PageSection>
+
+        <PageSection :title="t('menu.consumerManagement')">
+          <template #actions>
+            <a-button @click="load">{{ t('misc.refresh') }}</a-button>
+            <a-button type="primary" @click="openCreateAccount">{{ t('consumer.create') }}</a-button>
+          </template>
+
+          <a-table
+            :data-source="filteredAccounts"
+            :loading="loading"
+            row-key="consumerName"
+            :scroll="{ x: 920 }"
+            size="middle"
+          >
+            <a-table-column key="consumerName" data-index="consumerName" :title="t('consumer.columns.name')" />
+            <a-table-column key="displayName" data-index="displayName" :title="t('consumer.columns.displayName')" />
+            <a-table-column key="departmentPath" :title="t('consumer.columns.department')">
+              <template #default="{ record }">
+                {{ record.departmentPath || t('consumer.notAssigned') }}
+              </template>
+            </a-table-column>
+            <a-table-column key="userLevel" :title="t('consumer.columns.userLevel')">
+              <template #default="{ record }">
+                {{ resolveUserLevelText(record.userLevel) }}
+              </template>
+            </a-table-column>
+            <a-table-column key="status" :title="t('consumer.columns.portalStatus')">
+              <template #default="{ record }">
+                <StatusTag :value="record.status" :text="resolveAccountStatusText(record.status)" />
+              </template>
+            </a-table-column>
+            <a-table-column key="actions" :title="t('misc.actions')" fixed="right" width="220">
+              <template #default="{ record }">
+                <a-button type="link" size="small" @click="openConsumerDetail(record)">详情</a-button>
+                <a-button type="link" size="small" @click="openEditAccount(record)">{{ t('misc.edit') }}</a-button>
+                <a-button type="link" size="small" @click="handleResetPassword(record)">{{ t('consumer.resetPassword') }}</a-button>
+                <a-button
+                  v-if="String(record.status || '').toLowerCase() === 'active'"
+                  type="link"
+                  size="small"
+                  danger
+                  @click="handleStatus(record, 'disabled')"
+                >
+                  {{ t('consumer.disable') }}
+                </a-button>
+                <a-button
+                  v-else
+                  type="link"
+                  size="small"
+                  @click="handleStatus(record, 'active')"
+                >
+                  {{ t('consumer.enable') }}
+                </a-button>
+              </template>
+            </a-table-column>
+          </a-table>
+        </PageSection>
+      </div>
+
+      <PageSection :title="t('consumer.inviteCode.manage')">
         <template #actions>
-          <a-button size="small" @click="openCreateDepartment">{{ t('consumer.createDepartment') }}</a-button>
+          <a-button type="primary" @click="createInvite">{{ t('consumer.inviteCode.create') }}</a-button>
         </template>
 
-        <a-tree
-          :tree-data="departmentTreeData"
-          block-node
-          @select="handleDepartmentSelect"
-        />
-      </PageSection>
-
-      <PageSection :title="t('menu.consumerManagement')">
-        <template #actions>
-          <a-button @click="load">{{ t('misc.refresh') }}</a-button>
-          <a-button type="primary" @click="openCreateAccount">{{ t('consumer.create') }}</a-button>
-        </template>
-
-        <a-table
-          :data-source="filteredAccounts"
-          :loading="loading"
-          row-key="consumerName"
-          :scroll="{ x: 920 }"
-          size="middle"
-        >
-          <a-table-column key="consumerName" data-index="consumerName" :title="t('consumer.columns.name')" />
-          <a-table-column key="displayName" data-index="displayName" :title="t('consumer.columns.displayName')" />
-          <a-table-column key="departmentPath" :title="t('consumer.columns.department')">
+        <a-table :data-source="inviteCodes" :loading="inviteLoading" row-key="inviteCode" size="small" :scroll="{ x: 980 }">
+          <a-table-column key="inviteCode" data-index="inviteCode" :title="t('consumer.inviteCode.columns.code')" />
+          <a-table-column key="status" :title="t('consumer.inviteCode.columns.status')">
             <template #default="{ record }">
-              {{ record.departmentPath || t('consumer.notAssigned') }}
+              <StatusTag :value="record.status" :text="resolveInviteStatusText(record.status)" />
             </template>
           </a-table-column>
-          <a-table-column key="userLevel" :title="t('consumer.columns.userLevel')">
-            <template #default="{ record }">
-              {{ resolveUserLevelText(record.userLevel) }}
-            </template>
+          <a-table-column key="expiresAt" :title="t('consumer.inviteCode.columns.expiresAt')">
+            <template #default="{ record }">{{ formatDateTimeDisplay(record.expiresAt) }}</template>
           </a-table-column>
-          <a-table-column key="status" :title="t('consumer.columns.portalStatus')">
-            <template #default="{ record }">
-              <StatusTag :value="record.status" :text="resolveAccountStatusText(record.status)" />
-            </template>
+          <a-table-column key="usedByConsumer" :title="t('consumer.inviteCode.columns.usedBy')">
+            <template #default="{ record }">{{ record.usedByConsumer || '-' }}</template>
           </a-table-column>
-          <a-table-column key="actions" :title="t('misc.actions')" fixed="right" width="220">
+          <a-table-column key="usedAt" :title="t('consumer.inviteCode.columns.usedAt')">
+            <template #default="{ record }">{{ formatDateTimeDisplay(record.usedAt) }}</template>
+          </a-table-column>
+          <a-table-column key="createdAt" :title="t('consumer.inviteCode.columns.createdAt')">
+            <template #default="{ record }">{{ formatDateTimeDisplay(record.createdAt) }}</template>
+          </a-table-column>
+          <a-table-column key="actions" :title="t('misc.actions')" width="120">
             <template #default="{ record }">
-              <a-button type="link" size="small" @click="openEditAccount(record)">{{ t('misc.edit') }}</a-button>
-              <a-button type="link" size="small" @click="handleResetPassword(record)">{{ t('consumer.resetPassword') }}</a-button>
               <a-button
                 v-if="String(record.status || '').toLowerCase() === 'active'"
                 type="link"
                 size="small"
                 danger
-                @click="handleStatus(record, 'disabled')"
+                @click="handleInviteStatus(record, 'disabled')"
               >
-                {{ t('consumer.disable') }}
+                {{ t('consumer.inviteCode.disable') }}
               </a-button>
               <a-button
-                v-else
+                v-else-if="String(record.status || '').toLowerCase() === 'disabled'"
                 type="link"
                 size="small"
-                @click="handleStatus(record, 'active')"
+                @click="handleInviteStatus(record, 'active')"
               >
-                {{ t('consumer.enable') }}
+                {{ t('consumer.inviteCode.enable') }}
               </a-button>
+              <span v-else>-</span>
             </template>
           </a-table-column>
         </a-table>
       </PageSection>
-    </div>
-
-    <PageSection :title="t('consumer.inviteCode.manage')">
-      <template #actions>
-        <a-button type="primary" @click="createInvite">{{ t('consumer.inviteCode.create') }}</a-button>
-      </template>
-
-      <a-table :data-source="inviteCodes" :loading="inviteLoading" row-key="inviteCode" size="small" :scroll="{ x: 980 }">
-        <a-table-column key="inviteCode" data-index="inviteCode" :title="t('consumer.inviteCode.columns.code')" />
-        <a-table-column key="status" :title="t('consumer.inviteCode.columns.status')">
-          <template #default="{ record }">
-            <StatusTag :value="record.status" :text="resolveInviteStatusText(record.status)" />
-          </template>
-        </a-table-column>
-        <a-table-column key="expiresAt" :title="t('consumer.inviteCode.columns.expiresAt')">
-          <template #default="{ record }">{{ formatDateTimeDisplay(record.expiresAt) }}</template>
-        </a-table-column>
-        <a-table-column key="usedByConsumer" :title="t('consumer.inviteCode.columns.usedBy')">
-          <template #default="{ record }">{{ record.usedByConsumer || '-' }}</template>
-        </a-table-column>
-        <a-table-column key="usedAt" :title="t('consumer.inviteCode.columns.usedAt')">
-          <template #default="{ record }">{{ formatDateTimeDisplay(record.usedAt) }}</template>
-        </a-table-column>
-        <a-table-column key="createdAt" :title="t('consumer.inviteCode.columns.createdAt')">
-          <template #default="{ record }">{{ formatDateTimeDisplay(record.createdAt) }}</template>
-        </a-table-column>
-        <a-table-column key="actions" :title="t('misc.actions')" width="120">
-          <template #default="{ record }">
-            <a-button
-              v-if="String(record.status || '').toLowerCase() === 'active'"
-              type="link"
-              size="small"
-              danger
-              @click="handleInviteStatus(record, 'disabled')"
-            >
-              {{ t('consumer.inviteCode.disable') }}
-            </a-button>
-            <a-button
-              v-else-if="String(record.status || '').toLowerCase() === 'disabled'"
-              type="link"
-              size="small"
-              @click="handleInviteStatus(record, 'active')"
-            >
-              {{ t('consumer.inviteCode.enable') }}
-            </a-button>
-            <span v-else>-</span>
-          </template>
-        </a-table-column>
-      </a-table>
-    </PageSection>
+    </template>
 
     <a-modal
       v-model:open="accountModalOpen"
@@ -477,6 +535,42 @@ onMounted(load);
         </a-form-item>
       </a-form>
     </a-modal>
+
+    <a-drawer v-model:open="detailOpen" width="720" title="Consumer 详情" destroy-on-close>
+      <a-skeleton :loading="detailLoading" active>
+        <a-empty v-if="!consumerDetail" description="暂无可展示的 Consumer 详情" />
+        <div v-else class="consumer-page__detail">
+          <a-descriptions bordered size="small" :column="2">
+            <a-descriptions-item label="Consumer Name">{{ consumerDetail.name || '-' }}</a-descriptions-item>
+            <a-descriptions-item label="状态">{{ resolveAccountStatusText(consumerDetail.portalStatus) }}</a-descriptions-item>
+            <a-descriptions-item label="显示名">{{ consumerDetail.portalDisplayName || '-' }}</a-descriptions-item>
+            <a-descriptions-item label="邮箱">{{ consumerDetail.portalEmail || '-' }}</a-descriptions-item>
+            <a-descriptions-item label="用户等级">{{ resolveUserLevelText(consumerDetail.portalUserLevel) }}</a-descriptions-item>
+            <a-descriptions-item label="用户来源">{{ consumerDetail.portalUserSource || '-' }}</a-descriptions-item>
+            <a-descriptions-item label="部门">{{ consumerDetail.department || '-' }}</a-descriptions-item>
+            <a-descriptions-item label="部门 ID">{{ consumerDetail.departmentId || '-' }}</a-descriptions-item>
+            <a-descriptions-item label="部门路径" :span="2">{{ consumerDetail.departmentPath || '-' }}</a-descriptions-item>
+            <a-descriptions-item label="创建时间">{{ formatDateTimeDisplay(consumerDetail.createdAt) }}</a-descriptions-item>
+            <a-descriptions-item label="更新时间">{{ formatDateTimeDisplay(consumerDetail.updatedAt) }}</a-descriptions-item>
+            <a-descriptions-item label="最近登录" :span="2">{{ formatDateTimeDisplay(consumerDetail.lastLoginAt) }}</a-descriptions-item>
+          </a-descriptions>
+
+          <PageSection title="可见凭证概要" subtle>
+            <a-empty v-if="!resolveCredentialList(consumerDetail).length" description="当前没有可展示的活跃凭证。" />
+            <a-list
+              v-else
+              size="small"
+              bordered
+              :data-source="resolveCredentialList(consumerDetail)"
+            >
+              <template #renderItem="{ item }">
+                <a-list-item>{{ item }}</a-list-item>
+              </template>
+            </a-list>
+          </PageSection>
+        </div>
+      </a-skeleton>
+    </a-drawer>
   </div>
 </template>
 
@@ -489,6 +583,11 @@ onMounted(load);
 .consumer-page__layout {
   display: grid;
   grid-template-columns: 320px minmax(0, 1fr);
+  gap: 18px;
+}
+
+.consumer-page__detail {
+  display: grid;
   gap: 18px;
 }
 

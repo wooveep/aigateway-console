@@ -15,6 +15,7 @@ const (
 	DefaultAdminCookieName     = "_hi_sess"
 	DefaultAdminCookieMaxAge   = 30 * 24 * 60 * 60
 	DefaultAdminDisplayName    = "AIGateway Admin"
+	DefaultAdminStateKey       = "default"
 	DefaultConfigMapName       = "aigateway-console"
 	DefaultSecretName          = "aigateway-console"
 	DefaultDashboardUIDMain    = "aigateway-main"

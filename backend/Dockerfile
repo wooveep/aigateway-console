@@ -2,20 +2,29 @@ FROM golang:1.25-alpine AS builder
 
 WORKDIR /src
 
+RUN apk add --no-cache git ca-certificates tzdata
+
 COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /out/main main.go
+ARG TARGETOS
+ARG TARGETARCH
+RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} \
+    go build -trimpath -ldflags='-s -w' -o /out/aigateway-console main.go
 
 FROM alpine:3.20
 
 WORKDIR /app
 
-COPY --from=builder /out/main /app/main
+RUN apk add --no-cache ca-certificates tzdata && \
+    addgroup -S app && adduser -S -G app app
+
+COPY --from=builder /out/aigateway-console /app/aigateway-console
 COPY resource /app/resource
 COPY manifest/config /app/manifest/config
 
 EXPOSE 8080
+USER app
 
-CMD ["./main"]
+CMD ["/app/aigateway-console"]

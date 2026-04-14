@@ -27,7 +27,7 @@
 
 ## 报告一般问题
 
-老实说，我们把每一个 AIGateway Console 用户都视为非常善良的贡献者。在体验了 AIGateway 之后，您可能会对项目有一些反馈。然后随时通过 [NEW ISSUE](https://github.com/alibaba/aigateway-group/aigateway-console/issues/new/choose)打开一个问题。
+老实说，我们把每一个 AIGateway Console 用户都视为非常善良的贡献者。在体验了 AIGateway 之后，您可能会对项目有一些反馈。然后随时通过 [NEW ISSUE](https://github.com/wooveep/aigateway-console/issues/new/choose)打开一个问题。
 
 因为 AIGateway Console 是一个分布式合作的项目，所以我们非常提倡详细的、准确的问题报告。为了提升沟通效率，我们希望每个人在提出问题前先在列表中进行搜索。如果相应的问题已经存在，请在现有问题下的评论中添加您的详细信息，而不是创建一个新的问题。
 
@@ -79,15 +79,15 @@
 
 为了提出 PR，我们假设你已经注册了一个 GitHub ID。然后您可以通过以下步骤完成准备工作：
 
-1. **FORK** AIGateway Console 到您的代码仓库。要完成这项工作，您只需单击 [alibaba/aigateway-group/aigateway-console](https://github.com/alibaba/aigateway-group/aigateway-console) 主页右侧的 Fork 按钮。然后你将在 
+1. **FORK** AIGateway Console 到您的代码仓库。要完成这项工作，您只需单击 [wooveep/aigateway-console](https://github.com/wooveep/aigateway-console) 主页右侧的 Fork 按钮。然后你将在 
    中得到你的存储库`https://github.com/<your-username>/aigateway-console`，其中`your-username`是你的 GitHub 用户名。
 
 2. **克隆** 您自己的代码仓库到本地并进行开发。使用 `git clone git@github.com:<your-username>/aigateway-console.git` 命令将代码仓库克隆到本地计算机。 然后您可以创建新分支来完成您希望进行的更改。
 
-3. **设置远程** 使用以下两个命令将仓库上游设置为 `git@github.com:alibaba/aigateway-group/aigateway-console.git`：
+3. **设置远程** 使用以下两个命令将仓库上游设置为 `git@github.com:wooveep/aigateway-console.git`：
 
 ```bash
-git remote add upstream git@github.com:alibaba/aigateway-group/aigateway-console.git
+git remote add upstream git@github.com:wooveep/aigateway-console.git
 git remote set-url --push upstream no-pushing
 ```
 
@@ -97,7 +97,7 @@ git remote set-url --push upstream no-pushing
 $ git remote -v
 origin     git@github.com:\<your-username\>/aigateway-console.git (fetch)
 origin     git@github.com:\<your-username\>/aigateway-console.git (push)
-upstream   git@github.com:alibaba/aigateway-group/aigateway-console.git (fetch)
+upstream   git@github.com:wooveep/aigateway-console.git (fetch)
 upstream   no-pushing (push)
 ```
 
@@ -105,7 +105,7 @@ upstream   no-pushing (push)
 
 ### 分支定义
 
-现在我们假设通过拉取请求进行的每个贡献都是针对 AIGateway Console 中的 [主分支](https://github.com/alibaba/aigateway-group/aigateway-console/tree/main) 。在贡献之前，请注意分支定义会很有帮助。
+现在我们假设通过拉取请求进行的每个贡献都是针对 AIGateway Console 中的 [主分支](https://github.com/wooveep/aigateway-console/tree/main) 。在贡献之前，请注意分支定义会很有帮助。
 
 作为贡献者，请再次记住，通过拉取请求的每个贡献都是针对主分支的。而在 AIGateway Console 项目中，还有其他几种分支，我们一般称它们为 release 分支（如0.6.0、0.6.1）、feature 分支、hotfix 分支。
 
