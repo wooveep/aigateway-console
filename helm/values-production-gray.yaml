@@ -22,7 +22,7 @@ global:
 image:
   repository: aigateway/console
   pullPolicy: IfNotPresent
-  tag: "2.2.0-dev-20260422064512"
+  tag: "1.0.0"
 
 controller:
   serviceName: aigateway-controller
@@ -33,7 +33,7 @@ pluginServer:
 certmanager:
   image:
     repository: aigateway
-    tag: dev-20260419132939
+    tag: "1.0.0"
 
 portalDatabase:
   enabled: false
