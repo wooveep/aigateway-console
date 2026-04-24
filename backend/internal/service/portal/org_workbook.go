@@ -20,7 +20,7 @@ var (
 	orgDepartmentSheet = "Departments"
 	orgAccountSheet    = "Accounts"
 	orgDepartmentHead  = []string{"departmentId", "name", "parentDepartmentId", "adminConsumerName"}
-	orgAccountHead     = []string{"consumerName", "displayName", "email", "status", "userLevel", "departmentId", "parentConsumerName"}
+	orgAccountHead     = []string{"consumerName", "displayName", "email", "status", "userLevel", "departmentId"}
 )
 
 func (s *Service) DownloadOrgTemplate(ctx context.Context) ([]byte, error) {
@@ -138,13 +138,12 @@ func (s *Service) ImportOrganizationWorkbook(ctx context.Context, content []byte
 			continue
 		}
 		mutation := AccountMutation{
-			ConsumerName:       consumerName,
-			DisplayName:        strings.TrimSpace(record[1]),
-			Email:              strings.TrimSpace(record[2]),
-			Status:             strings.TrimSpace(record[3]),
-			UserLevel:          strings.TrimSpace(record[4]),
-			DepartmentID:       strings.TrimSpace(record[5]),
-			ParentConsumerName: strings.TrimSpace(record[6]),
+			ConsumerName: consumerName,
+			DisplayName:  strings.TrimSpace(record[1]),
+			Email:        strings.TrimSpace(record[2]),
+			Status:       strings.TrimSpace(record[3]),
+			UserLevel:    strings.TrimSpace(record[4]),
+			DepartmentID: strings.TrimSpace(record[5]),
 		}
 		if _, ok := accountsByName[consumerName]; ok {
 			if _, err := s.UpdateAccount(ctx, consumerName, mutation); err != nil {
@@ -228,7 +227,6 @@ func flattenAccountWorkbookRows(accounts []OrgAccountRecord) [][]string {
 			item.Status,
 			item.UserLevel,
 			item.DepartmentID,
-			item.ParentConsumerName,
 		})
 	}
 	return rows

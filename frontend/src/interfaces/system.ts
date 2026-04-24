@@ -74,3 +74,24 @@ export interface HigressGlobalConfigParseResult {
   rawYaml: string;
   unknownTree: Record<string, unknown>;
 }
+
+export interface PortalSSOClaimMapping {
+  email: string;
+  displayName: string;
+  username: string;
+}
+
+export interface PortalSSOConfigRecord {
+  enabled: boolean;
+  providerType: string;
+  displayName: string;
+  issuerUrl: string;
+  clientId: string;
+  clientSecret?: string;
+  clientSecretMasked?: string;
+  clientSecretConfigured: boolean;
+  scopes: string[];
+  claimMapping: PortalSSOClaimMapping;
+  updatedBy?: string;
+  updatedAt?: string;
+}

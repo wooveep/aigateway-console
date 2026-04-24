@@ -16,6 +16,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	portalsvc "github.com/wooveep/aigateway-console/backend/internal/service/portal"
+	k8sclient "github.com/wooveep/aigateway-console/backend/utility/clients/k8s"
 )
 
 var (
@@ -450,8 +451,13 @@ func normalizeAIProvider(payload map[string]any) (map[string]any, error) {
 	payload["type"] = providerType
 	payload["rawConfigs"] = rawConfigs
 
-	if protocol := strings.TrimSpace(fmt.Sprint(payload["protocol"])); protocol != "" {
-		payload["protocol"] = protocol
+	protocol := k8sclient.NormalizeProviderProtocolCanonical(strings.TrimSpace(fmt.Sprint(payload["protocol"])))
+	if !k8sclient.IsSupportedProviderProtocol(protocol) {
+		return nil, fmt.Errorf("unsupported provider protocol %s", strings.TrimSpace(fmt.Sprint(payload["protocol"])))
+	}
+	payload["protocol"] = protocol
+	if protocol == k8sclient.AIProviderProtocolAuto {
+		payload["protocol"] = k8sclient.AIProviderProtocolAuto
 	}
 	tokens := normalizeStringSlice(payload["tokens"])
 	if len(tokens) > 0 {

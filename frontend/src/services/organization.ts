@@ -2,6 +2,7 @@ import {
   AssetGrantRecord,
   OrgAccountMutation,
   OrgAccountRecord,
+  OrgAccountSSORebindRequest,
   OrgDepartmentMoveRequest,
   OrgImportResult,
   OrgDepartmentMutation,
@@ -21,7 +22,7 @@ export const createOrgDepartment = (payload: OrgDepartmentMutation): Promise<Org
   return request.post<any, OrgDepartmentNode>('/v1/org/departments', payload);
 };
 
-export const updateOrgDepartment = (departmentId: string, payload: Pick<OrgDepartmentMutation, 'name'>): Promise<OrgDepartmentNode> => {
+export const updateOrgDepartment = (departmentId: string, payload: OrgDepartmentMutation): Promise<OrgDepartmentNode> => {
   return request.put<any, OrgDepartmentNode>(`/v1/org/departments/${departmentId}`, payload);
 };
 
@@ -45,9 +46,23 @@ export const updateOrgAccount = (consumerName: string, payload: OrgAccountMutati
   return request.put<any, OrgAccountRecord>(`/v1/org/accounts/${consumerName}`, payload);
 };
 
+export const deleteOrgAccount = (consumerName: string): Promise<void> => {
+  return request.delete<any, any>(`/v1/org/accounts/${consumerName}`);
+};
+
+export const rebindOrgAccountSSOIdentity = (
+  consumerName: string,
+  payload: OrgAccountSSORebindRequest,
+): Promise<{ sourceConsumerName: string; targetConsumerName: string }> => {
+  return request.post<any, { sourceConsumerName: string; targetConsumerName: string }>(
+    `/v1/org/accounts/${consumerName}/sso/rebind`,
+    payload,
+  );
+};
+
 export const updateOrgAccountAssignment = (
   consumerName: string,
-  payload: Pick<OrgAccountMutation, 'departmentId' | 'parentConsumerName'>,
+  payload: Pick<OrgAccountMutation, 'departmentId'>,
 ): Promise<OrgAccountRecord> => {
   return request.patch<any, OrgAccountRecord>(`/v1/org/accounts/${consumerName}/assignment`, payload);
 };

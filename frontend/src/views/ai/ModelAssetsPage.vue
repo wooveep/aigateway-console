@@ -20,7 +20,7 @@ import {
   updateModelAsset,
   updateModelBinding,
 } from '@/services/model-asset';
-import { getLlmProviders } from '@/services/llm-provider';
+import { getLlmProviders, getProviderProtocolDirectory } from '@/services/llm-provider';
 import { listAssetGrants, listOrgAccounts, listOrgDepartmentsTree, replaceAssetGrants } from '@/services/organization';
 import { USER_LEVELS } from '@/utils/consumer-level';
 import { formatProviderDisplayName } from '@/features/llm-provider/provider-display';
@@ -45,6 +45,7 @@ const loading = ref(false);
 const search = ref('');
 const assets = ref<any[]>([]);
 const providers = ref<any[]>([]);
+const protocolDirectory = ref<any>(null);
 const assetOptions = ref<any>({
   capabilities: {
     modelTypes: [],
@@ -130,6 +131,7 @@ async function loadAssets() {
 async function loadSupportData() {
   if (portalUnavailable.value) {
     providers.value = [];
+    protocolDirectory.value = null;
     assetOptions.value = {
       capabilities: {
         modelTypes: [],
@@ -147,8 +149,9 @@ async function loadSupportData() {
     departments.value = [];
     return;
   }
-  const [nextProviders, nextAssetOptions, nextAccounts, nextDepartments] = await Promise.all([
+  const [nextProviders, nextProtocolDirectory, nextAssetOptions, nextAccounts, nextDepartments] = await Promise.all([
     getLlmProviders().catch(() => []),
+    getProviderProtocolDirectory().catch(() => null),
     getModelAssetOptions().catch(() => ({
       capabilities: {
         modelTypes: [],
@@ -166,6 +169,7 @@ async function loadSupportData() {
     listOrgDepartmentsTree().catch(() => []),
   ]);
   providers.value = nextProviders;
+  protocolDirectory.value = nextProtocolDirectory;
   assetOptions.value = nextAssetOptions;
   accounts.value = nextAccounts;
   departments.value = nextDepartments;
@@ -495,6 +499,7 @@ onMounted(async () => {
       :assets="assets"
       :selected-asset-id="selectedAssetId"
       :providers="providers"
+      :protocol-directory="protocolDirectory"
       :asset-options="assetOptions"
       :active-price-version="activePriceVersion"
       @submit="saveBinding"

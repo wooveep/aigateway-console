@@ -24,6 +24,10 @@ type builtinPluginRuleLoader interface {
 	LoadBuiltinPluginRules(ctx context.Context, pluginName string) (map[string]map[string]any, error)
 }
 
+type builtinPluginExecutionUpdater interface {
+	UpsertBuiltinWasmPluginExecution(ctx context.Context, pluginName, phase string, priority int) error
+}
+
 type portalReader interface {
 	ListAccounts(ctx context.Context) ([]portalsvc.OrgAccountRecord, error)
 	ListDepartmentTree(ctx context.Context) ([]*portalsvc.OrgDepartmentNode, error)
@@ -54,6 +58,14 @@ func (s *Service) List(ctx context.Context, kind string) ([]map[string]any, erro
 		return s.mergeWasmPlugins(items), nil
 	}
 	return s.hydrateResources(kind, items), nil
+}
+
+func (s *Service) ListWasmPlugins(ctx context.Context, lang string) ([]map[string]any, error) {
+	items, err := s.k8sClient.ListResources(ctx, "wasm-plugins")
+	if err != nil {
+		return nil, err
+	}
+	return s.mergeWasmPluginsWithLang(items, lang), nil
 }
 
 func (s *Service) Get(ctx context.Context, kind, name string) (map[string]any, error) {
@@ -88,6 +100,11 @@ func (s *Service) Save(ctx context.Context, kind string, payload map[string]any)
 	item, err := s.k8sClient.UpsertResource(ctx, kind, name, normalized)
 	if err != nil {
 		return nil, err
+	}
+	if kind == "wasm-plugins" {
+		if err := s.syncBuiltinWasmPluginExecution(ctx, name, normalized); err != nil {
+			return nil, err
+		}
 	}
 	if err := s.afterWrite(ctx, kind, "save"); err != nil {
 		return nil, err
@@ -134,6 +151,18 @@ func (s *Service) SwaggerToMCPConfig(content string) string {
 func (s *Service) GetPluginInstance(ctx context.Context, scope, target, pluginName string, aliases ...string) (map[string]any, error) {
 	item, err := s.k8sClient.GetResource(ctx, pluginInstanceKind(scope, target), pluginName)
 	if err == nil {
+		if scope == "route" {
+			runtimeItem, runtimeErr := s.getBuiltinRuntimePluginInstance(ctx, pluginName, append([]string{target}, aliases...))
+			if runtimeErr == nil {
+				return mergePluginInstanceRuntime(item, runtimeItem), nil
+			}
+		}
+		if scope == "global" {
+			runtimeItem, runtimeErr := s.getBuiltinGlobalPluginInstance(ctx, pluginName)
+			if runtimeErr == nil {
+				return mergePluginInstanceRuntime(item, runtimeItem), nil
+			}
+		}
 		return item, nil
 	}
 	if scope == "route" {
@@ -301,10 +330,7 @@ func (s *Service) mergeBuiltinRuntimePluginInstances(
 	seen := make(map[string]int, len(items))
 	for _, item := range items {
 		cloned := clonePayload(item)
-		pluginName := strings.TrimSpace(fmt.Sprint(cloned["pluginName"]))
-		if pluginName == "" {
-			pluginName = strings.TrimSpace(fmt.Sprint(cloned["name"]))
-		}
+		pluginName := pluginInstanceName(cloned)
 		if pluginName != "" {
 			seen[pluginName] = len(result)
 		}
@@ -452,6 +478,18 @@ func mergePluginInstanceRuntime(base, runtime map[string]any) map[string]any {
 	return merged
 }
 
+func pluginInstanceName(item map[string]any) string {
+	pluginName := strings.TrimSpace(fmt.Sprint(item["pluginName"]))
+	if pluginName != "" && pluginName != "<nil>" {
+		return pluginName
+	}
+	name := strings.TrimSpace(fmt.Sprint(item["name"]))
+	if name != "" && name != "<nil>" {
+		return name
+	}
+	return ""
+}
+
 func boolValue(value any) bool {
 	switch typed := value.(type) {
 	case bool:
@@ -461,6 +499,20 @@ func boolValue(value any) bool {
 	default:
 		return false
 	}
+}
+
+func (s *Service) syncBuiltinWasmPluginExecution(ctx context.Context, pluginName string, payload map[string]any) error {
+	legacy, ok := s.loadBuiltinWasmPlugin(pluginName)
+	if !ok {
+		return nil
+	}
+	phase := firstNonEmpty(stringValue(payload["phase"]), stringValue(legacy["phase"]))
+	priority := toInt(firstNonNil(payload["priority"], legacy["priority"]))
+	updater, ok := s.k8sClient.(builtinPluginExecutionUpdater)
+	if !ok {
+		return nil
+	}
+	return updater.UpsertBuiltinWasmPluginExecution(ctx, pluginName, phase, priority)
 }
 
 func mapValue(value any) map[string]any {

@@ -83,18 +83,20 @@ type ResetPasswordResult struct {
 }
 
 type OrgDepartmentNode struct {
-	DepartmentID       string               `json:"departmentId"`
-	Name               string               `json:"name"`
-	ParentDepartmentID string               `json:"parentDepartmentId,omitempty"`
-	AdminConsumerName  string               `json:"adminConsumerName,omitempty"`
-	Level              int                  `json:"level,omitempty"`
-	MemberCount        int                  `json:"memberCount,omitempty"`
-	Children           []*OrgDepartmentNode `json:"children,omitempty"`
+	DepartmentID             string               `json:"departmentId"`
+	Name                     string               `json:"name"`
+	ParentDepartmentID       string               `json:"parentDepartmentId,omitempty"`
+	AdminConsumerName        string               `json:"adminConsumerName,omitempty"`
+	CreatedAdminTempPassword string               `json:"createdAdminTempPassword,omitempty"`
+	Level                    int                  `json:"level,omitempty"`
+	MemberCount              int                  `json:"memberCount,omitempty"`
+	Children                 []*OrgDepartmentNode `json:"children,omitempty"`
 }
 
 type DepartmentMutation struct {
 	Name               string `json:"name"`
 	ParentDepartmentID string `json:"parentDepartmentId"`
+	AdminMode          string `json:"adminMode"`
 	AdminConsumerName  string `json:"adminConsumerName"`
 	AdminDisplayName   string `json:"adminDisplayName"`
 	AdminEmail         string `json:"adminEmail"`
@@ -103,30 +105,33 @@ type DepartmentMutation struct {
 }
 
 type OrgAccountRecord struct {
-	ConsumerName       string     `json:"consumerName"`
-	DisplayName        string     `json:"displayName,omitempty"`
-	Email              string     `json:"email,omitempty"`
-	Status             string     `json:"status,omitempty"`
-	UserLevel          string     `json:"userLevel,omitempty"`
-	Source             string     `json:"source,omitempty"`
-	DepartmentID       string     `json:"departmentId,omitempty"`
-	DepartmentName     string     `json:"departmentName,omitempty"`
-	DepartmentPath     string     `json:"departmentPath,omitempty"`
-	ParentConsumerName string     `json:"parentConsumerName,omitempty"`
-	IsDepartmentAdmin  bool       `json:"isDepartmentAdmin,omitempty"`
-	LastLoginAt        *time.Time `json:"lastLoginAt,omitempty"`
-	TempPassword       string     `json:"tempPassword,omitempty"`
+	ConsumerName      string     `json:"consumerName"`
+	DisplayName       string     `json:"displayName,omitempty"`
+	Email             string     `json:"email,omitempty"`
+	Status            string     `json:"status,omitempty"`
+	UserLevel         string     `json:"userLevel,omitempty"`
+	Source            string     `json:"source,omitempty"`
+	DepartmentID      string     `json:"departmentId,omitempty"`
+	DepartmentName    string     `json:"departmentName,omitempty"`
+	DepartmentPath    string     `json:"departmentPath,omitempty"`
+	IsDepartmentAdmin bool       `json:"isDepartmentAdmin,omitempty"`
+	LastLoginAt       *time.Time `json:"lastLoginAt,omitempty"`
+	TempPassword      string     `json:"tempPassword,omitempty"`
 }
 
 type AccountMutation struct {
-	ConsumerName       string `json:"consumerName"`
-	DisplayName        string `json:"displayName"`
-	Email              string `json:"email"`
-	UserLevel          string `json:"userLevel"`
-	Password           string `json:"password"`
-	Status             string `json:"status"`
-	DepartmentID       string `json:"departmentId"`
-	ParentConsumerName string `json:"parentConsumerName"`
+	ConsumerName string `json:"consumerName"`
+	DisplayName  string `json:"displayName"`
+	Email        string `json:"email"`
+	UserLevel    string `json:"userLevel"`
+	Password     string `json:"password"`
+	Status       string `json:"status"`
+	DepartmentID string `json:"departmentId"`
+}
+
+type AccountSSORebindResult struct {
+	SourceConsumerName string `json:"sourceConsumerName"`
+	TargetConsumerName string `json:"targetConsumerName"`
 }
 
 type InviteCodeRecord struct {
@@ -386,8 +391,8 @@ func (s *Service) SaveConsumer(ctx context.Context, mutation ConsumerMutation, c
 		return nil, portaldbclient.WrapExecError("save consumer", err)
 	}
 	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO org_account_membership (consumer_name, department_id, parent_consumer_name)
-		VALUES (?, ?, NULL)
+		INSERT INTO org_account_membership (consumer_name, department_id)
+		VALUES (?, ?)
 		`+portaldbclient.UpsertClause(s.client.Driver(), []string{"consumer_name"},
 		portaldbclient.AssignValue(s.client.Driver(), "department_id"),
 		`updated_at = CURRENT_TIMESTAMP`)+``,
@@ -590,27 +595,117 @@ func (s *Service) CreateDepartment(ctx context.Context, mutation DepartmentMutat
 		return nil, errors.New("department name cannot be blank")
 	}
 
+	adminMode := normalizeDepartmentAdminMode(mutation)
+	adminConsumerName := strings.TrimSpace(mutation.AdminConsumerName)
+	if adminConsumerName == "" {
+		return nil, errors.New("adminConsumerName cannot be blank")
+	}
+
 	id := "dept-" + strings.ToLower(strings.ReplaceAll(uuid.NewString()[:8], "-", ""))
 	path, level, err := s.resolveDepartmentPlacement(ctx, db, mutation.ParentDepartmentID, name)
 	if err != nil {
 		return nil, err
 	}
-	if _, err := db.ExecContext(ctx, `
+
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	tempPassword := ""
+	switch adminMode {
+	case "existing":
+		account, accountErr := s.lookupAccountState(ctx, tx, adminConsumerName)
+		if accountErr != nil {
+			return nil, accountErr
+		}
+		if account == nil {
+			return nil, fmt.Errorf("consumer not found: %s", adminConsumerName)
+		}
+		if account.Status != "active" {
+			return nil, fmt.Errorf("department admin must be an active account: %s", adminConsumerName)
+		}
+		if _, execErr := tx.ExecContext(ctx, `
+			UPDATE org_department
+			SET admin_consumer_name = NULL, updated_at = CURRENT_TIMESTAMP
+			WHERE admin_consumer_name = ? AND status = 'active'`,
+			adminConsumerName,
+		); execErr != nil {
+			return nil, execErr
+		}
+	case "create":
+		adminDisplayName := strings.TrimSpace(mutation.AdminDisplayName)
+		if adminDisplayName == "" {
+			return nil, errors.New("adminDisplayName cannot be blank")
+		}
+		if exists, existsErr := s.consumerExists(ctx, tx, adminConsumerName); existsErr != nil {
+			return nil, existsErr
+		} else if exists {
+			return nil, fmt.Errorf("consumer already exists: %s", adminConsumerName)
+		}
+
+		adminPassword := strings.TrimSpace(mutation.AdminPassword)
+		if adminPassword == "" {
+			adminPassword = newTempPassword()
+			tempPassword = adminPassword
+		}
+		adminPasswordHash, hashErr := hashPassword(adminPassword)
+		if hashErr != nil {
+			return nil, hashErr
+		}
+		adminUserLevel := normalizeUserLevel(mutation.AdminUserLevel)
+		if _, execErr := tx.ExecContext(ctx, `
+			INSERT INTO portal_user (
+				consumer_name, display_name, email, status, user_level, source, password_hash
+			) VALUES (?, ?, ?, 'active', ?, 'console', ?)`,
+			adminConsumerName,
+			adminDisplayName,
+			firstNonEmpty(strings.TrimSpace(mutation.AdminEmail), ""),
+			adminUserLevel,
+			adminPasswordHash,
+		); execErr != nil {
+			return nil, execErr
+		}
+	default:
+		return nil, fmt.Errorf("unsupported adminMode: %s", adminMode)
+	}
+
+	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO org_department (department_id, name, parent_department_id, admin_consumer_name, path, level, sort_order, status)
 		VALUES (?, ?, ?, ?, ?, ?, 0, 'active')`,
 		id,
 		name,
 		nullIfEmpty(strings.TrimSpace(mutation.ParentDepartmentID)),
-		trimOrNil(mutation.AdminConsumerName),
+		adminConsumerName,
 		path,
 		level,
 	); err != nil {
 		return nil, err
 	}
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO org_account_membership (consumer_name, department_id)
+		VALUES (?, ?)
+		`+portaldbclient.UpsertClause(s.client.Driver(), []string{"consumer_name"},
+		portaldbclient.AssignValue(s.client.Driver(), "department_id"),
+		`updated_at = CURRENT_TIMESTAMP`)+``,
+		adminConsumerName,
+		id,
+	); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
 	if err := s.hook.AfterWrite(ctx, "org-department-create"); err != nil {
 		return nil, err
 	}
-	return s.getDepartment(ctx, id)
+	item, err := s.getDepartment(ctx, id)
+	if err != nil || item == nil {
+		return item, err
+	}
+	item.CreatedAdminTempPassword = tempPassword
+	return item, nil
 }
 
 func (s *Service) UpdateDepartment(ctx context.Context, departmentID string, mutation DepartmentMutation) (*OrgDepartmentNode, error) {
@@ -621,6 +716,16 @@ func (s *Service) UpdateDepartment(ctx context.Context, departmentID string, mut
 	id := strings.TrimSpace(departmentID)
 	if id == "" {
 		return nil, errors.New("departmentId cannot be blank")
+	}
+	adminConsumerName := strings.TrimSpace(mutation.AdminConsumerName)
+	if adminConsumerName != "" {
+		ok, err := s.departmentActiveAccountExists(ctx, db, id, adminConsumerName)
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			return nil, fmt.Errorf("department admin must be an active account in department: %s", adminConsumerName)
+		}
 	}
 
 	result, err := db.ExecContext(ctx, `
@@ -761,7 +866,7 @@ func (s *Service) ListAccounts(ctx context.Context) ([]OrgAccountRecord, error) 
 
 	rows, err := db.QueryContext(ctx, `
 		SELECT u.consumer_name, u.display_name, u.email, u.status, u.user_level, u.source, m.department_id,
-			m.parent_consumer_name, CASE WHEN d.admin_consumer_name = u.consumer_name THEN 1 ELSE 0 END, u.last_login_at
+			CASE WHEN d.admin_consumer_name = u.consumer_name THEN 1 ELSE 0 END, u.last_login_at
 		FROM portal_user u
 		LEFT JOIN org_account_membership m ON m.consumer_name = u.consumer_name
 		LEFT JOIN org_department d ON d.department_id = m.department_id
@@ -776,7 +881,6 @@ func (s *Service) ListAccounts(ctx context.Context) ([]OrgAccountRecord, error) 
 	for rows.Next() {
 		var item OrgAccountRecord
 		var departmentID sql.NullString
-		var parentName sql.NullString
 		var lastLogin sql.NullTime
 		if err := rows.Scan(
 			&item.ConsumerName,
@@ -786,14 +890,12 @@ func (s *Service) ListAccounts(ctx context.Context) ([]OrgAccountRecord, error) 
 			&item.UserLevel,
 			&item.Source,
 			&departmentID,
-			&parentName,
 			&item.IsDepartmentAdmin,
 			&lastLogin,
 		); err != nil {
 			return nil, err
 		}
 		item.DepartmentID = departmentID.String
-		item.ParentConsumerName = parentName.String
 		if lastLogin.Valid {
 			item.LastLoginAt = &lastLogin.Time
 		}
@@ -823,8 +925,10 @@ func (s *Service) CreateAccount(ctx context.Context, mutation AccountMutation) (
 	status := normalizeStatus(mutation.Status, true)
 	userLevel := normalizeUserLevel(mutation.UserLevel)
 	password := strings.TrimSpace(mutation.Password)
+	tempPassword := ""
 	if password == "" {
 		password = newTempPassword()
+		tempPassword = password
 	}
 	passwordHash, err := hashPassword(password)
 	if err != nil {
@@ -859,15 +963,13 @@ func (s *Service) CreateAccount(ctx context.Context, mutation AccountMutation) (
 		return nil, err
 	}
 	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO org_account_membership (consumer_name, department_id, parent_consumer_name)
-		VALUES (?, ?, ?)
+		INSERT INTO org_account_membership (consumer_name, department_id)
+		VALUES (?, ?)
 		`+portaldbclient.UpsertClause(s.client.Driver(), []string{"consumer_name"},
 		portaldbclient.AssignValue(s.client.Driver(), "department_id"),
-		portaldbclient.AssignValue(s.client.Driver(), "parent_consumer_name"),
 		`updated_at = CURRENT_TIMESTAMP`)+``,
 		name,
 		nullIfEmpty(strings.TrimSpace(mutation.DepartmentID)),
-		nullIfEmpty(strings.TrimSpace(mutation.ParentConsumerName)),
 	); err != nil {
 		return nil, err
 	}
@@ -877,7 +979,12 @@ func (s *Service) CreateAccount(ctx context.Context, mutation AccountMutation) (
 	if err := s.hook.AfterWrite(ctx, "org-account-create"); err != nil {
 		return nil, err
 	}
-	return s.getAccount(ctx, name)
+	item, err := s.getAccount(ctx, name)
+	if err != nil || item == nil {
+		return item, err
+	}
+	item.TempPassword = tempPassword
+	return item, nil
 }
 
 func (s *Service) UpdateAccount(ctx context.Context, consumerName string, mutation AccountMutation) (*OrgAccountRecord, error) {
@@ -929,15 +1036,13 @@ func (s *Service) UpdateAccount(ctx context.Context, consumerName string, mutati
 		return nil, fmt.Errorf("consumer not found: %s", name)
 	}
 	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO org_account_membership (consumer_name, department_id, parent_consumer_name)
-		VALUES (?, ?, ?)
+		INSERT INTO org_account_membership (consumer_name, department_id)
+		VALUES (?, ?)
 		`+portaldbclient.UpsertClause(s.client.Driver(), []string{"consumer_name"},
 		portaldbclient.AssignValue(s.client.Driver(), "department_id"),
-		portaldbclient.AssignValue(s.client.Driver(), "parent_consumer_name"),
 		`updated_at = CURRENT_TIMESTAMP`)+``,
 		name,
 		nullIfEmpty(strings.TrimSpace(mutation.DepartmentID)),
-		nullIfEmpty(strings.TrimSpace(mutation.ParentConsumerName)),
 	); err != nil {
 		return nil, err
 	}
@@ -950,7 +1055,7 @@ func (s *Service) UpdateAccount(ctx context.Context, consumerName string, mutati
 	return s.getAccount(ctx, name)
 }
 
-func (s *Service) UpdateAccountAssignment(ctx context.Context, consumerName, departmentID, parentConsumerName string) (*OrgAccountRecord, error) {
+func (s *Service) UpdateAccountAssignment(ctx context.Context, consumerName, departmentID string) (*OrgAccountRecord, error) {
 	db, err := s.db(ctx)
 	if err != nil {
 		return nil, err
@@ -968,15 +1073,13 @@ func (s *Service) UpdateAccountAssignment(ctx context.Context, consumerName, dep
 	}
 
 	result, err := db.ExecContext(ctx, `
-		INSERT INTO org_account_membership (consumer_name, department_id, parent_consumer_name)
-		VALUES (?, ?, ?)
+		INSERT INTO org_account_membership (consumer_name, department_id)
+		VALUES (?, ?)
 		`+portaldbclient.UpsertClause(s.client.Driver(), []string{"consumer_name"},
 		portaldbclient.AssignValue(s.client.Driver(), "department_id"),
-		portaldbclient.AssignValue(s.client.Driver(), "parent_consumer_name"),
 		`updated_at = CURRENT_TIMESTAMP`)+``,
 		name,
 		nullIfEmpty(strings.TrimSpace(departmentID)),
-		nullIfEmpty(strings.TrimSpace(parentConsumerName)),
 	)
 	if err != nil {
 		return nil, err
@@ -1016,6 +1119,109 @@ func (s *Service) UpdateAccountStatus(ctx context.Context, consumerName, status 
 		return nil, err
 	}
 	return s.getAccount(ctx, name)
+}
+
+func (s *Service) DeleteAccount(ctx context.Context, consumerName string) error {
+	return s.DeleteConsumer(ctx, consumerName)
+}
+
+func (s *Service) RebindAccountSSOIdentity(ctx context.Context, consumerName, targetConsumerName string) (*AccountSSORebindResult, error) {
+	db, err := s.db(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	sourceConsumerName := strings.TrimSpace(consumerName)
+	targetName := strings.TrimSpace(targetConsumerName)
+	if sourceConsumerName == "" {
+		return nil, errors.New("consumerName cannot be blank")
+	}
+	if targetName == "" {
+		return nil, errors.New("targetConsumerName cannot be blank")
+	}
+	if sourceConsumerName == targetName {
+		return nil, errors.New("targetConsumerName cannot be the same as consumerName")
+	}
+	if admin, err := s.isDepartmentAdmin(ctx, db, sourceConsumerName); err != nil {
+		return nil, err
+	} else if admin {
+		return nil, errors.New("department administrator cannot be rebound")
+	}
+
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	sourceAccount, err := s.lookupAccountState(ctx, tx, sourceConsumerName)
+	if err != nil {
+		return nil, err
+	}
+	if sourceAccount == nil {
+		return nil, fmt.Errorf("consumer not found: %s", sourceConsumerName)
+	}
+	if sourceAccount.Source != "sso" {
+		return nil, fmt.Errorf("consumer is not an sso account: %s", sourceConsumerName)
+	}
+	if sourceAccount.Status != "pending" {
+		return nil, fmt.Errorf("consumer is not pending: %s", sourceConsumerName)
+	}
+
+	targetAccount, err := s.lookupAccountState(ctx, tx, targetName)
+	if err != nil {
+		return nil, err
+	}
+	if targetAccount == nil {
+		return nil, fmt.Errorf("target consumer not found: %s", targetName)
+	}
+
+	identity, err := s.lookupAccountSSOIdentity(ctx, tx, sourceConsumerName)
+	if err != nil {
+		return nil, err
+	}
+	if identity == nil {
+		return nil, fmt.Errorf("sso identity not found: %s", sourceConsumerName)
+	}
+
+	bound, err := s.accountHasSSOIdentity(ctx, tx, identity.ProviderKey, targetName)
+	if err != nil {
+		return nil, err
+	}
+	if bound {
+		return nil, fmt.Errorf("target consumer already has sso identity: %s", targetName)
+	}
+
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE portal_user_sso_identity
+		SET consumer_name = ?, updated_at = CURRENT_TIMESTAMP
+		WHERE provider_key = ? AND issuer = ? AND subject = ?`,
+		targetName,
+		identity.ProviderKey,
+		identity.Issuer,
+		identity.Subject,
+	); err != nil {
+		return nil, err
+	}
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE portal_user
+		SET is_deleted = 1, deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+		WHERE consumer_name = ? AND COALESCE(is_deleted, FALSE) = FALSE`,
+		sourceConsumerName,
+	); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	if err := s.hook.AfterWrite(ctx, "org-account-sso-rebind"); err != nil {
+		return nil, err
+	}
+	return &AccountSSORebindResult{
+		SourceConsumerName: sourceConsumerName,
+		TargetConsumerName: targetName,
+	}, nil
 }
 
 func (s *Service) CreateInviteCode(ctx context.Context, expiresInDays int) (*InviteCodeRecord, error) {
@@ -1134,6 +1340,75 @@ func (s *Service) consumerExists(ctx context.Context, queryable interface {
 	return count > 0, nil
 }
 
+type accountState struct {
+	ConsumerName string
+	Source       string
+	Status       string
+}
+
+type accountSSOIdentityState struct {
+	ProviderKey string
+	Issuer      string
+	Subject     string
+}
+
+func (s *Service) lookupAccountState(ctx context.Context, queryable interface {
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+}, consumerName string) (*accountState, error) {
+	var item accountState
+	err := queryable.QueryRowContext(ctx, `
+		SELECT consumer_name, source, status
+		FROM portal_user
+		WHERE consumer_name = ? AND COALESCE(is_deleted, FALSE) = FALSE
+		LIMIT 1`,
+		strings.TrimSpace(consumerName),
+	).Scan(&item.ConsumerName, &item.Source, &item.Status)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &item, nil
+}
+
+func (s *Service) lookupAccountSSOIdentity(ctx context.Context, queryable interface {
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+}, consumerName string) (*accountSSOIdentityState, error) {
+	var item accountSSOIdentityState
+	err := queryable.QueryRowContext(ctx, `
+		SELECT provider_key, issuer, subject
+		FROM portal_user_sso_identity
+		WHERE consumer_name = ?
+		ORDER BY linked_at DESC
+		LIMIT 1`,
+		strings.TrimSpace(consumerName),
+	).Scan(&item.ProviderKey, &item.Issuer, &item.Subject)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &item, nil
+}
+
+func (s *Service) accountHasSSOIdentity(ctx context.Context, queryable interface {
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+}, providerKey, consumerName string) (bool, error) {
+	var count int
+	if err := queryable.QueryRowContext(ctx, `
+		SELECT COUNT(1)
+		FROM portal_user_sso_identity
+		WHERE provider_key = ? AND consumer_name = ?`,
+		strings.TrimSpace(providerKey),
+		strings.TrimSpace(consumerName),
+	).Scan(&count); err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
 func (s *Service) lookupDepartmentIDByName(ctx context.Context, queryable interface {
 	QueryRowContext(context.Context, string, ...any) *sql.Row
 }, departmentName string) (string, error) {
@@ -1220,6 +1495,38 @@ func (s *Service) departmentMemberCounts(ctx context.Context, db *sql.DB) (map[s
 		counts[departmentID] = count
 	}
 	return counts, rows.Err()
+}
+
+func (s *Service) departmentActiveAccountExists(ctx context.Context, db *sql.DB, departmentID, consumerName string) (bool, error) {
+	var count int
+	if err := db.QueryRowContext(ctx, `
+		SELECT COUNT(1)
+		FROM org_account_membership m
+		INNER JOIN portal_user u ON u.consumer_name = m.consumer_name
+		WHERE m.department_id = ?
+		  AND m.consumer_name = ?
+		  AND COALESCE(u.is_deleted, FALSE) = FALSE
+		  AND COALESCE(u.status, 'pending') = 'active'`,
+		departmentID,
+		consumerName,
+	).Scan(&count); err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+func normalizeDepartmentAdminMode(mutation DepartmentMutation) string {
+	mode := strings.ToLower(strings.TrimSpace(mutation.AdminMode))
+	if mode == "existing" || mode == "create" {
+		return mode
+	}
+	if strings.TrimSpace(mutation.AdminDisplayName) != "" ||
+		strings.TrimSpace(mutation.AdminEmail) != "" ||
+		strings.TrimSpace(mutation.AdminPassword) != "" ||
+		strings.TrimSpace(mutation.AdminUserLevel) != "" {
+		return "create"
+	}
+	return "existing"
 }
 
 func (s *Service) resolveDepartmentLevel(nodes map[string]*OrgDepartmentNode, departmentID string) int {

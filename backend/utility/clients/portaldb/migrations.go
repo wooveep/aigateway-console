@@ -150,12 +150,12 @@ func legacyUsersMigrationSQL(driver string) string {
 func legacyMembershipMigrationSQL(driver string) string {
 	return fmt.Sprintf(`
 		INSERT INTO org_account_membership (consumer_name, department_id, parent_consumer_name)
-		SELECT consumer_name, NULLIF(department_id, ''), NULLIF(parent_consumer_name, '')
+		SELECT consumer_name, NULLIF(department_id, ''), NULL
 		FROM portal_users
 		%s`,
 		upsertClause(driver, []string{"consumer_name"}, []string{
 			assign(driver, "department_id"),
-			assign(driver, "parent_consumer_name"),
+			"parent_consumer_name = NULL",
 		}),
 	)
 }

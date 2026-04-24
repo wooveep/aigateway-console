@@ -1,3 +1,6 @@
+//go:build integration
+// +build integration
+
 package portal_test
 
 import (
@@ -37,7 +40,15 @@ func TestPortalServiceUsesSharedSchemaAndConsoleOwnedTables(t *testing.T) {
 	require.NoError(t, err)
 	svc := portalsvc.New(client, k8s)
 
-	department, err := svc.CreateDepartment(ctx, portalsvc.DepartmentMutation{Name: "Engineering", ParentDepartmentID: "root"})
+	department, err := svc.CreateDepartment(ctx, portalsvc.DepartmentMutation{
+		Name:               "Engineering",
+		ParentDepartmentID: "root",
+		AdminConsumerName:  "eng-admin",
+		AdminDisplayName:   "Engineering Admin",
+		AdminEmail:         "eng-admin@example.com",
+		AdminUserLevel:     "pro",
+		AdminPassword:      "secret",
+	})
 	require.NoError(t, err)
 	require.Equal(t, "Engineering", department.Name)
 

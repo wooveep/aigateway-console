@@ -75,6 +75,7 @@ const selectedPluginReadme = ref('');
 const queryType = computed(() => String(route.query.type || ''));
 const queryName = computed(() => String(route.query.name || ''));
 const isTargetMode = computed(() => Boolean(queryType.value && queryName.value));
+const isAiRouteMode = computed(() => queryType.value === QueryType.AI_ROUTE);
 const visibilityScope = computed(() => resolvePluginVisibilityScope(queryType.value));
 const selectedPlugin = computed(() => rows.value.find((item) => item.name === selectedPluginName.value) || null);
 const selectedPluginSchemaText = computed(() => (
@@ -86,7 +87,8 @@ const isAiDataMaskingRouteBindingRecord = computed(() => (
 ));
 const canDeleteCurrentBinding = computed(() => (
   Boolean(configuring.value && currentInstanceData.value && (
-    !isBuiltInPlugin(configuring.value.name) || isAiDataMaskingRouteBindingRecord.value
+    (!isBuiltInPlugin(configuring.value.name) || isAiDataMaskingRouteBindingRecord.value)
+    && configuring.value.canDisable !== false
   ))
 ));
 
@@ -183,6 +185,60 @@ function getPluginTargetAliases() {
   ];
 }
 
+function getPluginDependencyNames(record: any): string[] {
+  return Array.isArray(record?.requiredPlugins)
+    ? record.requiredPlugins.filter((item: unknown) => typeof item === 'string' && item.trim())
+    : [];
+}
+
+function enrichAiRouteDependencyState(items: any[]) {
+  if (!isAiRouteMode.value) {
+    return items;
+  }
+
+  const enabledPlugins = new Set(
+    items
+      .filter((item) => Boolean(item?.enabled))
+      .map((item) => String(item?.name || ''))
+      .filter(Boolean),
+  );
+  const dependentMap = new Map<string, string[]>();
+
+  items.forEach((item) => {
+    if (!enabledPlugins.has(String(item?.name || ''))) {
+      return;
+    }
+    getPluginDependencyNames(item).forEach((dependencyName) => {
+      const nextDependents = dependentMap.get(dependencyName) || [];
+      if (!nextDependents.includes(item.name)) {
+        nextDependents.push(item.name);
+      }
+      dependentMap.set(dependencyName, nextDependents);
+    });
+  });
+
+  return items.map((item) => {
+    const dependents = dependentMap.get(item.name) || [];
+    const dependencyEnabled = Boolean(item.dependencyEnabled);
+    const canDisable = dependents.length === 0;
+    let enableStateText = item.enabled ? '当前 AI 路由已启用该插件。' : '当前 AI 路由未启用该插件。';
+
+    if (dependencyEnabled && dependents.length) {
+      enableStateText = `当前插件由依赖关系自动启用，依赖来源：${dependents.join('、')}`;
+    } else if (dependents.length) {
+      enableStateText = `当前插件已启用，且被以下插件依赖：${dependents.join('、')}`;
+    }
+
+    return {
+      ...item,
+      dependentBy: dependents,
+      dependencyEnabled,
+      canDisable,
+      enableStateText,
+    };
+  });
+}
+
 async function load() {
   loading.value = true;
   try {
@@ -233,8 +289,9 @@ async function load() {
       });
     }
 
-    rows.value = merged;
-    await syncSelectedPlugin(merged);
+    const nextRows = enrichAiRouteDependencyState(merged);
+    rows.value = nextRows;
+    await syncSelectedPlugin(nextRows);
   } finally {
     loading.value = false;
   }
@@ -277,11 +334,11 @@ function openWasmDrawer(record?: any) {
 }
 
 function resolveConfigPath(record: any) {
-  const dedicatedPath = resolveDedicatedPluginPath(record?.name);
-  if (!dedicatedPath) {
+  if (isAiRouteMode.value) {
     return '';
   }
-  if (queryType.value === QueryType.AI_ROUTE && record?.name === 'ai-data-masking') {
+  const dedicatedPath = resolveDedicatedPluginPath(record?.name);
+  if (!dedicatedPath) {
     return '';
   }
   return dedicatedPath;
@@ -383,10 +440,66 @@ async function submitBuiltIn(payload: Record<string, any>) {
   showSuccess('配置已保存');
 }
 
-async function submitPlugin(payload: { enabled: boolean; rawConfigurations: string }) {
+async function enableRequiredPlugins(record: any) {
+  const requiredPlugins = getPluginDependencyNames(record);
+  if (!requiredPlugins.length) {
+    return [];
+  }
+
+  const enabledPlugins: string[] = [];
+  for (const dependencyName of requiredPlugins) {
+    const existingRecord = rows.value.find((item) => item.name === dependencyName) || { name: dependencyName };
+    const existingInstance = await loadPluginInstance(existingRecord);
+    if (existingInstance?.enabled ?? existingInstance?.runtimeEnabled) {
+      continue;
+    }
+    await updateRoutePluginInstance(
+      { name: getPluginTargetName(), pluginName: dependencyName },
+      {
+        enabled: true,
+        pluginName: dependencyName,
+        rawConfigurations: existingInstance?.rawConfigurations || '',
+      },
+    );
+    enabledPlugins.push(dependencyName);
+  }
+  return enabledPlugins;
+}
+
+async function updatePluginExecution(record: any, payload: { phase: string; priority: number }) {
+  if (!isAiRouteMode.value) {
+    return;
+  }
+  await updateWasmPlugin(record.name, {
+    ...record,
+    name: record.name,
+    phase: payload.phase,
+    priority: payload.priority,
+  });
+}
+
+async function submitPlugin(payload: {
+  enabled: boolean;
+  rawConfigurations: string;
+  phase: string;
+  priority: number;
+}) {
   if (!configuring.value) {
     return;
   }
+
+  if (isAiRouteMode.value && payload.enabled === false && configuring.value.canDisable === false) {
+    const dependentBy = Array.isArray(configuring.value.dependentBy) ? configuring.value.dependentBy : [];
+    showError(`当前插件仍被以下插件依赖，暂不允许关闭：${dependentBy.join('、')}`);
+    return;
+  }
+
+  let dependencyEnabledPlugins: string[] = [];
+  if (isAiRouteMode.value && payload.enabled) {
+    dependencyEnabledPlugins = await enableRequiredPlugins(configuring.value);
+  }
+
+  await updatePluginExecution(configuring.value, payload);
 
   const nextPayload = {
     enabled: payload.enabled,
@@ -406,11 +519,20 @@ async function submitPlugin(payload: { enabled: boolean; rawConfigurations: stri
 
   configDrawerOpen.value = false;
   await load();
+  if (dependencyEnabledPlugins.length) {
+    showSuccess(`配置已保存，并自动启用依赖插件：${dependencyEnabledPlugins.join('、')}`);
+    return;
+  }
   showSuccess('配置已保存');
 }
 
 async function deleteConfiguredBinding() {
   if (!configuring.value) {
+    return;
+  }
+  if (configuring.value.canDisable === false) {
+    const dependentBy = Array.isArray(configuring.value.dependentBy) ? configuring.value.dependentBy : [];
+    showError(`当前插件仍被以下插件依赖，暂不允许删除绑定：${dependentBy.join('、')}`);
     return;
   }
 
@@ -435,6 +557,11 @@ async function deleteConfiguredBinding() {
 
 function requestDeleteConfiguredBinding() {
   if (!configuring.value) {
+    return;
+  }
+  if (configuring.value.canDisable === false) {
+    const dependentBy = Array.isArray(configuring.value.dependentBy) ? configuring.value.dependentBy : [];
+    showError(`当前插件仍被以下插件依赖，暂不允许删除绑定：${dependentBy.join('、')}`);
     return;
   }
   showConfirm({
@@ -526,6 +653,12 @@ onMounted(load);
               <StatusTag :value="selectedPlugin.enabled ? 'enabled' : 'disabled'" />
             </a-descriptions-item>
             <a-descriptions-item label="作用域">{{ visibilityScope }}</a-descriptions-item>
+            <a-descriptions-item v-if="isAiRouteMode" label="依赖插件">
+              {{ selectedPlugin.requiredPlugins?.length ? selectedPlugin.requiredPlugins.join('、') : '-' }}
+            </a-descriptions-item>
+            <a-descriptions-item v-if="isAiRouteMode" label="被依赖状态">
+              {{ selectedPlugin.dependentBy?.length ? selectedPlugin.dependentBy.join('、') : '-' }}
+            </a-descriptions-item>
             <a-descriptions-item label="描述" :span="2">{{ selectedPlugin.description || '-' }}</a-descriptions-item>
           </a-descriptions>
 

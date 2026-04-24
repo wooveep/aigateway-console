@@ -82,6 +82,9 @@ AIGATEWAY_CONSOLE_PORTALDB_DRIVER=postgres
 AIGATEWAY_CONSOLE_PORTALDB_DSN=host=127.0.0.1 port=5432 user=postgres password=postgres dbname=aigateway_portal sslmode=disable
 ```
 
+Portal OIDC SSO 的控制面入口也依赖这条共享库连接；未配置 `portaldb` 时，`/system` 页的 `Portal SSO`
+区块同样会退化为不可用状态。
+
 如果是 K8S / Helm 部署，Console 现在会优先从 Helm 注入的结构化依赖配置自动发现并连接：
 
 ```text
@@ -115,6 +118,14 @@ AIGATEWAY_CONSOLE_NAMESPACE / AIGATEWAY_CONSOLE_CLUSTER_DOMAIN
 ```bash
 python3 ./scripts/aigateway-dev.py check-connectivity
 ```
+
+## Portal SSO 配置入口
+
+- Console 已在 `/system` 页面新增 `Portal SSO` 配置区块。
+- 当前只支持单一全局 OIDC Provider。
+- 保存时会校验 `issuer/.well-known/openid-configuration`，并要求 discovery 文档中存在 `authorization_endpoint`、`token_endpoint`、`jwks_uri`。
+- `clientSecret` 只在保存时回写，后续读取始终脱敏显示。
+- Portal 登录页是否展示 SSO 按钮、以及实际 authorize/callback 运行时行为，都以共享库中的 `portal_sso_config` 为准。
 
 ### 前端项目
 

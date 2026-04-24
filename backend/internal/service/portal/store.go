@@ -259,6 +259,71 @@ func (s *portalStore) saveAIQuotaBalance(ctx context.Context, balance do.PortalA
 	return err
 }
 
+func (s *portalStore) getPortalSSOConfig(ctx context.Context) (*portalSSOConfigStored, error) {
+	row := portaldbclient.QueryRowContext(ctx, s.db, s.driver, `
+		SELECT enabled, provider_type, display_name, issuer_url, client_id, client_secret_encrypted,
+			scopes_json, claim_mapping_json, updated_by, updated_at
+		FROM portal_sso_config
+		WHERE provider_type = ?
+		LIMIT 1`, portalSSOProviderTypeOIDC)
+
+	var (
+		item      portalSSOConfigStored
+		updatedAt sql.NullTime
+	)
+	if err := row.Scan(
+		&item.Enabled,
+		&item.ProviderType,
+		&item.DisplayName,
+		&item.IssuerURL,
+		&item.ClientID,
+		&item.ClientSecretEncrypted,
+		&item.ScopesJSON,
+		&item.ClaimMappingJSON,
+		&item.UpdatedBy,
+		&updatedAt,
+	); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if updatedAt.Valid {
+		item.UpdatedAt = &updatedAt.Time
+	}
+	return &item, nil
+}
+
+func (s *portalStore) upsertPortalSSOConfig(ctx context.Context, cfg portalSSOConfigStored) error {
+	_, err := portaldbclient.ExecContext(ctx, s.db, s.driver, `
+		INSERT INTO portal_sso_config (
+			provider_type, enabled, display_name, issuer_url, client_id, client_secret_encrypted,
+			scopes_json, claim_mapping_json, updated_by, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`+portaldbclient.UpsertClause(s.driver, []string{"provider_type"},
+		portaldbclient.AssignValue(s.driver, "enabled"),
+		portaldbclient.AssignValue(s.driver, "display_name"),
+		portaldbclient.AssignValue(s.driver, "issuer_url"),
+		portaldbclient.AssignValue(s.driver, "client_id"),
+		portaldbclient.AssignValue(s.driver, "client_secret_encrypted"),
+		portaldbclient.AssignValue(s.driver, "scopes_json"),
+		portaldbclient.AssignValue(s.driver, "claim_mapping_json"),
+		portaldbclient.AssignValue(s.driver, "updated_by"),
+		portaldbclient.AssignValue(s.driver, "updated_at"))+``,
+		cfg.ProviderType,
+		cfg.Enabled,
+		cfg.DisplayName,
+		cfg.IssuerURL,
+		cfg.ClientID,
+		cfg.ClientSecretEncrypted,
+		cfg.ScopesJSON,
+		cfg.ClaimMappingJSON,
+		cfg.UpdatedBy,
+		gtime.Now(),
+	)
+	return err
+}
+
 func (s *portalStore) refreshPortalBillingBalance(
 	ctx context.Context,
 	consumerName string,

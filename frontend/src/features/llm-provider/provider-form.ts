@@ -1,4 +1,4 @@
-import type { LlmProvider } from '@/interfaces/llm-provider';
+import { LlmProviderProtocol, type LlmProvider, type ProviderProtocolDirectory, type ProviderProtocolOption } from '@/interfaces/llm-provider';
 import type { Service } from '@/interfaces/service';
 import { stringifyPretty } from '@/lib/portal';
 
@@ -109,10 +109,16 @@ const SURFACED_RAW_CONFIG_KEYS = [
   'geminiSafetySettings',
 ];
 
-export const providerProtocolOptions = [
-  { label: 'openai/v1', value: 'openai/v1' },
-  { label: 'original', value: 'original' },
+export const fallbackProviderProtocolOptions: ProviderProtocolOption[] = [
+  { label: 'Auto', value: LlmProviderProtocol.AUTO },
+  { label: 'OpenAI', value: LlmProviderProtocol.OPENAI_V1 },
+  { label: 'Claude', value: LlmProviderProtocol.ANTHROPIC_V1_MESSAGES },
+  { label: 'Original', value: LlmProviderProtocol.ORIGINAL },
 ];
+
+export function buildProviderProtocolOptions(directory?: ProviderProtocolDirectory | null): ProviderProtocolOption[] {
+  return directory?.protocolOptions?.provider?.length ? directory.protocolOptions.provider : fallbackProviderProtocolOptions;
+}
 
 export const providerTypeOrder = [
   'openai',
@@ -354,7 +360,7 @@ export function createProviderFormState(): ProviderFormState {
   return {
     name: '',
     type: '',
-    protocol: 'openai/v1',
+    protocol: LlmProviderProtocol.AUTO,
     proxyName: '',
     tokens: [''],
     volcengineBaseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
@@ -422,7 +428,7 @@ export function toProviderFormState(provider?: (Partial<LlmProvider> & Record<st
     ...createProviderFormState(),
     name: String(provider?.name || ''),
     type: normalizeLegacyProviderType(provider?.type),
-    protocol: String(provider?.protocol || 'openai/v1'),
+    protocol: String(provider?.protocol || LlmProviderProtocol.AUTO),
     proxyName: String(provider?.proxyName || ''),
     tokens: tokens.length ? tokens : [''],
     volcengineBaseUrl: buildVolcengineBaseUrl(rawConfigs),

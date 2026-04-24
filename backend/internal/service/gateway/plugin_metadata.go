@@ -18,6 +18,23 @@ var builtinPluginResourceDirs = []string{
 }
 
 var builtinPluginFallbacks = map[string]map[string]any{
+	"ai-data-masking": {
+		"name":        "ai-data-masking",
+		"builtIn":     true,
+		"internal":    true,
+		"title":       "AI Data Masking",
+		"description": "Provides AI request and response masking for AI routes.",
+		"category":    "ai",
+		"version":     "2.0.0",
+		"phase":       "AUTHN",
+		"priority":    100,
+		"x-title-i18n": map[string]any{
+			"zh-CN": "AI 数据脱敏",
+		},
+		"x-description-i18n": map[string]any{
+			"zh-CN": "提供 AI 路由的请求与响应脱敏能力。",
+		},
+	},
 	"ai-quota": {
 		"name":        "ai-quota",
 		"builtIn":     true,
@@ -26,8 +43,14 @@ var builtinPluginFallbacks = map[string]map[string]any{
 		"description": "Provides AI quota control and billing runtime enforcement for AI routes.",
 		"category":    "ai",
 		"version":     "1.1.0",
-		"phase":       "UNSPECIFIED_PHASE",
+		"phase":       "AUTHN",
 		"priority":    280,
+		"x-title-i18n": map[string]any{
+			"zh-CN": "AI 配额",
+		},
+		"x-description-i18n": map[string]any{
+			"zh-CN": "提供 AI 路由的配额控制与计费运行时校验能力。",
+		},
 	},
 	"cluster-key-rate-limit": {
 		"name":        "cluster-key-rate-limit",
@@ -39,6 +62,12 @@ var builtinPluginFallbacks = map[string]map[string]any{
 		"version":     "2.0.0",
 		"phase":       "UNSPECIFIED_PHASE",
 		"priority":    20,
+		"x-title-i18n": map[string]any{
+			"zh-CN": "集群 Key 限流",
+		},
+		"x-description-i18n": map[string]any{
+			"zh-CN": "提供 AI 路由运行时的集群级按 Key 请求限流能力。",
+		},
 	},
 	"ai-token-ratelimit": {
 		"name":        "ai-token-ratelimit",
@@ -50,10 +79,22 @@ var builtinPluginFallbacks = map[string]map[string]any{
 		"version":     "2.0.0",
 		"phase":       "UNSPECIFIED_PHASE",
 		"priority":    600,
+		"x-title-i18n": map[string]any{
+			"zh-CN": "AI Token 限流",
+		},
+		"x-description-i18n": map[string]any{
+			"zh-CN": "提供 AI 路由运行时按 consumer 的 token 限流能力。",
+		},
 	},
 }
 
+var aiRoutePluginDependencies = map[string][]string{}
+
 func (s *Service) mergeWasmPlugins(items []map[string]any) []map[string]any {
+	return s.mergeWasmPluginsWithLang(items, "")
+}
+
+func (s *Service) mergeWasmPluginsWithLang(items []map[string]any, lang string) []map[string]any {
 	index := map[string]map[string]any{}
 	for _, item := range items {
 		hydrated := s.hydrateResource("wasm-plugins", item)
@@ -72,7 +113,7 @@ func (s *Service) mergeWasmPlugins(items []map[string]any) []map[string]any {
 	}
 	result := make([]map[string]any, 0, len(index))
 	for _, item := range index {
-		result = append(result, item)
+		result = append(result, s.localizeWasmPlugin(clonePayload(item), lang))
 	}
 	sort.Slice(result, func(i, j int) bool {
 		return stringValue(result[i]["name"]) < stringValue(result[j]["name"])
@@ -152,6 +193,12 @@ func loadBuiltinWasmPluginFromRoot(base, name string) (map[string]any, bool) {
 		"phase":       strings.ToUpper(stringValue(specNode["phase"])),
 		"priority":    specNode["priority"],
 	}
+	if titleI18n, ok := info["x-title-i18n"].(map[string]any); ok && len(titleI18n) > 0 {
+		item["x-title-i18n"] = clonePayload(titleI18n)
+	}
+	if descI18n, ok := info["x-description-i18n"].(map[string]any); ok && len(descI18n) > 0 {
+		item["x-description-i18n"] = clonePayload(descI18n)
+	}
 	if schema, ok := specNode["configSchema"]; ok {
 		item["configSchema"] = schema
 	}
@@ -166,6 +213,69 @@ func loadBuiltinWasmPluginFromRoot(base, name string) (map[string]any, bool) {
 		item["documentation"] = readme
 	}
 	return item, true
+}
+
+func (s *Service) localizeWasmPlugin(item map[string]any, lang string) map[string]any {
+	if item == nil {
+		return nil
+	}
+	requiredPlugins := aiRoutePluginDependenciesForPlugin(stringValue(item["name"]))
+	item["requiredPlugins"] = requiredPlugins
+	item["dependencySource"] = "ai-route-explicit-map"
+	if len(requiredPlugins) == 0 {
+		item["dependencyEnabled"] = false
+	}
+	locale := normalizePluginLocale(lang)
+	if locale == "" {
+		return item
+	}
+	if title := localizedPluginText(item, "title", locale); title != "" {
+		item["title"] = title
+	}
+	if description := localizedPluginText(item, "description", locale); description != "" {
+		item["description"] = description
+	}
+	return item
+}
+
+func aiRoutePluginDependenciesForPlugin(pluginName string) []string {
+	items := aiRoutePluginDependencies[strings.TrimSpace(pluginName)]
+	if len(items) == 0 {
+		return []string{}
+	}
+	result := make([]string, 0, len(items))
+	for _, item := range items {
+		trimmed := strings.TrimSpace(item)
+		if trimmed == "" {
+			continue
+		}
+		result = append(result, trimmed)
+	}
+	sort.Strings(result)
+	return result
+}
+
+func normalizePluginLocale(lang string) string {
+	switch strings.TrimSpace(lang) {
+	case "zh-CN", "en-US":
+		return strings.TrimSpace(lang)
+	default:
+		return ""
+	}
+}
+
+func localizedPluginText(item map[string]any, key, locale string) string {
+	if item == nil || locale == "" {
+		return ""
+	}
+	i18nMap, _ := item["x-"+key+"-i18n"].(map[string]any)
+	if len(i18nMap) == 0 {
+		return stringValue(item[key])
+	}
+	if value := stringValue(i18nMap[locale]); value != "" {
+		return value
+	}
+	return stringValue(item[key])
 }
 
 func resolveBuiltinPluginRoots() []string {

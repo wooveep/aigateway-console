@@ -1,4 +1,4 @@
-import { InitParams } from '@/interfaces/system';
+import { InitParams, PortalSSOConfigRecord } from '@/interfaces/system';
 import request from './request';
 
 export async function getSystemInfo(): Promise<any> {
@@ -23,4 +23,12 @@ export async function getAIGatewayConfig(): Promise<any> {
 
 export async function updateAIGatewayConfig(config: string): Promise<any> {
   return request.put<any, any>('/system/aigateway-config', { config });
+}
+
+export async function getPortalSSOConfig(): Promise<PortalSSOConfigRecord> {
+  return request.get('/v1/portal/sso');
+}
+
+export async function updatePortalSSOConfig(payload: PortalSSOConfigRecord): Promise<PortalSSOConfigRecord> {
+  return request.put('/v1/portal/sso', payload);
 }

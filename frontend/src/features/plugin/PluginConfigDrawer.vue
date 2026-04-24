@@ -6,6 +6,7 @@ import BuiltInPluginForm from './BuiltInPluginForm.vue';
 import PluginSchemaEditor from './PluginSchemaEditor.vue';
 import { showError, showWarning } from '@/lib/feedback';
 import { BUILTIN_ROUTE_PLUGIN_LIST } from '@/plugins/constants';
+import { PluginPhase } from '@/interfaces/wasm-plugin';
 import {
   AI_DATA_MASKING_PLUGIN_NAME,
   cloneDeep,
@@ -35,18 +36,28 @@ const props = defineProps<{
 const emit = defineEmits<{
   'update:open': [value: boolean];
   submitBuiltIn: [payload: Record<string, any>];
-  submitPlugin: [payload: { enabled: boolean; rawConfigurations: string }];
+  submitPlugin: [payload: {
+    enabled: boolean;
+    rawConfigurations: string;
+    phase: string;
+    priority: number;
+  }];
   deletePlugin: [];
 }>();
 
-const { locale } = useI18n();
+const { locale, t } = useI18n();
 const activeTab = ref<'form' | 'yaml'>('form');
 const builtInRef = ref<InstanceType<typeof BuiltInPluginForm> | null>(null);
 
 const schemaState = reactive<Record<string, any>>({});
 const yamlState = ref('');
 const enabledState = ref(false);
+const phaseState = ref(PluginPhase.UNSPECIFIED);
+const priorityState = ref(100);
 const isRouteBuiltInPlugin = computed(() => BUILTIN_ROUTE_PLUGIN_LIST.some((item) => item.key === props.record?.name));
+const requiredPlugins = computed(() => Array.isArray(props.record?.requiredPlugins) ? props.record.requiredPlugins : []);
+const dependentBy = computed(() => Array.isArray(props.record?.dependentBy) ? props.record.dependentBy : []);
+const isDisableLocked = computed(() => props.record?.canDisable === false && dependentBy.value.length > 0);
 
 const currentConfigData = computed(() => {
   if (props.record?.name === AI_DATA_MASKING_PLUGIN_NAME) {
@@ -81,6 +92,11 @@ watch(
       ?? props.instanceData?.runtimeEnabled
       ?? props.record?.enabled
     );
+    const nextPhase = String(props.record?.phase || PluginPhase.UNSPECIFIED);
+    phaseState.value = Object.values(PluginPhase).includes(nextPhase as PluginPhase)
+      ? nextPhase as PluginPhase
+      : PluginPhase.UNSPECIFIED;
+    priorityState.value = Number(props.record?.priority || 100);
     const exampleRaw = getExampleRaw(currentConfigData.value, !props.record?.queryType && props.record?.category === 'auth');
     const raw = props.instanceData?.rawConfigurations || exampleRaw || '';
     yamlState.value = raw;
@@ -133,6 +149,11 @@ function submit() {
     return;
   }
 
+  if (!enabledState.value && isDisableLocked.value) {
+    showError(`当前插件仍被以下插件依赖，暂不允许关闭：${dependentBy.value.join('、')}`);
+    return;
+  }
+
   if (shouldUseBuiltInEditor.value) {
     const payload = builtInRef.value?.serialize?.();
     if (!payload) {
@@ -146,6 +167,8 @@ function submit() {
     emit('submitPlugin', {
       enabled: enabledState.value,
       rawConfigurations: props.instanceData?.rawConfigurations || '',
+      phase: phaseState.value,
+      priority: Number(priorityState.value || 0),
     });
     return;
   }
@@ -174,6 +197,8 @@ function submit() {
   emit('submitPlugin', {
     enabled: enabledState.value,
     rawConfigurations,
+    phase: phaseState.value,
+    priority: Number(priorityState.value || 0),
   });
 }
 </script>
@@ -198,6 +223,24 @@ function submit() {
 
       <div v-else class="plugin-config-drawer">
         <a-alert
+          v-if="record?.queryType === QueryType.AI_ROUTE && record?.enableStateText"
+          type="info"
+          show-icon
+          :message="record.enableStateText"
+        />
+        <a-alert
+          v-if="record?.queryType === QueryType.AI_ROUTE && requiredPlugins.length"
+          type="info"
+          show-icon
+          :message="`启用当前插件时会自动启用依赖插件：${requiredPlugins.join('、')}`"
+        />
+        <a-alert
+          v-if="record?.queryType === QueryType.AI_ROUTE && dependentBy.length"
+          type="warning"
+          show-icon
+          :message="`当前插件被以下插件依赖：${dependentBy.join('、')}`"
+        />
+        <a-alert
           v-if="record?.name === AI_DATA_MASKING_PLUGIN_NAME"
           type="info"
           show-icon
@@ -208,7 +251,18 @@ function submit() {
 
         <a-form layout="vertical">
           <a-form-item label="启用状态">
-            <a-switch v-model:checked="enabledState" />
+            <a-switch v-model:checked="enabledState" :disabled="isDisableLocked && enabledState" />
+          </a-form-item>
+          <a-form-item v-if="record?.queryType === QueryType.AI_ROUTE" label="执行阶段">
+            <a-select v-model:value="phaseState">
+              <a-select-option :value="PluginPhase.UNSPECIFIED">{{ t('plugin.phases.unspecified') }}</a-select-option>
+              <a-select-option :value="PluginPhase.AUTHN">{{ t('plugin.phases.authn') }}</a-select-option>
+              <a-select-option :value="PluginPhase.AUTHZ">{{ t('plugin.phases.authz') }}</a-select-option>
+              <a-select-option :value="PluginPhase.STATS">{{ t('plugin.phases.stats') }}</a-select-option>
+            </a-select>
+          </a-form-item>
+          <a-form-item v-if="record?.queryType === QueryType.AI_ROUTE" label="执行优先级">
+            <a-input-number v-model:value="priorityState" style="width: 100%" :min="0" :max="1000" />
           </a-form-item>
         </a-form>
 

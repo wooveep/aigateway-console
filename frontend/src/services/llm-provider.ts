@@ -1,8 +1,12 @@
 import request from './request';
-import { LlmProvider } from '@/interfaces/llm-provider';
+import { LlmProvider, ProviderProtocolDirectory } from '@/interfaces/llm-provider';
 
 export const getLlmProviders = (): Promise<LlmProvider[]> => {
   return request.get<any, LlmProvider[]>('/v1/ai/providers');
+};
+
+export const getProviderProtocolDirectory = (): Promise<ProviderProtocolDirectory> => {
+  return request.get<any, ProviderProtocolDirectory>('/v1/ai/provider-protocol-directory');
 };
 
 export const addLlmProvider = (payload: LlmProvider): Promise<any> => {

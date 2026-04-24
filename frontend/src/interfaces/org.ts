@@ -4,6 +4,7 @@ export interface OrgDepartmentNode {
   parentDepartmentId?: string;
   adminConsumerName?: string;
   adminDisplayName?: string;
+  createdAdminTempPassword?: string;
   level?: number;
   memberCount?: number;
   children?: OrgDepartmentNode[];
@@ -19,7 +20,6 @@ export interface OrgAccountRecord {
   departmentId?: string;
   departmentName?: string;
   departmentPath?: string;
-  parentConsumerName?: string;
   isDepartmentAdmin?: boolean;
   lastLoginAt?: string;
   tempPassword?: string;
@@ -33,14 +33,21 @@ export interface OrgAccountMutation {
   password?: string;
   status?: string;
   departmentId?: string;
-  parentConsumerName?: string;
 }
 
 export interface OrgDepartmentMutation {
   name?: string;
   parentDepartmentId?: string;
+  adminMode?: 'existing' | 'create' | string;
   adminConsumerName?: string;
-  admin?: OrgDepartmentAdminMutation;
+  adminDisplayName?: string;
+  adminEmail?: string;
+  adminUserLevel?: string;
+  adminPassword?: string;
+}
+
+export interface OrgAccountSSORebindRequest {
+  targetConsumerName: string;
 }
 
 export interface OrgDepartmentMoveRequest {
@@ -52,14 +59,6 @@ export interface AssetGrantRecord {
   assetId?: string;
   subjectType?: 'consumer' | 'department' | 'user_level' | string;
   subjectId?: string;
-}
-
-export interface OrgDepartmentAdminMutation {
-  consumerName: string;
-  displayName?: string;
-  email?: string;
-  userLevel?: string;
-  password?: string;
 }
 
 export interface OrgImportResult {

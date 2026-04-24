@@ -19,7 +19,34 @@ export interface TokeFailoverConfig {
 }
 
 export enum LlmProviderProtocol {
+  AUTO = 'auto',
   OPENAI_V1 = 'openai/v1',
+  ANTHROPIC_V1_MESSAGES = 'anthropic/v1/messages',
+  ORIGINAL = 'original',
+}
+
+export interface ProviderProtocolOption {
+  label: string;
+  value: string;
+}
+
+export interface ProviderProtocolMatrixEntry {
+  nativeProtocols?: string[];
+  compatibleProtocols?: string[];
+  claudeFallback?: boolean;
+  recommendedEndpoints?: Record<string, string>;
+  capabilities?: string[];
+  docsStatus?: string;
+}
+
+export interface ProviderProtocolDirectory {
+  protocolOptions?: {
+    provider?: ProviderProtocolOption[];
+    binding?: ProviderProtocolOption[];
+  };
+  recommendedEndpoints?: Record<string, string>;
+  providerProtocolMatrix?: Record<string, ProviderProtocolMatrixEntry>;
+  providerDocsStatus?: Record<string, string>;
 }
 
 export interface LlmProviderRawConfigs {

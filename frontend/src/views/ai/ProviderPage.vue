@@ -6,8 +6,8 @@ import DeleteConfirmModal from '@/components/common/DeleteConfirmModal.vue';
 import SecretMaskText from '@/components/common/SecretMaskText.vue';
 import ProviderDrawer from '@/features/llm-provider/ProviderDrawer.vue';
 import { getProviderCredentialValues, getProviderTypeLabel } from '@/features/llm-provider/provider-form';
-import type { LlmProvider } from '@/interfaces/llm-provider';
-import { addLlmProvider, deleteLlmProvider, getLlmProviders, updateLlmProvider } from '@/services/llm-provider';
+import type { LlmProvider, ProviderProtocolDirectory } from '@/interfaces/llm-provider';
+import { addLlmProvider, deleteLlmProvider, getLlmProviders, getProviderProtocolDirectory, updateLlmProvider } from '@/services/llm-provider';
 import { showSuccess } from '@/lib/feedback';
 import { useI18n } from 'vue-i18n';
 
@@ -19,6 +19,7 @@ const drawerOpen = ref(false);
 const deleteOpen = ref(false);
 const editing = ref<(LlmProvider & Record<string, any>) | null>(null);
 const deleting = ref<(LlmProvider & Record<string, any>) | null>(null);
+const protocolDirectory = ref<ProviderProtocolDirectory | null>(null);
 
 const filtered = computed(() => rows.value.filter((item) => {
   const keyword = search.value.trim().toLowerCase();
@@ -31,7 +32,12 @@ const filtered = computed(() => rows.value.filter((item) => {
 async function load() {
   loading.value = true;
   try {
-    rows.value = await getLlmProviders().catch(() => []);
+    const [providers, directory] = await Promise.all([
+      getLlmProviders().catch(() => []),
+      getProviderProtocolDirectory().catch(() => null),
+    ]);
+    rows.value = providers || [];
+    protocolDirectory.value = directory;
   } finally {
     loading.value = false;
   }
@@ -101,6 +107,7 @@ onMounted(load);
     <ProviderDrawer
       v-model:open="drawerOpen"
       :provider="editing"
+      :protocol-directory="protocolDirectory"
       @submit="submit"
     />
 

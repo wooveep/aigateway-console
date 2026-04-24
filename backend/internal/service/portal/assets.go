@@ -1405,7 +1405,9 @@ func scanModelBinding(scanner interface{ Scan(...any) error }) (ModelAssetBindin
 	); err != nil {
 		return ModelAssetBinding{}, err
 	}
-	item.Endpoint = endpoint.String
+	rawProtocol := item.Protocol
+	item.Protocol = k8sclient.NormalizeBindingProtocolCanonical(item.Protocol)
+	item.Endpoint = normalizeBindingEndpoint(endpoint.String, rawProtocol, item.Protocol)
 	if pricingJSON.String != "" {
 		item.Pricing = &ModelBindingPricing{}
 		_ = json.Unmarshal([]byte(pricingJSON.String), item.Pricing)
@@ -1561,7 +1563,8 @@ func normalizeBinding(binding ModelAssetBinding) (ModelAssetBinding, error) {
 	binding.ModelID = strings.TrimSpace(binding.ModelID)
 	binding.ProviderName = strings.TrimSpace(binding.ProviderName)
 	binding.TargetModel = strings.TrimSpace(binding.TargetModel)
-	binding.Protocol = strings.TrimSpace(binding.Protocol)
+	rawProtocol := strings.TrimSpace(binding.Protocol)
+	binding.Protocol = k8sclient.NormalizeBindingProtocolCanonical(rawProtocol)
 	binding.Endpoint = strings.TrimSpace(binding.Endpoint)
 	if binding.BindingID == "" {
 		binding.BindingID = uuid.NewString()
@@ -1569,12 +1572,36 @@ func normalizeBinding(binding ModelAssetBinding) (ModelAssetBinding, error) {
 	if binding.ModelID == "" || binding.ProviderName == "" || binding.TargetModel == "" {
 		return ModelAssetBinding{}, errors.New("modelId, providerName and targetModel are required")
 	}
-	if binding.Protocol == "" {
-		binding.Protocol = "openai/v1"
+	if !k8sclient.IsSupportedBindingProtocol(binding.Protocol) {
+		return ModelAssetBinding{}, errors.New("protocol must be openai/v1, anthropic/v1/messages or original")
 	}
+	binding.Endpoint = normalizeBindingEndpoint(binding.Endpoint, rawProtocol, binding.Protocol)
 	binding.Pricing = canonicalizeModelBindingPricing(binding.Pricing)
 	binding.Limits = canonicalizeModelBindingLimits(binding.Limits)
 	return binding, nil
+}
+
+func normalizeBindingEndpoint(endpoint, rawProtocol, protocol string) string {
+	endpoint = strings.TrimSpace(endpoint)
+	if endpoint == "-" {
+		endpoint = ""
+	}
+	if endpoint == "" && strings.Contains(strings.ToLower(strings.TrimSpace(rawProtocol)), "responses") {
+		return k8sclient.AIProviderDefaultResponsesEndpoint
+	}
+	if endpoint == "" {
+		return k8sclient.RecommendedEndpointForProtocol(protocol)
+	}
+	if strings.HasPrefix(endpoint, "http://") || strings.HasPrefix(endpoint, "https://") {
+		return endpoint
+	}
+	if !strings.HasPrefix(endpoint, "/") {
+		endpoint = "/" + endpoint
+	}
+	if endpoint == "/v1/chatcompletions" {
+		return k8sclient.AIProviderDefaultOpenAIEndpoint
+	}
+	return endpoint
 }
 
 func canonicalizeModelBindingPricing(pricing *ModelBindingPricing) *ModelBindingPricing {

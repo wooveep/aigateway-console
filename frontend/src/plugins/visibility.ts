@@ -93,10 +93,10 @@ const VISIBLE_PLUGIN_NAMES_BY_SCOPE: PluginVisibilityConfig = {
   },
   [PluginVisibilityScope.AI_ROUTE]: {
     [PluginVisibilityCategory.ROUTE]: [],
-    [PluginVisibilityCategory.AI]: ['ai-statistics', 'ai-data-masking'],
+    [PluginVisibilityCategory.AI]: ['ai-statistics', 'ai-data-masking', 'ai-quota', 'ai-token-ratelimit'],
     [PluginVisibilityCategory.AUTH]: [],
     [PluginVisibilityCategory.SECURITY]: [],
-    [PluginVisibilityCategory.TRAFFIC]: [],
+    [PluginVisibilityCategory.TRAFFIC]: ['cluster-key-rate-limit'],
     [PluginVisibilityCategory.TRANSFORM]: [],
     [PluginVisibilityCategory.O11Y]: [],
     [PluginVisibilityCategory.CUSTOM]: [],

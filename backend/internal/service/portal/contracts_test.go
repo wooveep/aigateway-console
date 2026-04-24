@@ -262,6 +262,8 @@ func expectSharedSchemaMigration(mock sqlmock.Sqlmock) {
 		"portal_model_asset",
 		"portal_model_binding",
 		"portal_agent_catalog",
+		"portal_sso_config",
+		"portal_user_sso_identity",
 	} {
 		mock.ExpectExec("CREATE TABLE IF NOT EXISTS " + table).WillReturnResult(sqlmock.NewResult(0, 0))
 	}
@@ -307,6 +309,8 @@ func expectSharedSchemaCheck(mock sqlmock.Sqlmock) {
 		"portal_model_asset",
 		"portal_model_binding",
 		"portal_agent_catalog",
+		"portal_sso_config",
+		"portal_user_sso_identity",
 	} {
 		mock.ExpectQuery(query).
 			WithArgs(table).

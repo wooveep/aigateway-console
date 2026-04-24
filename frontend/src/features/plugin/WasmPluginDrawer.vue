@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { reactive, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { ImagePullPolicy, PluginPhase, type WasmPluginData } from '@/interfaces/wasm-plugin';
 import DrawerFooter from '@/components/common/DrawerFooter.vue';
 import { buildPluginImageUrl, splitPluginImageUrl } from './plugin-config';
@@ -14,6 +15,8 @@ const emit = defineEmits<{
   'update:open': [value: boolean];
   submit: [payload: WasmPluginData, isEdit: boolean];
 }>();
+
+const { t } = useI18n();
 
 const formState = reactive({
   name: '',
@@ -98,10 +101,10 @@ function submit() {
       <div class="wasm-plugin-drawer__grid">
         <a-form-item label="执行阶段">
           <a-select v-model:value="formState.phase">
-            <a-select-option :value="PluginPhase.UNSPECIFIED">未指定</a-select-option>
-            <a-select-option :value="PluginPhase.AUTHN">AUTHN</a-select-option>
-            <a-select-option :value="PluginPhase.AUTHZ">AUTHZ</a-select-option>
-            <a-select-option :value="PluginPhase.STATS">STATS</a-select-option>
+            <a-select-option :value="PluginPhase.UNSPECIFIED">{{ t('plugin.phases.unspecified') }}</a-select-option>
+            <a-select-option :value="PluginPhase.AUTHN">{{ t('plugin.phases.authn') }}</a-select-option>
+            <a-select-option :value="PluginPhase.AUTHZ">{{ t('plugin.phases.authz') }}</a-select-option>
+            <a-select-option :value="PluginPhase.STATS">{{ t('plugin.phases.stats') }}</a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item label="优先级">

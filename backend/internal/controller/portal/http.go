@@ -8,10 +8,33 @@ import (
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
 
+	"github.com/wooveep/aigateway-console/backend/internal/consts"
+	"github.com/wooveep/aigateway-console/backend/internal/model/response"
 	portalsvc "github.com/wooveep/aigateway-console/backend/internal/service/portal"
 )
 
 func Bind(group *ghttp.RouterGroup, portalService *portalsvc.Service) {
+	group.GET("/v1/portal/sso", func(r *ghttp.Request) {
+		item, err := portalService.GetPortalSSOConfig(r.Context())
+		writeJSON(r, item, err, 200)
+	})
+	group.PUT("/v1/portal/sso", func(r *ghttp.Request) {
+		var req portalsvc.PortalSSOConfigRecord
+		if err := r.Parse(&req); err != nil {
+			writeJSON(r, nil, err, 400)
+			return
+		}
+
+		user, _ := r.GetCtxVar(consts.CtxKeyCurrentUser).Val().(*response.User)
+		updatedBy := "system"
+		if user != nil {
+			updatedBy = firstNonEmpty(user.Username, user.Name, user.DisplayName, updatedBy)
+		}
+
+		item, err := portalService.SavePortalSSOConfig(r.Context(), req, updatedBy)
+		writeJSON(r, item, err, 200)
+	})
+
 	group.GET("/v1/consumers", func(r *ghttp.Request) {
 		items, err := portalService.ListConsumers(r.Context())
 		writeJSON(r, items, err, 200)
@@ -514,16 +537,38 @@ func Bind(group *ghttp.RouterGroup, portalService *portalsvc.Service) {
 		item, err := portalService.UpdateAccount(r.Context(), r.GetRouter("consumerName").String(), req)
 		writeJSON(r, item, err, 200)
 	})
-	group.PATCH("/v1/org/accounts/:consumerName/assignment", func(r *ghttp.Request) {
+	group.DELETE("/v1/org/accounts/:consumerName", func(r *ghttp.Request) {
+		if err := portalService.DeleteAccount(r.Context(), r.GetRouter("consumerName").String()); err != nil {
+			writeJSON(r, nil, err, 400)
+			return
+		}
+		r.Response.WriteStatus(204)
+		r.ExitAll()
+	})
+	group.POST("/v1/org/accounts/:consumerName/sso/rebind", func(r *ghttp.Request) {
 		var req struct {
-			DepartmentID       string `json:"departmentId"`
-			ParentConsumerName string `json:"parentConsumerName"`
+			TargetConsumerName string `json:"targetConsumerName"`
 		}
 		if err := r.Parse(&req); err != nil {
 			writeJSON(r, nil, err, 400)
 			return
 		}
-		item, err := portalService.UpdateAccountAssignment(r.Context(), r.GetRouter("consumerName").String(), req.DepartmentID, req.ParentConsumerName)
+		item, err := portalService.RebindAccountSSOIdentity(
+			r.Context(),
+			r.GetRouter("consumerName").String(),
+			req.TargetConsumerName,
+		)
+		writeJSON(r, item, err, 200)
+	})
+	group.PATCH("/v1/org/accounts/:consumerName/assignment", func(r *ghttp.Request) {
+		var req struct {
+			DepartmentID string `json:"departmentId"`
+		}
+		if err := r.Parse(&req); err != nil {
+			writeJSON(r, nil, err, 400)
+			return
+		}
+		item, err := portalService.UpdateAccountAssignment(r.Context(), r.GetRouter("consumerName").String(), req.DepartmentID)
 		writeJSON(r, item, err, 200)
 	})
 	group.PATCH("/v1/org/accounts/:consumerName/status", func(r *ghttp.Request) {

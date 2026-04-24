@@ -366,6 +366,61 @@ func TestBuiltinWasmPluginManifestSupportsAIDataMasking(t *testing.T) {
 	require.Equal(t, "http://aigateway-plugin-server.aigateway-system.svc.cluster.local/plugins/ai-data-masking/2.0.0/plugin.wasm", spec["url"])
 }
 
+func TestBuiltinWasmPluginManifestSupportsAIQuotaAuthNPhase(t *testing.T) {
+	manifest, ok := builtinWasmPluginManifest(higressWasmPluginNameAIQuota, "aigateway-system")
+	require.True(t, ok)
+
+	spec := mapValue(manifest["spec"])
+	require.Equal(t, higressWasmPluginPhaseAuthN, spec["phase"])
+	require.EqualValues(t, higressWasmPluginPriorityAIQuota, spec["priority"])
+	require.Equal(t, "http://aigateway-plugin-server.aigateway-system.svc.cluster.local/plugins/ai-quota/1.1.0/plugin.wasm", spec["url"])
+}
+
+func TestSyncBuiltinWasmPluginBaseSpecPreservesUserExecutionSettingsForAIQuota(t *testing.T) {
+	plugin := map[string]any{
+		"metadata": map[string]any{
+			"labels": map[string]any{
+				higressLabelWasmPluginVersion: "0.0.0",
+			},
+		},
+		"spec": map[string]any{
+			"phase":    higressWasmPluginPhaseStats,
+			"priority": 321,
+			"url":      "http://invalid/plugin.wasm",
+		},
+	}
+
+	syncBuiltinWasmPluginBaseSpec(plugin, higressWasmPluginNameAIQuota, "aigateway-system")
+
+	labels := mapValue(nestedValue(plugin, "metadata", "labels"))
+	require.Equal(t, higressWasmPluginNameAIQuota, labels[higressLabelWasmPluginName])
+	require.Equal(t, higressAnnotationTrueValue, labels[higressLabelInternal])
+	require.Equal(t, "1.1.0", labels[higressLabelWasmPluginVersion])
+
+	spec := mapValue(plugin["spec"])
+	require.Equal(t, higressWasmPluginPhaseStats, spec["phase"])
+	require.EqualValues(t, 321, spec["priority"])
+	require.Equal(t, "http://aigateway-plugin-server.aigateway-system.svc.cluster.local/plugins/ai-quota/1.1.0/plugin.wasm", spec["url"])
+	require.Equal(t, true, spec["defaultConfigDisable"])
+	require.Empty(t, toMapSlice(spec["matchRules"]))
+	require.Empty(t, mapValue(spec["defaultConfig"]))
+}
+
+func TestMemoryClientUpsertBuiltinWasmPluginExecutionUpdatesRuntimeSpec(t *testing.T) {
+	client := NewMemoryClient()
+
+	err := client.UpsertBuiltinWasmPluginExecution(context.Background(), higressWasmPluginNameAIQuota, higressWasmPluginPhaseStats, 456)
+	require.NoError(t, err)
+
+	plugin, err := client.GetResource(context.Background(), "wasmplugin.extensions.higress.io", "ai-quota.internal")
+	require.NoError(t, err)
+
+	spec := mapValue(plugin["spec"])
+	require.Equal(t, higressWasmPluginPhaseStats, spec["phase"])
+	require.EqualValues(t, 456, spec["priority"])
+	require.Equal(t, "http://aigateway-plugin-server.aigateway-system.svc.cluster.local/plugins/ai-quota/1.1.0/plugin.wasm", spec["url"])
+}
+
 func TestBuiltinWasmPluginManifestSupportsModelRateLimitPlugins(t *testing.T) {
 	clusterManifest, ok := builtinWasmPluginManifest(higressWasmPluginNameClusterKeyRateLimit, "aigateway-system")
 	require.True(t, ok)

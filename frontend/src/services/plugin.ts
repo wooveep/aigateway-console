@@ -38,7 +38,7 @@ export const getWasmPluginReadme = (name: string) => {
 
 // 获取全局的指定插件配置
 export const getGlobalPluginInstance = (pluginName: string) => {
-  return request.get<any, any>(`/v1/global/plugin-instances/${pluginName}`);
+  return request.get<any, any>(`/v1/global/plugin-instances/${pluginName}`, QUIET_PLUGIN_REQUEST_OPTIONS);
 };
 
 // 修改全局的指定插件配置
@@ -66,12 +66,13 @@ export const getRoutePluginInstancesWithAliases = (name: string, aliases: string
 // 获取指定路由的指定插件配置
 export const getRoutePluginInstance = (params: { name: string; pluginName: string }) => {
   const { name, pluginName } = params;
-  return request.get<any, any>(`/v1/routes/${name}/plugin-instances/${pluginName}`);
+  return request.get<any, any>(`/v1/routes/${name}/plugin-instances/${pluginName}`, QUIET_PLUGIN_REQUEST_OPTIONS);
 };
 
 export const getRoutePluginInstanceWithAliases = (params: { name: string; pluginName: string; aliases?: string[] }) => {
   const { name, pluginName, aliases = [] } = params;
   return request.get<any, any>(`/v1/routes/${name}/plugin-instances/${pluginName}`, {
+    ...QUIET_PLUGIN_REQUEST_OPTIONS,
     params: {
       aliases: aliases.join(','),
     },
@@ -97,7 +98,7 @@ export const getDomainPluginInstances = (name: string) => {
 // 获取指定域名的指定插件配置
 export const getDomainPluginInstance = (params: { name: string; pluginName: string }) => {
   const { name, pluginName } = params;
-  return request.get<any, any>(`/v1/domains/${name}/plugin-instances/${pluginName}`);
+  return request.get<any, any>(`/v1/domains/${name}/plugin-instances/${pluginName}`, QUIET_PLUGIN_REQUEST_OPTIONS);
 };
 
 // 修改指定域名的指定插件配置
@@ -117,7 +118,7 @@ export const getServicePluginInstances = (name: string) => {
 
 export const getServicePluginInstance = (params: { name: string; pluginName: string }) => {
   const { name, pluginName } = params;
-  return request.get<any, any>(`/v1/services/${name}/plugin-instances/${pluginName}`);
+  return request.get<any, any>(`/v1/services/${name}/plugin-instances/${pluginName}`, QUIET_PLUGIN_REQUEST_OPTIONS);
 };
 
 export const updateServicePluginInstance = (params: { name: string; pluginName: string }, payload) => {

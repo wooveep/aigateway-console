@@ -29,6 +29,10 @@ func Bind(group *ghttp.RouterGroup, gatewayService *gatewaysvc.Service) {
 		r.Response.WriteJsonExit(g.Map{"success": true, "data": items})
 	})
 
+	group.GET("/v1/ai/provider-protocol-directory", func(r *ghttp.Request) {
+		r.Response.WriteJsonExit(g.Map{"success": true, "data": gatewayService.GetProviderProtocolDirectory(r.Context())})
+	})
+
 	group.GET("/v1/mcpServer/consumers", func(r *ghttp.Request) {
 		serverName := strings.TrimSpace(r.GetQuery("mcpServerName").String())
 		if serverName == "" {
@@ -121,7 +125,15 @@ func Bind(group *ghttp.RouterGroup, gatewayService *gatewaysvc.Service) {
 
 func bindCollection(group *ghttp.RouterGroup, gatewayService *gatewaysvc.Service, kind, path string, paginated bool, hasGet bool) {
 	group.GET(path, func(r *ghttp.Request) {
-		items, err := gatewayService.List(r.Context(), kind)
+		var (
+			items []map[string]any
+			err   error
+		)
+		if kind == "wasm-plugins" {
+			items, err = gatewayService.ListWasmPlugins(r.Context(), strings.TrimSpace(r.GetQuery("lang").String()))
+		} else {
+			items, err = gatewayService.List(r.Context(), kind)
+		}
 		if err != nil {
 			r.Response.WriteStatusExit(500, g.Map{"success": false, "message": err.Error()})
 			return

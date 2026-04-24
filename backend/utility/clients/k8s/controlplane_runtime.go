@@ -454,10 +454,10 @@ func (c *RealClient) syncAIRouteRuntime(ctx context.Context, name string, data m
 	if err := c.syncAIRouteModelMapper(ctx, internalName, data); err != nil {
 		return err
 	}
-	if err := c.syncAIStatisticsRule(ctx, publicName, true); err != nil {
+	if err := c.syncAIStatisticsRule(ctx, name, publicName, true); err != nil {
 		return err
 	}
-	if err := c.syncAIStatisticsRule(ctx, internalName, true); err != nil {
+	if err := c.syncAIStatisticsRule(ctx, name, internalName, true); err != nil {
 		return err
 	}
 	if err := c.syncAIQuotaRule(ctx, name, publicName, true); err != nil {
@@ -467,6 +467,17 @@ func (c *RealClient) syncAIRouteRuntime(ctx context.Context, name string, data m
 		return err
 	}
 	return c.syncAIRouteFallbackRuntime(ctx, name, data)
+}
+
+func (c *RealClient) SyncAIRouteManagedBuiltinRuntime(ctx context.Context, routeName string) error {
+	item, err := c.GetResource(ctx, "ai-routes", routeName)
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return nil
+		}
+		return err
+	}
+	return c.syncAIRouteRuntime(ctx, routeName, item)
 }
 
 func (c *RealClient) syncAIRouteFallbackRuntime(ctx context.Context, name string, data map[string]any) error {
@@ -524,10 +535,10 @@ func (c *RealClient) syncAIRouteFallbackRuntime(ctx context.Context, name string
 	if err := c.syncAIRouteModelMapper(ctx, aiRouteInternalFallbackIngressName(name), fallbackData); err != nil {
 		return err
 	}
-	if err := c.syncAIStatisticsRule(ctx, aiRouteFallbackIngressName(name), true); err != nil {
+	if err := c.syncAIStatisticsRule(ctx, name, aiRouteFallbackIngressName(name), true); err != nil {
 		return err
 	}
-	if err := c.syncAIStatisticsRule(ctx, aiRouteInternalFallbackIngressName(name), true); err != nil {
+	if err := c.syncAIStatisticsRule(ctx, name, aiRouteInternalFallbackIngressName(name), true); err != nil {
 		return err
 	}
 	if err := c.syncAIQuotaRule(ctx, name, aiRouteFallbackIngressName(name), true); err != nil {
@@ -767,23 +778,36 @@ func (c *RealClient) enableModelRouter(ctx context.Context) error {
 	}, true)
 }
 
-func (c *RealClient) syncAIStatisticsRule(ctx context.Context, ingressName string, enabled bool) error {
+func (c *RealClient) syncAIStatisticsRule(ctx context.Context, routeName, ingressName string, defaultEnabled bool) error {
+	enabled, config, err := c.resolveAIRouteManagedBuiltinRule(ctx, routeName, higressWasmPluginNameAIStatistics, defaultEnabled, map[string]any{
+		higressAIStatisticsDefaultAttrsKey: true,
+	})
+	if err != nil {
+		return err
+	}
 	if !enabled {
 		return c.removeBuiltinPluginRule(ctx, higressWasmPluginNameAIStatistics, map[string][]string{"ingress": {ingressName}})
 	}
-	return c.upsertBuiltinPluginRule(ctx, higressWasmPluginNameAIStatistics, map[string][]string{"ingress": {ingressName}}, map[string]any{
-		higressAIStatisticsDefaultAttrsKey: true,
-	}, true, nil)
+	return c.upsertBuiltinPluginRule(ctx, higressWasmPluginNameAIStatistics, map[string][]string{"ingress": {ingressName}}, config, true, nil)
 }
 
-func (c *RealClient) syncAIQuotaRule(ctx context.Context, routeName, ingressName string, enabled bool) error {
+func (c *RealClient) syncAIQuotaRule(ctx context.Context, routeName, ingressName string, defaultEnabled bool) error {
+	serviceName := c.resolveAIQuotaRedisServiceName(ctx)
+	password := c.resolveAIQuotaRedisPassword(ctx)
+	enabled, config, err := c.resolveAIRouteManagedBuiltinRule(
+		ctx,
+		routeName,
+		higressWasmPluginNameAIQuota,
+		defaultEnabled,
+		buildAIQuotaRuleConfig(routeName, serviceName, password),
+	)
+	if err != nil {
+		return err
+	}
 	if !enabled {
 		return c.removeBuiltinPluginRule(ctx, higressWasmPluginNameAIQuota, map[string][]string{"ingress": {ingressName}})
 	}
-	serviceName := c.resolveAIQuotaRedisServiceName(ctx)
-	password := c.resolveAIQuotaRedisPassword(ctx)
-	return c.upsertBuiltinPluginRule(ctx, higressWasmPluginNameAIQuota, map[string][]string{"ingress": {ingressName}},
-		buildAIQuotaRuleConfig(routeName, serviceName, password), true, nil)
+	return c.upsertBuiltinPluginRule(ctx, higressWasmPluginNameAIQuota, map[string][]string{"ingress": {ingressName}}, config, true, nil)
 }
 
 func (c *RealClient) syncAIQuotaMirrorRule(ctx context.Context, sourceIngress, targetIngress string) error {
@@ -822,6 +846,9 @@ func (c *RealClient) SyncAIModelRateLimitRuntime(ctx context.Context) error {
 		projection = map[string]any{}
 	}
 	desiredRules := buildAIModelRateLimitRulesFromProjection(projection)
+	if err := c.applyAIRouteModelRateLimitOverrides(ctx, desiredRules); err != nil {
+		return err
+	}
 	for _, pluginName := range []string{higressWasmPluginNameClusterKeyRateLimit, higressWasmPluginNameAITokenRateLimit} {
 		desired := desiredRules[pluginName]
 		_, lookupErr := c.getBuiltinWasmPlugin(ctx, pluginName)
@@ -861,6 +888,114 @@ func buildAIQuotaRuleConfig(routeName, redisServiceName, redisPassword string) m
 		"redis":              buildRedisRuntimeConfig(serviceName, redisPassword),
 	}
 	return config
+}
+
+func (c *RealClient) resolveAIRouteManagedBuiltinRule(
+	ctx context.Context,
+	routeName string,
+	pluginName string,
+	defaultEnabled bool,
+	baseConfig map[string]any,
+) (bool, map[string]any, error) {
+	override, err := c.loadAIRoutePluginInstanceOverride(ctx, routeName, pluginName)
+	if err != nil {
+		return false, nil, err
+	}
+	config := cloneMap(baseConfig)
+	if override != nil && len(override.Config) > 0 {
+		for key, value := range override.Config {
+			config[key] = value
+		}
+	}
+	if override == nil {
+		return defaultEnabled, config, nil
+	}
+	return override.Enabled, config, nil
+}
+
+type aiRoutePluginInstanceOverride struct {
+	Enabled bool
+	Config  map[string]any
+}
+
+func (c *RealClient) loadAIRoutePluginInstanceOverride(
+	ctx context.Context,
+	routeName string,
+	pluginName string,
+) (*aiRoutePluginInstanceOverride, error) {
+	target := aiRouteIngressName(routeName)
+	item, err := c.GetResource(ctx, routePluginInstanceKind(target), pluginName)
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &aiRoutePluginInstanceOverride{
+		Enabled: boolValue(firstNonNil(item["enabled"], item["runtimeEnabled"])),
+		Config:  parsePluginInstanceOverrideConfig(item),
+	}, nil
+}
+
+func parsePluginInstanceOverrideConfig(item map[string]any) map[string]any {
+	if item == nil {
+		return map[string]any{}
+	}
+	raw := strings.TrimSpace(stringValue(item["rawConfigurations"]))
+	if raw != "" {
+		var parsed map[string]any
+		if err := yaml.Unmarshal([]byte(raw), &parsed); err == nil && len(parsed) > 0 {
+			return parsed
+		}
+	}
+	return cloneMap(mapValue(item["config"]))
+}
+
+func (c *RealClient) applyAIRouteModelRateLimitOverrides(
+	ctx context.Context,
+	desiredRules map[string]map[string]map[string]any,
+) error {
+	routes, err := c.ListResources(ctx, "ai-routes")
+	if err != nil {
+		return err
+	}
+	for _, pluginName := range []string{higressWasmPluginNameClusterKeyRateLimit, higressWasmPluginNameAITokenRateLimit} {
+		desired := desiredRules[pluginName]
+		if desired == nil {
+			desired = map[string]map[string]any{}
+			desiredRules[pluginName] = desired
+		}
+		for _, route := range routes {
+			routeName := stringValue(route["name"])
+			if routeName == "" {
+				continue
+			}
+			override, err := c.loadAIRoutePluginInstanceOverride(ctx, routeName, pluginName)
+			if err != nil {
+				return err
+			}
+			if override == nil {
+				continue
+			}
+			ingressName := aiRouteIngressName(routeName)
+			if !override.Enabled {
+				delete(desired, ingressName)
+				continue
+			}
+			if len(override.Config) == 0 {
+				continue
+			}
+			if current := cloneMap(desired[ingressName]); len(current) > 0 {
+				for key, value := range override.Config {
+					current[key] = value
+				}
+				desired[ingressName] = current
+				continue
+			}
+			desired[ingressName] = cloneMap(override.Config)
+		}
+	}
+	return nil
 }
 
 func buildRedisRuntimeConfig(redisServiceName, redisPassword string) map[string]any {
@@ -1002,6 +1137,7 @@ func (c *RealClient) mutateBuiltinWasmPlugin(ctx context.Context, pluginName str
 		return err
 	}
 	working := cloneMap(plugin)
+	syncBuiltinWasmPluginBaseSpec(working, pluginName, c.namespace)
 	if err := mutate(working); err != nil {
 		return err
 	}
@@ -1012,6 +1148,50 @@ func (c *RealClient) mutateBuiltinWasmPlugin(ctx context.Context, pluginName str
 	}
 	_, err = c.run(ctx, payload, "apply", "-f", "-")
 	return err
+}
+
+func syncBuiltinWasmPluginBaseSpec(plugin map[string]any, pluginName, namespace string) {
+	specTemplate, version, ok := builtinWasmPluginSpec(pluginName, namespace)
+	if !ok {
+		return
+	}
+	metadata := ensureMap(plugin, "metadata")
+	labels := ensureMap(metadata, "labels")
+	labels[higressLabelWasmPluginName] = strings.TrimSpace(pluginName)
+	labels[higressLabelResourceDefiner] = higressLabelResourceDefinerValue
+	labels[higressLabelInternal] = higressAnnotationTrueValue
+	labels[higressLabelWasmPluginVersion] = version
+
+	spec := ensureMap(plugin, "spec")
+	if stringValue(spec["phase"]) == "" {
+		spec["phase"] = specTemplate["phase"]
+	}
+	if toInt(spec["priority"]) == 0 {
+		spec["priority"] = specTemplate["priority"]
+	}
+	spec["url"] = specTemplate["url"]
+	if _, ok := spec["defaultConfig"]; !ok {
+		spec["defaultConfig"] = map[string]any{}
+	}
+	if _, ok := spec["matchRules"]; !ok {
+		spec["matchRules"] = []map[string]any{}
+	}
+	if _, ok := spec["defaultConfigDisable"]; !ok {
+		spec["defaultConfigDisable"] = true
+	}
+}
+
+func (c *RealClient) UpsertBuiltinWasmPluginExecution(ctx context.Context, pluginName, phase string, priority int) error {
+	return c.mutateBuiltinWasmPlugin(ctx, pluginName, func(plugin map[string]any) error {
+		spec := ensureMap(plugin, "spec")
+		if strings.TrimSpace(phase) != "" {
+			spec["phase"] = strings.TrimSpace(phase)
+		}
+		if priority > 0 {
+			spec["priority"] = priority
+		}
+		return nil
+	})
 }
 
 func (c *RealClient) getBuiltinWasmPlugin(ctx context.Context, pluginName string) (map[string]any, error) {
@@ -1757,6 +1937,29 @@ func aiRouteIngressName(name string) string {
 	return "ai-route-" + strings.TrimSpace(name) + consts.InternalResourceNameSuffix
 }
 
+func aiRouteNameFromPluginTarget(target string) (string, bool) {
+	trimmed := strings.TrimSpace(target)
+	prefix := "ai-route-"
+	if !strings.HasPrefix(trimmed, prefix) {
+		return "", false
+	}
+	for _, suffix := range []string{
+		".fallback.internal-internal",
+		".fallback.internal",
+		".internal-internal",
+		consts.InternalResourceNameSuffix,
+	} {
+		if strings.HasSuffix(trimmed, suffix) {
+			name := strings.TrimSuffix(strings.TrimPrefix(trimmed, prefix), suffix)
+			if strings.TrimSpace(name) == "" {
+				return "", false
+			}
+			return name, true
+		}
+	}
+	return "", false
+}
+
 func aiRouteInternalIngressName(name string) string {
 	return aiRouteIngressName(name) + "-internal"
 }
@@ -2356,6 +2559,7 @@ func builtinWasmPluginSpec(pluginName, namespace string) (map[string]any, string
 	case higressWasmPluginNameAIProxy:
 		priority = higressWasmPluginPriorityAIProxy
 	case higressWasmPluginNameAIQuota:
+		phase = higressWasmPluginPhaseAuthN
 		priority = higressWasmPluginPriorityAIQuota
 	case higressWasmPluginNameAIDataMasking:
 		phase = higressWasmPluginPhaseAuthN

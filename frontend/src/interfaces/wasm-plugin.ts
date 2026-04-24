@@ -18,6 +18,12 @@ export interface WasmPluginData {
   };
   enabled?: boolean;
   internal?: boolean;
+  requiredPlugins?: string[];
+  dependentBy?: string[];
+  dependencySource?: string;
+  dependencyEnabled?: boolean;
+  canDisable?: boolean;
+  enableStateText?: string;
   resKey?: string;
   key?: string;
   [key: string]: any;

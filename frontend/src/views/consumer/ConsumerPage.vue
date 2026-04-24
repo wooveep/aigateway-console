@@ -4,7 +4,7 @@ import PageSection from '@/components/common/PageSection.vue';
 import PortalUnavailableState from '@/components/common/PortalUnavailableState.vue';
 import StatusTag from '@/components/common/StatusTag.vue';
 import { usePortalAvailability } from '@/composables/usePortalAvailability';
-import { showCopyValueModal, showError, showSuccess } from '@/lib/feedback';
+import { showConfirm, showCopyValueModal, showError, showSuccess } from '@/lib/feedback';
 import { formatDateTimeDisplay } from '@/utils/time';
 import { useI18n } from 'vue-i18n';
 import type { ConsumerDetail, InviteCodeRecord } from '@/interfaces/consumer';
@@ -12,9 +12,12 @@ import type { OrgAccountRecord, OrgDepartmentNode } from '@/interfaces/org';
 import {
   createOrgAccount,
   createOrgDepartment,
+  deleteOrgAccount,
   listOrgAccounts,
   listOrgDepartmentsTree,
+  rebindOrgAccountSSOIdentity,
   updateOrgAccount,
+  updateOrgDepartment,
   updateOrgAccountStatus,
 } from '@/services/organization';
 import {
@@ -33,6 +36,7 @@ const loading = ref(false);
 const inviteLoading = ref(false);
 const accountSaving = ref(false);
 const departmentSaving = ref(false);
+const ssoRebindSaving = ref(false);
 
 const departments = ref<OrgDepartmentNode[]>([]);
 const accounts = ref<OrgAccountRecord[]>([]);
@@ -40,19 +44,24 @@ const inviteCodes = ref<InviteCodeRecord[]>([]);
 const selectedDepartmentId = ref<string>();
 const accountModalOpen = ref(false);
 const departmentModalOpen = ref(false);
+const departmentModalMode = ref<'create' | 'edit'>('create');
 const detailOpen = ref(false);
 const detailLoading = ref(false);
 const editingAccount = ref<OrgAccountRecord | null>(null);
 const consumerDetail = ref<ConsumerDetail | null>(null);
+const ssoRebindModalOpen = ref(false);
+const ssoRebindSourceAccount = ref<OrgAccountRecord | null>(null);
 
 const accountFormRef = ref();
 const departmentFormRef = ref();
+const ssoRebindFormRef = ref();
 
 const accountForm = reactive({
   consumerName: '',
   displayName: '',
   email: '',
   userLevel: 'normal',
+  status: 'active',
   departmentId: '',
   password: '',
 });
@@ -60,6 +69,16 @@ const accountForm = reactive({
 const departmentForm = reactive({
   name: '',
   parentDepartmentId: '',
+  adminMode: 'existing',
+  adminConsumerName: '',
+  adminDisplayName: '',
+  adminEmail: '',
+  adminUserLevel: 'normal',
+  adminPassword: '',
+});
+
+const ssoRebindForm = reactive({
+  targetConsumerName: '',
 });
 
 const filteredAccounts = computed(() => {
@@ -69,13 +88,49 @@ const filteredAccounts = computed(() => {
   return accounts.value.filter((item) => item.departmentId === selectedDepartmentId.value);
 });
 
+const selectedDepartment = computed(() => findDepartmentNode(departments.value, selectedDepartmentId.value));
 const departmentTreeData = computed(() => toDepartmentTree(departments.value));
 const departmentOptions = computed(() => flattenDepartmentOptions(departments.value));
+const departmentAdminOptions = computed(() => {
+  const departmentId = selectedDepartment.value?.departmentId;
+  if (!departmentId) {
+    return [];
+  }
+  return accounts.value
+    .filter((item) => item.departmentId === departmentId && String(item.status || '').toLowerCase() === 'active')
+    .map((item) => ({
+      label: `${item.displayName || item.consumerName} (${item.consumerName})`,
+      value: item.consumerName,
+    }));
+});
+const departmentExistingAdminOptions = computed(() => accounts.value
+  .filter((item) => String(item.status || '').toLowerCase() === 'active')
+  .map((item) => ({
+    label: [
+      `${item.displayName || item.consumerName} (${item.consumerName})`,
+      item.email || '',
+      item.departmentPath || t('consumer.notAssigned'),
+    ].filter(Boolean).join(' · '),
+    value: item.consumerName,
+  })));
+const ssoRebindTargetOptions = computed(() => {
+  const sourceConsumerName = ssoRebindSourceAccount.value?.consumerName;
+  return accounts.value
+    .filter((item) => item.consumerName !== sourceConsumerName)
+    .map((item) => ({
+      label: [
+        `${item.displayName || item.consumerName} (${item.consumerName})`,
+        item.email || '',
+        resolveAccountStatusText(item.status),
+      ].filter(Boolean).join(' · '),
+      value: item.consumerName,
+    }));
+});
 
 function toDepartmentTree(nodes: OrgDepartmentNode[]): any[] {
   return (nodes || []).map((node) => ({
     key: node.departmentId,
-    title: `${node.name} (${node.memberCount || 0})`,
+    title: `${node.name} (${node.memberCount || 0}) / ${node.adminConsumerName || '-'}`,
     children: toDepartmentTree(node.children || []),
   }));
 }
@@ -92,6 +147,22 @@ function flattenDepartmentOptions(nodes: OrgDepartmentNode[], level = 0): Array<
 
 function handleDepartmentSelect(keys: string[]) {
   selectedDepartmentId.value = keys[0];
+}
+
+function findDepartmentNode(nodes: OrgDepartmentNode[], departmentId?: string): OrgDepartmentNode | undefined {
+  if (!departmentId) {
+    return undefined;
+  }
+  for (const node of nodes || []) {
+    if (node.departmentId === departmentId) {
+      return node;
+    }
+    const child = findDepartmentNode(node.children || [], departmentId);
+    if (child) {
+      return child;
+    }
+  }
+  return undefined;
 }
 
 function resolveAccountStatusText(status?: string) {
@@ -162,6 +233,7 @@ function openCreateAccount() {
     displayName: '',
     email: '',
     userLevel: 'normal',
+    status: 'active',
     departmentId: selectedDepartmentId.value || '',
     password: '',
   });
@@ -169,9 +241,34 @@ function openCreateAccount() {
 }
 
 function openCreateDepartment() {
+  departmentModalMode.value = 'create';
   Object.assign(departmentForm, {
     name: '',
     parentDepartmentId: selectedDepartmentId.value || '',
+    adminMode: 'existing',
+    adminConsumerName: '',
+    adminDisplayName: '',
+    adminEmail: '',
+    adminUserLevel: 'normal',
+    adminPassword: '',
+  });
+  departmentModalOpen.value = true;
+}
+
+function openEditDepartment() {
+  if (!selectedDepartment.value) {
+    return;
+  }
+  departmentModalMode.value = 'edit';
+  Object.assign(departmentForm, {
+    name: selectedDepartment.value.name || '',
+    parentDepartmentId: selectedDepartment.value.parentDepartmentId || '',
+    adminMode: 'existing',
+    adminConsumerName: selectedDepartment.value.adminConsumerName || '',
+    adminDisplayName: '',
+    adminEmail: '',
+    adminUserLevel: 'normal',
+    adminPassword: '',
   });
   departmentModalOpen.value = true;
 }
@@ -183,6 +280,7 @@ function openEditAccount(record: OrgAccountRecord) {
     displayName: record.displayName || '',
     email: record.email || '',
     userLevel: record.userLevel || 'normal',
+    status: record.status || 'active',
     departmentId: record.departmentId || '',
     password: '',
   });
@@ -199,13 +297,21 @@ async function saveAccount() {
       consumerName: accountForm.consumerName.trim(),
       displayName: accountForm.displayName.trim(),
       email: accountForm.email.trim() || undefined,
+      status: accountForm.status || 'active',
       departmentId: accountForm.departmentId || undefined,
       password: accountForm.password || undefined,
     };
     if (editingAccount.value) {
       await updateOrgAccount(editingAccount.value.consumerName, payload);
     } else {
-      await createOrgAccount(payload);
+      const created = await createOrgAccount(payload);
+      if (created.tempPassword) {
+        showCopyValueModal({
+          title: t('consumer.resetPasswordTitle'),
+          message: t('consumer.resetPasswordHint', { name: created.consumerName }),
+          value: created.tempPassword,
+        });
+      }
     }
     accountModalOpen.value = false;
     await load();
@@ -220,20 +326,102 @@ async function saveDepartment() {
 
   departmentSaving.value = true;
   try {
-    await createOrgDepartment({
-      name: departmentForm.name.trim(),
-      parentDepartmentId: departmentForm.parentDepartmentId || undefined,
-    });
+    if (departmentModalMode.value === 'create') {
+      const payload = {
+        name: departmentForm.name.trim(),
+        parentDepartmentId: departmentForm.parentDepartmentId || undefined,
+        adminMode: departmentForm.adminMode,
+        adminConsumerName: departmentForm.adminConsumerName.trim(),
+      };
+      if (departmentForm.adminMode === 'create') {
+        Object.assign(payload, {
+          adminDisplayName: departmentForm.adminDisplayName.trim(),
+          adminEmail: departmentForm.adminEmail.trim() || undefined,
+          adminUserLevel: departmentForm.adminUserLevel || 'normal',
+          adminPassword: departmentForm.adminPassword || undefined,
+        });
+      }
+      const created = await createOrgDepartment(payload);
+      if (created.createdAdminTempPassword) {
+        showCopyValueModal({
+          title: t('consumer.departmentAdminTempPasswordTitle'),
+          message: t('consumer.departmentAdminTempPasswordHint', { name: created.adminConsumerName || departmentForm.adminConsumerName.trim() }),
+          value: created.createdAdminTempPassword,
+        });
+      }
+      showSuccess(t('consumer.departmentCreateSuccess'));
+    } else if (selectedDepartment.value) {
+      await updateOrgDepartment(selectedDepartment.value.departmentId, {
+        name: departmentForm.name.trim(),
+        adminConsumerName: departmentForm.adminConsumerName || undefined,
+      });
+      showSuccess(t('consumer.departmentUpdateSuccess'));
+    }
     departmentModalOpen.value = false;
     Object.assign(departmentForm, {
       name: '',
       parentDepartmentId: '',
+      adminMode: 'existing',
+      adminConsumerName: '',
+      adminDisplayName: '',
+      adminEmail: '',
+      adminUserLevel: 'normal',
+      adminPassword: '',
     });
     await load();
-    showSuccess(t('consumer.departmentCreateSuccess'));
   } finally {
     departmentSaving.value = false;
   }
+}
+
+function openSSORebind(record: OrgAccountRecord) {
+  ssoRebindSourceAccount.value = record;
+  ssoRebindForm.targetConsumerName = '';
+  ssoRebindModalOpen.value = true;
+}
+
+async function saveSSORebind() {
+  if (!ssoRebindSourceAccount.value) {
+    return;
+  }
+  await ssoRebindFormRef.value?.validate();
+
+  ssoRebindSaving.value = true;
+  try {
+    await rebindOrgAccountSSOIdentity(ssoRebindSourceAccount.value.consumerName, {
+      targetConsumerName: ssoRebindForm.targetConsumerName,
+    });
+    ssoRebindModalOpen.value = false;
+    ssoRebindSourceAccount.value = null;
+    ssoRebindForm.targetConsumerName = '';
+    await load();
+    showSuccess(t('consumer.ssoRebindSuccess'));
+  } catch {
+    showError(t('consumer.ssoRebindFailed'));
+  } finally {
+    ssoRebindSaving.value = false;
+  }
+}
+
+function handleDeleteAccount(record: OrgAccountRecord) {
+  showConfirm({
+    title: t('consumer.deleteTitle'),
+    content: `${t('consumer.deleteSoftHint')} ${record.consumerName}`,
+    okText: t('misc.ok'),
+    cancelText: t('misc.cancel'),
+    okButtonProps: {
+      danger: true,
+    },
+    async onOk() {
+      try {
+        await deleteOrgAccount(record.consumerName);
+        await load();
+        showSuccess(t('consumer.deleteSuccess'));
+      } catch {
+        showError(t('consumer.deleteFailed'));
+      }
+    },
+  });
 }
 
 async function handleResetPassword(record: OrgAccountRecord) {
@@ -340,6 +528,7 @@ onMounted(load);
         <PageSection :title="t('consumer.departmentTree')" subtle>
           <template #actions>
             <a-button size="small" @click="openCreateDepartment">{{ t('consumer.createDepartment') }}</a-button>
+            <a-button size="small" :disabled="!selectedDepartment" @click="openEditDepartment">{{ t('consumer.editDepartment') }}</a-button>
           </template>
 
           <a-tree
@@ -379,11 +568,19 @@ onMounted(load);
                 <StatusTag :value="record.status" :text="resolveAccountStatusText(record.status)" />
               </template>
             </a-table-column>
-            <a-table-column key="actions" :title="t('misc.actions')" fixed="right" width="220">
+            <a-table-column key="actions" :title="t('misc.actions')" fixed="right" width="320">
               <template #default="{ record }">
                 <a-button type="link" size="small" @click="openConsumerDetail(record)">详情</a-button>
                 <a-button type="link" size="small" @click="openEditAccount(record)">{{ t('misc.edit') }}</a-button>
                 <a-button type="link" size="small" @click="handleResetPassword(record)">{{ t('consumer.resetPassword') }}</a-button>
+                <a-button
+                  v-if="String(record.source || '').toLowerCase() === 'sso' && String(record.status || '').toLowerCase() === 'pending'"
+                  type="link"
+                  size="small"
+                  @click="openSSORebind(record)"
+                >
+                  {{ t('consumer.ssoRebind') }}
+                </a-button>
                 <a-button
                   v-if="String(record.status || '').toLowerCase() === 'active'"
                   type="link"
@@ -400,6 +597,9 @@ onMounted(load);
                   @click="handleStatus(record, 'active')"
                 >
                   {{ t('consumer.enable') }}
+                </a-button>
+                <a-button type="link" size="small" danger @click="handleDeleteAccount(record)">
+                  {{ t('misc.delete') }}
                 </a-button>
               </template>
             </a-table-column>
@@ -511,7 +711,7 @@ onMounted(load);
 
     <a-modal
       v-model:open="departmentModalOpen"
-      :title="t('consumer.createDepartment')"
+      :title="departmentModalMode === 'create' ? t('consumer.createDepartment') : t('consumer.editDepartment')"
       :confirm-loading="departmentSaving"
       destroy-on-close
       @ok="saveDepartment"
@@ -529,8 +729,128 @@ onMounted(load);
             v-model:value="departmentForm.parentDepartmentId"
             allow-clear
             show-search
+            option-filter-prop="label"
             :options="departmentOptions"
             :placeholder="t('consumer.departmentForm.parentDepartmentPlaceholder')"
+            :disabled="departmentModalMode === 'edit'"
+          />
+        </a-form-item>
+        <a-form-item
+          v-if="departmentModalMode === 'create'"
+          :label="t('consumer.departmentForm.adminMode')"
+          name="adminMode"
+        >
+          <a-radio-group v-model:value="departmentForm.adminMode">
+            <a-radio-button value="existing">{{ t('consumer.departmentForm.adminModeExisting') }}</a-radio-button>
+            <a-radio-button value="create">{{ t('consumer.departmentForm.adminModeCreate') }}</a-radio-button>
+          </a-radio-group>
+        </a-form-item>
+        <a-alert
+          v-if="departmentModalMode === 'create' && departmentForm.adminMode === 'existing'"
+          type="info"
+          show-icon
+          :message="t('consumer.departmentForm.adminModeExistingHint')"
+          class="consumer-page__inline-alert"
+        />
+        <a-form-item
+          v-if="departmentModalMode === 'create' && departmentForm.adminMode === 'create'"
+          :label="t('consumer.departmentForm.adminConsumerName')"
+          name="adminConsumerName"
+          :rules="[{ required: true, message: t('consumer.departmentForm.adminConsumerNameRequired') }]"
+        >
+          <a-input v-model:value="departmentForm.adminConsumerName" :placeholder="t('consumer.departmentForm.adminConsumerNamePlaceholder')" />
+        </a-form-item>
+        <a-form-item
+          v-if="departmentModalMode === 'create' && departmentForm.adminMode === 'create'"
+          :label="t('consumer.departmentForm.adminDisplayName')"
+          name="adminDisplayName"
+          :rules="[{ required: true, message: t('consumer.departmentForm.adminDisplayNameRequired') }]"
+        >
+          <a-input v-model:value="departmentForm.adminDisplayName" :placeholder="t('consumer.departmentForm.adminDisplayNamePlaceholder')" />
+        </a-form-item>
+        <a-form-item
+          v-if="departmentModalMode === 'create' && departmentForm.adminMode === 'existing'"
+          :label="t('consumer.departmentForm.adminConsumerName')"
+          name="adminConsumerName"
+          :rules="[{ required: true, message: t('consumer.departmentForm.adminConsumerNameRequired') }]"
+        >
+          <a-select
+            v-model:value="departmentForm.adminConsumerName"
+            show-search
+            option-filter-prop="label"
+            :options="departmentExistingAdminOptions"
+            :placeholder="t('consumer.departmentForm.adminConsumerNameExistingPlaceholder')"
+          />
+        </a-form-item>
+        <a-form-item
+          v-if="departmentModalMode === 'create' && departmentForm.adminMode === 'create'"
+          :label="t('consumer.departmentForm.adminEmail')"
+          name="adminEmail"
+        >
+          <a-input v-model:value="departmentForm.adminEmail" :placeholder="t('consumer.departmentForm.adminEmailPlaceholder')" />
+        </a-form-item>
+        <a-form-item
+          v-if="departmentModalMode === 'create' && departmentForm.adminMode === 'create'"
+          :label="t('consumer.departmentForm.adminUserLevel')"
+          name="adminUserLevel"
+          :rules="[{ required: true, message: t('consumer.departmentForm.adminUserLevelRequired') }]"
+        >
+          <a-select v-model:value="departmentForm.adminUserLevel">
+            <a-select-option value="normal">{{ resolveUserLevelText('normal') }}</a-select-option>
+            <a-select-option value="plus">{{ resolveUserLevelText('plus') }}</a-select-option>
+            <a-select-option value="pro">{{ resolveUserLevelText('pro') }}</a-select-option>
+            <a-select-option value="ultra">{{ resolveUserLevelText('ultra') }}</a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item
+          v-if="departmentModalMode === 'create' && departmentForm.adminMode === 'create'"
+          :label="t('consumer.departmentForm.adminPassword')"
+          name="adminPassword"
+        >
+          <a-input-password v-model:value="departmentForm.adminPassword" :placeholder="t('consumer.departmentForm.adminPasswordPlaceholder')" />
+        </a-form-item>
+        <a-form-item
+          v-if="departmentModalMode === 'edit'"
+          :label="t('consumer.departmentForm.adminConsumerName')"
+          name="adminConsumerName"
+          :rules="[{ required: true, message: t('consumer.departmentForm.adminConsumerNameRequired') }]"
+        >
+          <a-select
+            v-model:value="departmentForm.adminConsumerName"
+            show-search
+            option-filter-prop="label"
+            :options="departmentAdminOptions"
+            :placeholder="t('consumer.departmentForm.adminConsumerNamePlaceholder')"
+          />
+        </a-form-item>
+      </a-form>
+    </a-modal>
+
+    <a-modal
+      v-model:open="ssoRebindModalOpen"
+      :title="t('consumer.ssoRebindTitle')"
+      :confirm-loading="ssoRebindSaving"
+      destroy-on-close
+      @ok="saveSSORebind"
+    >
+      <a-alert
+        type="info"
+        show-icon
+        :message="t('consumer.ssoRebindHint', { name: ssoRebindSourceAccount?.consumerName || '-' })"
+        class="consumer-page__inline-alert"
+      />
+      <a-form ref="ssoRebindFormRef" layout="vertical" :model="ssoRebindForm">
+        <a-form-item
+          :label="t('consumer.ssoRebindTarget')"
+          name="targetConsumerName"
+          :rules="[{ required: true, message: t('consumer.ssoRebindTargetRequired') }]"
+        >
+          <a-select
+            v-model:value="ssoRebindForm.targetConsumerName"
+            show-search
+            option-filter-prop="label"
+            :options="ssoRebindTargetOptions"
+            :placeholder="t('consumer.ssoRebindTargetPlaceholder')"
           />
         </a-form-item>
       </a-form>
@@ -589,6 +909,10 @@ onMounted(load);
 .consumer-page__detail {
   display: grid;
   gap: 18px;
+}
+
+.consumer-page__inline-alert {
+  margin-bottom: 16px;
 }
 
 @media (max-width: 1023px) {

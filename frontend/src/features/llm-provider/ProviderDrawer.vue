@@ -3,7 +3,7 @@ import { computed, reactive, ref, watch } from 'vue';
 import { MinusCircleOutlined, PlusOutlined } from '@ant-design/icons-vue';
 import { useI18n } from 'vue-i18n';
 import DrawerFooter from '@/components/common/DrawerFooter.vue';
-import type { LlmProvider } from '@/interfaces/llm-provider';
+import type { LlmProvider, ProviderProtocolDirectory } from '@/interfaces/llm-provider';
 import type { ProxyServer } from '@/interfaces/proxy-server';
 import type { Service } from '@/interfaces/service';
 import { serviceToString } from '@/interfaces/service';
@@ -13,11 +13,11 @@ import { getGatewayServices } from '@/services/service';
 import {
   bedrockRegionOptions,
   buildProviderPayload,
+  buildProviderProtocolOptions,
   createProviderFormState,
   geminiSafetyCategoryOptions,
   geminiSafetyThresholdOptions,
   getProviderTypeOptions,
-  providerProtocolOptions,
   shouldShowTokenInputs,
   toProviderFormState,
   type ProviderFormState,
@@ -27,6 +27,7 @@ import {
 const props = defineProps<{
   open: boolean;
   provider?: (LlmProvider & Record<string, any>) | null;
+  protocolDirectory?: ProviderProtocolDirectory | null;
 }>();
 
 const emit = defineEmits<{
@@ -43,6 +44,7 @@ const services = ref<Service[]>([]);
 const formState = reactive<ProviderFormState>(createProviderFormState());
 
 const providerTypeOptions = computed(() => getProviderTypeOptions(t));
+const providerProtocolOptions = computed(() => buildProviderProtocolOptions(props.protocolDirectory));
 const servicesByDisplayName = computed(() => new Map(services.value.map((item) => [serviceToString(item), item])));
 const proxyOptions = computed(() => {
   const options = [{ label: t('serviceSource.serviceSourceForm.proxyServerNone'), value: '' }];
@@ -74,6 +76,28 @@ const qwenCustomMode = computed(() => formState.type === 'qwen' && formState.qwe
 const vertexServiceAccountMode = computed(() => formState.type === 'vertex' && formState.vertexAuthMode === 'serviceAccount');
 const vertexApiKeyMode = computed(() => formState.type === 'vertex' && formState.vertexAuthMode === 'apiKey');
 const isVolcengine = computed(() => formState.type === 'volcengine');
+const currentProtocolFacts = computed(() => props.protocolDirectory?.providerProtocolMatrix?.[formState.type] || null);
+const currentProtocolFactsText = computed(() => {
+  const facts = currentProtocolFacts.value;
+  if (!facts) {
+    return '';
+  }
+  const parts: string[] = [];
+  if (facts.docsStatus) {
+    parts.push(`文档状态：${facts.docsStatus}`);
+  }
+  if (Array.isArray(facts.capabilities) && facts.capabilities.length) {
+    parts.push(`能力：${facts.capabilities.join(' / ')}`);
+  }
+  const endpoints = facts.recommendedEndpoints || {};
+  const endpointParts = Object.entries(endpoints)
+    .filter(([, value]) => Boolean(value))
+    .map(([key, value]) => `${key} -> ${value}`);
+  if (endpointParts.length) {
+    parts.push(`推荐入口：${endpointParts.join('；')}`);
+  }
+  return parts.join(' | ');
+});
 
 watch(() => props.open, async (open) => {
   if (!open) {
@@ -187,6 +211,15 @@ async function submit() {
       show-icon
       style="margin-bottom: 16px"
       message="正在刷新 Provider 相关选项..."
+    />
+
+    <a-alert
+      v-if="currentProtocolFactsText"
+      type="info"
+      show-icon
+      style="margin-bottom: 16px"
+      :message="`协议事实源 / ${formState.type || 'provider'}`"
+      :description="currentProtocolFactsText"
     />
 
     <a-form layout="vertical">

@@ -60,8 +60,8 @@ const (
 	higressEnvoyFilterResource               = "envoyfilters.networking.istio.io"
 	higressAIRoutePrefix                     = "ai-route-"
 	higressDomainPrefix                      = "domain-"
-	higressProviderDefaultProtocol           = "openai/v1"
 	higressProviderPluginProtocolOpenAI      = "openai"
+	higressProviderPluginProtocolAnthropic   = "anthropic"
 	higressMCPConfigKey                      = "higress"
 	higressMCPServerPathPrefix               = "/mcp-servers"
 )
@@ -1298,20 +1298,28 @@ func inferMCPUpstreamType(data map[string]any) string {
 }
 
 func providerProtocolValue(value any) string {
-	switch strings.TrimSpace(fmt.Sprint(value)) {
-	case "", higressProviderPluginProtocolOpenAI:
-		return higressProviderDefaultProtocol
+	switch NormalizeProviderProtocolCanonical(strings.TrimSpace(fmt.Sprint(value))) {
+	case AIProviderProtocolOpenAIV1:
+		return AIProviderProtocolOpenAIV1
+	case AIProviderProtocolAnthropicMessages:
+		return AIProviderProtocolAnthropicMessages
+	case AIProviderProtocolOriginal:
+		return AIProviderProtocolOriginal
 	default:
-		return strings.TrimSpace(fmt.Sprint(value))
+		return AIProviderProtocolAuto
 	}
 }
 
 func providerProtocolPluginValue(value any) string {
-	switch strings.TrimSpace(fmt.Sprint(value)) {
-	case "", higressProviderDefaultProtocol:
+	switch NormalizeProviderProtocolCanonical(strings.TrimSpace(fmt.Sprint(value))) {
+	case AIProviderProtocolOpenAIV1:
 		return higressProviderPluginProtocolOpenAI
+	case AIProviderProtocolAnthropicMessages:
+		return higressProviderPluginProtocolAnthropic
+	case AIProviderProtocolOriginal:
+		return AIProviderProtocolOriginal
 	default:
-		return strings.TrimSpace(fmt.Sprint(value))
+		return ""
 	}
 }
 

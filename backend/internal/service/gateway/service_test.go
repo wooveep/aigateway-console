@@ -318,6 +318,54 @@ func TestBuiltinWasmPluginFallbackIncludesAIQuota(t *testing.T) {
 	require.Equal(t, "AI Quota", aiQuota["title"])
 }
 
+func TestListWasmPluginsLocalizesBuiltinMetadataForZhCN(t *testing.T) {
+	svc := New(k8sclient.NewMemoryClient())
+
+	items, err := svc.ListWasmPlugins(context.Background(), "zh-CN")
+	require.NoError(t, err)
+
+	var aiQuota map[string]any
+	var aiDataMasking map[string]any
+	for _, item := range items {
+		switch fmt.Sprint(item["name"]) {
+		case "ai-quota":
+			aiQuota = item
+		case "ai-data-masking":
+			aiDataMasking = item
+		}
+	}
+
+	require.NotNil(t, aiQuota)
+	require.Equal(t, "AI 配额", aiQuota["title"])
+	require.Contains(t, fmt.Sprint(aiQuota["description"]), "配额")
+	require.Equal(t, "AUTHN", aiQuota["phase"])
+	require.Equal(t, "ai-route-explicit-map", aiQuota["dependencySource"])
+	require.Len(t, aiQuota["requiredPlugins"], 0)
+
+	require.NotNil(t, aiDataMasking)
+	require.Equal(t, "AI 数据脱敏", aiDataMasking["title"])
+	require.Contains(t, fmt.Sprint(aiDataMasking["description"]), "脱敏")
+}
+
+func TestSaveBuiltinWasmPluginSyncsRuntimeExecutionSettings(t *testing.T) {
+	client := k8sclient.NewMemoryClient()
+	svc := New(client)
+
+	_, err := svc.Save(context.Background(), "wasm-plugins", map[string]any{
+		"name":     "ai-quota",
+		"phase":    "STATS",
+		"priority": 333,
+	})
+	require.NoError(t, err)
+
+	runtimePlugin, err := client.GetResource(context.Background(), "wasmplugin.extensions.higress.io", "ai-quota.internal")
+	require.NoError(t, err)
+
+	spec := mapValueTest(runtimePlugin["spec"])
+	require.Equal(t, "STATS", spec["phase"])
+	require.Equal(t, 333, toInt(spec["priority"]))
+}
+
 func TestMCPServerRouteMetadataIsExplicit(t *testing.T) {
 	svc := New(k8sclient.NewMemoryClient(k8sclient.Config{IngressClass: "aigateway"}))
 
@@ -400,6 +448,51 @@ func TestAIProviderValidationNormalizesClaudeDefaults(t *testing.T) {
 	rawConfigs, _ := item["rawConfigs"].(map[string]any)
 	require.Equal(t, "2023-06-01", rawConfigs["claudeVersion"])
 	require.Equal(t, true, rawConfigs["claudeCodeMode"])
+}
+
+func TestAIProviderValidationNormalizesCanonicalProtocols(t *testing.T) {
+	svc := New(k8sclient.NewMemoryClient())
+
+	item, err := svc.Save(context.Background(), "ai-providers", map[string]any{
+		"name":     "protocol-demo",
+		"type":     "openai",
+		"protocol": "anthropic",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "anthropic/v1/messages", item["protocol"])
+
+	item, err = svc.Save(context.Background(), "ai-providers", map[string]any{
+		"name":     "auto-demo",
+		"type":     "openai",
+		"protocol": "",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "auto", item["protocol"])
+
+	_, err = svc.Save(context.Background(), "ai-providers", map[string]any{
+		"name":     "invalid-demo",
+		"type":     "openai",
+		"protocol": "responses",
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "unsupported provider protocol")
+}
+
+func TestProviderProtocolDirectoryReadsDocsSubdirectories(t *testing.T) {
+	svc := New(k8sclient.NewMemoryClient())
+
+	item := svc.GetProviderProtocolDirectory(context.Background())
+	statuses, _ := item["providerDocsStatus"].(map[string]string)
+	require.Equal(t, "confirmed", statuses["openai"])
+	require.Equal(t, "confirmed", statuses["claude"])
+	require.Equal(t, "confirmed", statuses["qwen"])
+	require.Equal(t, "confirmed", statuses["ollama"])
+	require.Empty(t, statuses["deepseek"])
+
+	matrix := mapValueTest(item["providerProtocolMatrix"])
+	openaiFacts := mapValueTest(matrix["openai"])
+	require.Equal(t, "confirmed", openaiFacts["docsStatus"])
+	require.Equal(t, true, openaiFacts["claudeFallback"])
 }
 
 func TestAIProviderValidationRejectsInvalidVertexAuthKey(t *testing.T) {

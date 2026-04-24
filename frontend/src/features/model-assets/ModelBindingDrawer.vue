@@ -8,7 +8,7 @@ import type {
   ModelBindingPriceVersion,
   ProviderModelOption,
 } from '@/interfaces/model-asset';
-import type { LlmProvider } from '@/interfaces/llm-provider';
+import { LlmProviderProtocol, type LlmProvider, type ProviderProtocolDirectory } from '@/interfaces/llm-provider';
 import DrawerFooter from '@/components/common/DrawerFooter.vue';
 import { buildProviderDisplayOptions } from '@/features/llm-provider/provider-display';
 import {
@@ -30,6 +30,7 @@ const props = defineProps<{
   providers: LlmProvider[];
   assetOptions: ModelAssetOptions;
   activePriceVersion?: ModelBindingPriceVersion | null;
+  protocolDirectory?: ProviderProtocolDirectory | null;
 }>();
 
 const emit = defineEmits<{
@@ -60,6 +61,42 @@ const providerOptions = computed(() => buildProviderDisplayOptions(props.provide
 
 const currentProviderModels = computed(() => providerModelCatalog.value[formState.providerName] || []);
 const currentProviderUsesCatalog = computed(() => currentProviderModels.value.length > 0);
+const currentProvider = computed(() => props.providers.find((item) => item.name === formState.providerName) || null);
+const currentProviderFacts = computed(() => props.protocolDirectory?.providerProtocolMatrix?.[currentProvider.value?.type || ''] || null);
+const bindingProtocolOptions = computed(() => props.protocolDirectory?.protocolOptions?.binding || [
+  { label: 'OpenAI', value: LlmProviderProtocol.OPENAI_V1 },
+  { label: 'Claude', value: LlmProviderProtocol.ANTHROPIC_V1_MESSAGES },
+  { label: 'Original', value: LlmProviderProtocol.ORIGINAL },
+]);
+const currentRecommendedEndpoint = computed(() => {
+  const providerEndpoints = currentProviderFacts.value?.recommendedEndpoints || {};
+  return providerEndpoints[formState.protocol]
+    || props.protocolDirectory?.recommendedEndpoints?.[formState.protocol]
+    || '';
+});
+const currentDocsStatus = computed(() =>
+  currentProviderFacts.value?.docsStatus
+  || props.protocolDirectory?.providerDocsStatus?.[currentProvider.value?.type || '']
+  || '',
+);
+const providerProtocolHint = computed(() => {
+  const parts: string[] = [];
+  if (currentProvider.value?.type) {
+    parts.push(`Provider 类型：${currentProvider.value.type}`);
+  }
+  if (currentDocsStatus.value) {
+    parts.push(`文档状态：${currentDocsStatus.value}`);
+  }
+  if (currentRecommendedEndpoint.value) {
+    parts.push(`推荐入口：${currentRecommendedEndpoint.value}`);
+  }
+  const capabilities = currentProviderFacts.value?.capabilities || [];
+  if (Array.isArray(capabilities) && capabilities.length) {
+    parts.push(`能力：${capabilities.join(' / ')}`);
+  }
+  return parts.join(' | ');
+});
+const lastRecommendedEndpoint = ref('');
 const currentAssetLabel = computed(() =>
   props.assets.find((item) => item.assetId === formState.selectedAssetId)?.displayName
   || props.assets.find((item) => item.assetId === formState.selectedAssetId)?.canonicalName
@@ -80,6 +117,7 @@ watch(() => [props.open, props.binding, props.selectedAssetId], () => {
   if (!props.binding) {
     applyDefaultPricingByModelType(formState, currentModelType.value);
   }
+  lastRecommendedEndpoint.value = currentRecommendedEndpoint.value;
 }, { immediate: true });
 
 const currentModelIdOptions = computed(() => {
@@ -116,6 +154,19 @@ watch(() => currentModelType.value, (nextType) => {
   clearIrrelevantPricing(formState, nextType);
   applyDefaultPricingByModelType(formState, nextType);
 });
+
+watch(() => [formState.protocol, formState.providerName], () => {
+  const recommended = currentRecommendedEndpoint.value;
+  const current = formState.endpoint.trim();
+  if (!recommended) {
+    lastRecommendedEndpoint.value = '';
+    return;
+  }
+  if (!current || current === lastRecommendedEndpoint.value) {
+    formState.endpoint = recommended;
+  }
+  lastRecommendedEndpoint.value = recommended;
+}, { immediate: true });
 
 function syncBindingModelPair(field: 'modelId' | 'targetModel', selectedValue?: string) {
   if (!currentProviderUsesCatalog.value) {
@@ -299,12 +350,21 @@ async function submit() {
           <a-input v-else v-model:value="formState.targetModel" />
         </a-form-item>
         <a-form-item label="协议">
-          <a-input v-model:value="formState.protocol" />
+          <a-select v-model:value="formState.protocol" :options="bindingProtocolOptions" />
         </a-form-item>
-        <a-form-item label="入口地址">
+        <a-form-item label="入口地址" :extra="currentRecommendedEndpoint || undefined">
           <a-input v-model:value="formState.endpoint" />
         </a-form-item>
       </div>
+
+      <a-alert
+        v-if="providerProtocolHint"
+        type="info"
+        show-icon
+        style="margin-bottom: 16px"
+        message="协议 / 入口推荐"
+        :description="providerProtocolHint"
+      />
 
       <a-divider orientation="left">限制</a-divider>
       <div class="model-binding-drawer__grid model-binding-drawer__grid--compact">
