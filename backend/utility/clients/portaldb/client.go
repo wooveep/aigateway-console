@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -37,6 +38,7 @@ type FakeClient struct {
 type SQLClient struct {
 	config Config
 	db     *sql.DB
+	mu     sync.Mutex
 	err    error
 }
 
@@ -59,9 +61,7 @@ func New(cfg Config) Client {
 		db:     db,
 	}
 	client.config.Driver = driver
-	if cfg.AutoMigrate {
-		client.err = client.EnsureSchema(context.Background())
-	}
+	_ = client.EnsureSchema(context.Background())
 	return client
 }
 
@@ -87,13 +87,24 @@ func (c *FakeClient) EnsureSchema(ctx context.Context) error {
 func (c *FakeClient) MigrateLegacyData(ctx context.Context) error { return ErrUnavailable }
 
 func (c *SQLClient) Healthy(ctx context.Context) error {
-	if c.err != nil {
-		return c.err
-	}
 	if c.db == nil {
 		return ErrUnavailable
 	}
-	return c.db.PingContext(ctx)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if err := c.db.PingContext(ctx); err != nil {
+		c.err = err
+		return err
+	}
+	if c.err != nil {
+		if err := c.ensureSchemaLocked(ctx); err != nil {
+			c.err = err
+			return err
+		}
+	}
+	c.err = nil
+	return nil
 }
 
 func (c *SQLClient) Enabled() bool {
@@ -109,93 +120,131 @@ func (c *SQLClient) Driver() string {
 }
 
 func (c *SQLClient) EnsureSchema(ctx context.Context) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.ensureSchemaLocked(ctx)
+}
+
+func (c *SQLClient) ensureSchemaLocked(ctx context.Context) error {
 	if c.db == nil {
-		return ErrUnavailable
+		c.err = ErrUnavailable
+		return c.err
 	}
 	if c.config.AutoMigrate {
 		if err := portalshared.ApplyToSQLWithDriver(ctx, c.db, c.config.Driver); err != nil {
-			return WrapExecError("apply shared schema", err)
+			c.err = WrapExecError("apply shared schema", err)
+			return c.err
 		}
 	}
 	if err := c.ensureSharedSchemaAvailable(ctx); err != nil {
+		c.err = err
+		return err
+	}
+	if err := c.ensureOwnedSchema(ctx); err != nil {
+		c.err = err
 		return err
 	}
 	if !c.config.AutoMigrate {
+		c.err = nil
 		return nil
 	}
-
-	for _, statement := range ensureSchemaDDLs(c.config.Driver) {
-		if _, err := ExecContext(ctx, c.db, c.config.Driver, statement); err != nil {
-			return err
-		}
+	if err := c.migrateLegacyDataLocked(ctx); err != nil {
+		c.err = err
+		return err
 	}
-	return c.MigrateLegacyData(ctx)
+	c.err = nil
+	return nil
 }
 
 func (c *SQLClient) MigrateLegacyData(ctx context.Context) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.migrateLegacyDataLocked(ctx)
+}
+
+func (c *SQLClient) migrateLegacyDataLocked(ctx context.Context) error {
 	if c.db == nil {
-		return ErrUnavailable
+		c.err = ErrUnavailable
+		return c.err
 	}
 	if err := c.ensureSharedSchemaAvailable(ctx); err != nil {
+		c.err = err
 		return err
 	}
 
 	if exists, err := c.tableExists(ctx, "portal_users"); err != nil {
+		c.err = err
 		return err
 	} else if exists {
 		if err := c.migrateLegacyUsers(ctx); err != nil {
+			c.err = err
 			return err
 		}
 	}
 	if exists, err := c.tableExists(ctx, "portal_departments"); err != nil {
+		c.err = err
 		return err
 	} else if exists {
 		if err := c.migrateLegacyDepartments(ctx); err != nil {
+			c.err = err
 			return err
 		}
 	}
 	if exists, err := c.tableExists(ctx, "portal_asset_grant"); err != nil {
+		c.err = err
 		return err
 	} else if exists {
 		if err := c.migrateLegacyAssetGrants(ctx); err != nil {
+			c.err = err
 			return err
 		}
 	}
 	if exists, err := c.tableExists(ctx, "portal_ai_quota_user_policy"); err != nil {
+		c.err = err
 		return err
 	} else if exists {
 		if err := c.migrateLegacyQuotaPolicies(ctx); err != nil {
+			c.err = err
 			return err
 		}
 	}
 	if exists, err := c.tableExists(ctx, "ai_sensitive_detect_rule"); err != nil {
+		c.err = err
 		return err
 	} else if exists {
 		if err := c.migrateLegacyAISensitiveDetectRules(ctx); err != nil {
+			c.err = err
 			return err
 		}
 	}
 	if exists, err := c.tableExists(ctx, "ai_sensitive_replace_rule"); err != nil {
+		c.err = err
 		return err
 	} else if exists {
 		if err := c.migrateLegacyAISensitiveReplaceRules(ctx); err != nil {
+			c.err = err
 			return err
 		}
 	}
 	if exists, err := c.tableExists(ctx, "ai_sensitive_system_config"); err != nil {
+		c.err = err
 		return err
 	} else if exists {
 		if err := c.migrateLegacyAISensitiveSystemConfig(ctx); err != nil {
+			c.err = err
 			return err
 		}
 	}
 	if exists, err := c.tableExists(ctx, "ai_sensitive_block_audit"); err != nil {
+		c.err = err
 		return err
 	} else if exists {
 		if err := c.migrateLegacyAISensitiveAudits(ctx); err != nil {
+			c.err = err
 			return err
 		}
 	}
+	c.err = nil
 	return nil
 }
 
@@ -207,6 +256,15 @@ func (c *SQLClient) ensureSharedSchemaAvailable(ctx context.Context) error {
 		}
 		if !ok {
 			return fmt.Errorf("shared portal schema table is missing: %s", table)
+		}
+	}
+	return nil
+}
+
+func (c *SQLClient) ensureOwnedSchema(ctx context.Context) error {
+	for _, statement := range ensureSchemaDDLs(c.config.Driver) {
+		if _, err := ExecContext(ctx, c.db, c.config.Driver, statement); err != nil {
+			return err
 		}
 	}
 	return nil

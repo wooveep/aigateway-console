@@ -31,3 +31,8 @@
 ## 6. 时间字段一致性
 - 邀请码、密码重置等 `LocalDateTime` 返回统一 ISO 字符串，避免前端 `Invalid Date`。
 - 前端解析仅按标准日期解析，减少后端时间结构分支兼容逻辑。
+
+## 7. PortalDB 自有表初始化口径
+- `portaldb.autoMigrate=false` 的真实语义是：Console 不负责兜底创建 Portal 共享表，也不执行 legacy 数据迁移。
+- Console 自有 PortalDB 表仍必须由 Console 启动时保证存在，包括 `portal_ai_quota_balance`、`portal_ai_quota_schedule_rule`、`portal_model_binding_price_version`、`portal_ai_sensitive_*`、`job_run_record`。
+- 若共享表已经由 Portal migration 建好，Console 即使在 release 环境关闭 `autoMigrate`，也应能安全创建上述自有表并正常打开 `AI Quota`、`AI Sensitive` 等页面。

@@ -26,6 +26,7 @@ import {
 const props = defineProps<{
   open: boolean;
   route?: Route | null;
+  submitting?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -99,6 +100,9 @@ function removeAt<T>(items: T[], index: number) {
 }
 
 async function submit() {
+  if (props.submitting) {
+    return;
+  }
   try {
     const payload = buildGatewayRoutePayload(formState, props.route || undefined, servicesByKey.value);
     emit('submit', payload, Boolean(props.route));
@@ -211,7 +215,7 @@ async function submit() {
       />
     </a-form>
 
-    <DrawerFooter @cancel="close" @confirm="submit" />
+    <DrawerFooter :loading="submitting" @cancel="close" @confirm="submit" />
   </a-drawer>
 </template>
 

@@ -6,6 +6,7 @@
 - [x] 邀请码管理接口：创建/列表/禁用（并支持重新启用）。
 - [x] MCP 名称前后端 RFC1123 小写校验，K8s 422 -> HTTP 400。
 - [x] AI Quota 的 consumer 校验改为查 DB 真源。
+- [x] 干净发布环境下，Console 启动会始终补齐 `portal_ai_quota_balance` 等 Console 自有 PortalDB 表；`portaldb.autoMigrate=false` 不再导致 AI Quota 页面首次访问报缺表。
 - [x] DB -> key-auth 周期投影与启动回填任务（幂等）。
 - [x] 组织架构前端新增重置密码与邀请码管理入口。
 - [x] Route/AI Route/MCP 消费者下拉并集策略，避免历史值丢失。

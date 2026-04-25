@@ -35,6 +35,7 @@ import {
 const props = defineProps<{
   open: boolean;
   route?: AiRoute | null;
+  submitting?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -162,6 +163,9 @@ function validateEditableRoute() {
 }
 
 async function submit() {
+  if (props.submitting) {
+    return;
+  }
   try {
     validateEditableRoute();
     const payload = buildAiRoutePayload(formState, props.route || undefined);
@@ -369,7 +373,7 @@ async function submit() {
       </a-card>
     </a-form>
 
-    <DrawerFooter @cancel="close" @confirm="submit" />
+    <DrawerFooter :loading="submitting" @cancel="close" @confirm="submit" />
   </a-drawer>
 </template>
 

@@ -5,6 +5,7 @@
 {{- $portalDBDriver := $portalDB.driver | default "postgres" }}
 {{- $portalDBHost := $portalDB.host | default (printf "%s-aigateway-core-postgresql-pgpool" .Release.Name) }}
 {{- $portalDBSecretName := $portalDB.secretName | default (printf "%s-aigateway-core-db" .Release.Name) }}
+{{- $portalDBWait := $portalDB.waitFor | default (dict) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -37,6 +38,38 @@ spec:
       serviceAccountName: {{ include "aigateway-console.name" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- if and $portalDB.enabled ($portalDBWait.enabled | default true) }}
+      initContainers:
+        - name: wait-for-portal-db
+          image: "{{ $portalDBWait.image.repository | default "bitnamilegacy/postgresql-repmgr" }}:{{ $portalDBWait.image.tag | default "17.6.0-debian-12-r2" }}"
+          imagePullPolicy: {{ $portalDBWait.image.pullPolicy | default "IfNotPresent" }}
+          command:
+            - /bin/sh
+            - -ec
+          args:
+            - |
+              until pg_isready -h "${PORTAL_DB_HOST}" -p "${PORTAL_DB_PORT}" -U "${PORTAL_DB_USER}" -d "${PORTAL_DB_NAME}"; do
+                echo "waiting for portal database at ${PORTAL_DB_HOST}:${PORTAL_DB_PORT}"
+                sleep {{ $portalDBWait.periodSeconds | default 2 }}
+              done
+          env:
+            - name: PORTAL_DB_HOST
+              value: {{ $portalDBHost | quote }}
+            - name: PORTAL_DB_PORT
+              value: {{ $portalDB.port | quote }}
+            - name: PORTAL_DB_NAME
+              value: {{ $portalDB.database | quote }}
+            - name: PORTAL_DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $portalDBSecretName }}
+                  key: {{ $portalDB.usernameKey }}
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $portalDBSecretName }}
+                  key: {{ $portalDB.passwordKey }}
+      {{- end }}
       containers:
         - name: {{ .Chart.Name }}
           securityContext:

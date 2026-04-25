@@ -31,6 +31,7 @@ const props = defineProps<{
   assetOptions: ModelAssetOptions;
   activePriceVersion?: ModelBindingPriceVersion | null;
   protocolDirectory?: ProviderProtocolDirectory | null;
+  submitting?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -210,6 +211,9 @@ function close() {
 }
 
 async function submit() {
+  if (props.submitting) {
+    return;
+  }
   await formRef.value?.validate();
   emit('submit', {
     ...(props.binding || {}),
@@ -426,7 +430,7 @@ async function submit() {
       </div>
     </a-form>
 
-    <DrawerFooter @cancel="close" @confirm="submit">
+    <DrawerFooter :loading="submitting" @cancel="close" @confirm="submit">
       <template #extra>
         <a-button v-if="binding" @click="emit('open-history')">价格历史</a-button>
       </template>

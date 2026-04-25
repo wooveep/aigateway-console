@@ -174,3 +174,10 @@ portalDatabase:
   secretName: ""
   usernameKey: username
   passwordKey: password
+  waitFor:
+    enabled: true
+    image:
+      repository: bitnamilegacy/postgresql-repmgr
+      tag: 17.6.0-debian-12-r2
+      pullPolicy: IfNotPresent
+    periodSeconds: 2
