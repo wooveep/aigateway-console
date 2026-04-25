@@ -128,9 +128,8 @@ func TestBuildAIRouteIngressPayloadMapsFrontendContract(t *testing.T) {
 
 	require.Equal(t, []string{"api.example.com"}, publicPayload["domains"])
 	require.Equal(t, "/v1/chat/completions", mapValue(publicPayload["path"])["matchValue"])
-	require.Len(t, toMapSlice(publicPayload["headers"]), 2)
+	require.Len(t, toMapSlice(publicPayload["headers"]), 1)
 	require.Equal(t, "team-a", publicAnnotations["higress.io/exact-match-header-x-tenant"])
-	require.Equal(t, "gpt-4", publicAnnotations["higress.io/prefix-match-header-x-higress-llm-model"])
 	require.Equal(t, "gpt-4", publicAnnotations["higress.io/prefix-match-query-model"])
 	require.Equal(t, "GET POST", publicAnnotations[higressAnnotationMatchMethod])
 	require.Equal(t, "dept-a", publicAnnotations[higressAnnotationAuthConsumerDepartments])
@@ -140,6 +139,7 @@ func TestBuildAIRouteIngressPayloadMapsFrontendContract(t *testing.T) {
 	internalAnnotations := routeAnnotations(internalPayload)
 	require.Equal(t, []string{}, internalPayload["domains"])
 	require.Equal(t, higressAIRouteInternalPathPrefix+"chat-demo", mapValue(internalPayload["path"])["matchValue"])
+	require.Equal(t, "gpt-4", internalAnnotations["higress.io/prefix-match-header-x-higress-llm-model"])
 	require.Equal(t, "3", internalAnnotations[higressAnnotationProxyNextTries])
 	_, exists := internalAnnotations[higressAnnotationProxyNextTimeout]
 	require.False(t, exists)

@@ -1828,7 +1828,7 @@ func buildAIRouteIngressPayload(name, ingressName string, data map[string]any, s
 		"ingressClass": firstNonEmpty(stringValue(data["ingressClass"]), "aigateway"),
 		"path":         aiRoutePathForIngress(name, data, internal),
 		"services":     services,
-		"headers":      aiIngressHeaders(data, nil),
+		"headers":      aiIngressHeaders(data, nil, internal),
 		"urlParams":    toMapSlice(data["urlParamPredicates"]),
 		"methods":      normalizeStringSlice(data["methods"]),
 		"authConfig":   mapValue(data["authConfig"]),
@@ -1862,13 +1862,15 @@ func buildAIRouteFallbackIngressPayload(name, ingressName, originalRouteName str
 		"matchType":     "EQUAL",
 		"matchValue":    originalRouteName,
 		"caseSensitive": true,
-	})
+	}, internal)
 	return payload
 }
 
-func aiIngressHeaders(data map[string]any, extra map[string]any) []map[string]any {
+func aiIngressHeaders(data map[string]any, extra map[string]any, includeModelPredicates bool) []map[string]any {
 	headers := toMapSlice(data["headerPredicates"])
-	headers = append(headers, aiModelPredicateHeaders(data["modelPredicates"])...)
+	if includeModelPredicates {
+		headers = append(headers, aiModelPredicateHeaders(data["modelPredicates"])...)
+	}
 	if extra != nil {
 		headers = append(headers, extra)
 	}
