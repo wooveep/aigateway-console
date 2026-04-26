@@ -19,6 +19,7 @@ const deleteOpen = ref(false);
 const editing = ref<AiRoute | null>(null);
 const deleting = ref<AiRoute | null>(null);
 const usageCommand = ref('');
+const submitting = ref(false);
 
 const filtered = computed(() => rows.value.filter((item) => {
   const keyword = search.value.trim().toLowerCase();
@@ -65,14 +66,19 @@ function openUsage(record: AiRoute) {
 }
 
 async function submit(payload: AiRoute, isEdit: boolean) {
-  if (isEdit) {
-    await updateAiRoute(payload);
-  } else {
-    await addAiRoute(payload);
+  submitting.value = true;
+  try {
+    if (isEdit) {
+      await updateAiRoute(payload);
+    } else {
+      await addAiRoute(payload);
+    }
+    drawerOpen.value = false;
+    await load();
+    showSuccess('保存成功');
+  } finally {
+    submitting.value = false;
   }
-  drawerOpen.value = false;
-  await load();
-  showSuccess('保存成功');
 }
 
 async function confirmDelete() {
@@ -118,6 +124,7 @@ onMounted(load);
     <AiRouteDrawer
       v-model:open="drawerOpen"
       :route="editing"
+      :submitting="submitting"
       @submit="submit"
     />
 

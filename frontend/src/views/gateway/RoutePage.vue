@@ -22,6 +22,7 @@ const drawerOpen = ref(false);
 const deleteOpen = ref(false);
 const editing = ref<Route | null>(null);
 const deleting = ref<Route | null>(null);
+const submitting = ref(false);
 
 const filtered = computed(() => rows.value.filter((item) => {
   const keyword = search.value.trim().toLowerCase();
@@ -48,14 +49,19 @@ function openDrawer(record?: Route) {
 }
 
 async function submit(payload: Route, isEdit: boolean) {
-  if (isEdit) {
-    await updateGatewayRouteCompat(payload as any);
-  } else {
-    await addGatewayRouteCompat(payload as any);
+  submitting.value = true;
+  try {
+    if (isEdit) {
+      await updateGatewayRouteCompat(payload as any);
+    } else {
+      await addGatewayRouteCompat(payload as any);
+    }
+    drawerOpen.value = false;
+    await load();
+    showSuccess('保存成功');
+  } finally {
+    submitting.value = false;
   }
-  drawerOpen.value = false;
-  await load();
-  showSuccess('保存成功');
 }
 
 async function confirmDelete() {
@@ -102,6 +108,7 @@ onMounted(load);
     <GatewayRouteDrawer
       v-model:open="drawerOpen"
       :route="editing"
+      :submitting="submitting"
       @submit="submit"
     />
 

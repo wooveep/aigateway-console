@@ -31,6 +31,7 @@ const props = defineProps<{
   assetOptions: ModelAssetOptions;
   activePriceVersion?: ModelBindingPriceVersion | null;
   protocolDirectory?: ProviderProtocolDirectory | null;
+  submitting?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -107,6 +108,7 @@ const currentAsset = computed(() =>
   || props.assets.find((item) => item.assetId === props.selectedAssetId)
   || null,
 );
+const currentAssetCanonicalName = computed(() => currentAsset.value?.canonicalName?.trim() || '');
 const currentModelType = computed(() => currentAsset.value?.modelType || '');
 const pricingFields = computed(() => getPricingFieldsForType(currentModelType.value));
 const limitFields = computed(() => getLimitFieldsForType(currentModelType.value));
@@ -121,11 +123,14 @@ watch(() => [props.open, props.binding, props.selectedAssetId], () => {
 }, { immediate: true });
 
 const currentModelIdOptions = computed(() => {
-  const options = currentProviderModels.value.map((item) => ({
-    label: item.modelId === item.targetModel ? item.modelId : `${item.modelId} / ${item.targetModel}`,
-    value: item.modelId,
-  }));
-  if (formState.modelId && !currentProviderModels.value.some((item) => item.modelId === formState.modelId)) {
+  const options: Array<{ label: string; value: string }> = [];
+  if (currentAssetCanonicalName.value) {
+    options.push({
+      label: `规范名 / ${currentAssetCanonicalName.value}`,
+      value: currentAssetCanonicalName.value,
+    });
+  }
+  if (formState.modelId && formState.modelId !== currentAssetCanonicalName.value) {
     options.unshift({ label: `历史值 / ${formState.modelId}`, value: formState.modelId });
   }
   return options;
@@ -144,10 +149,8 @@ const currentTargetModelOptions = computed(() => {
 
 const hasLegacyCatalogValue = computed(() =>
   currentProviderUsesCatalog.value
-  && (
-    (Boolean(formState.modelId) && !currentProviderModels.value.some((item) => item.modelId === formState.modelId))
-    || (Boolean(formState.targetModel) && !currentProviderModels.value.some((item) => item.targetModel === formState.targetModel))
-  ),
+  && Boolean(formState.targetModel)
+  && !currentProviderModels.value.some((item) => item.targetModel === formState.targetModel),
 );
 
 watch(() => currentModelType.value, (nextType) => {
@@ -180,6 +183,14 @@ function syncBindingModelPair(field: 'modelId' | 'targetModel', selectedValue?: 
   }
 }
 
+function updateBindingField(field: 'modelId' | 'targetModel', value?: string) {
+  const nextValue = String(value || '');
+  formState[field] = nextValue;
+  if (field === 'targetModel') {
+    syncBindingModelPair(field, nextValue);
+  }
+}
+
 function handleProviderChange(providerName: string) {
   formState.providerName = providerName;
   const providerModels = providerModelCatalog.value[providerName] || [];
@@ -187,13 +198,11 @@ function handleProviderChange(providerName: string) {
     return;
   }
   const matched = providerModels.find((item) =>
-    item.modelId === formState.modelId || item.targetModel === formState.targetModel);
+    item.targetModel === formState.targetModel);
   if (matched) {
-    formState.modelId = matched.modelId;
     formState.targetModel = matched.targetModel;
     return;
   }
-  formState.modelId = '';
   formState.targetModel = '';
 }
 
@@ -202,6 +211,9 @@ function close() {
 }
 
 async function submit() {
+  if (props.submitting) {
+    return;
+  }
   await formRef.value?.validate();
   emit('submit', {
     ...(props.binding || {}),
@@ -279,6 +291,14 @@ async function submit() {
     />
 
     <a-alert
+      v-else-if="formState.providerName"
+      type="info"
+      show-icon
+      style="margin-bottom: 16px"
+      message="当前 Provider 已加载目标模型目录；模型 ID 建议使用当前模型资产的规范名，目标模型可从建议列表中选择或手动输入。"
+    />
+
+    <a-alert
       v-if="hasLegacyCatalogValue"
       type="warning"
       show-icon
@@ -326,26 +346,24 @@ async function submit() {
           name="modelId"
           :rules="[{ required: true, message: '请输入模型 ID' }]"
         >
-          <a-select
-            v-if="currentProviderUsesCatalog"
+          <a-auto-complete
             :value="formState.modelId"
-            show-search
             :options="currentModelIdOptions"
-            @update:value="(value) => syncBindingModelPair('modelId', String(value || ''))"
+            placeholder="建议使用当前模型资产的规范名，也可手动输入"
+            @update:value="(value) => updateBindingField('modelId', String(value || ''))"
           />
-          <a-input v-else v-model:value="formState.modelId" />
         </a-form-item>
         <a-form-item
           label="目标模型"
           name="targetModel"
           :rules="[{ required: true, message: '请输入目标模型' }]"
         >
-          <a-select
+          <a-auto-complete
             v-if="currentProviderUsesCatalog"
             :value="formState.targetModel"
-            show-search
             :options="currentTargetModelOptions"
-            @update:value="(value) => syncBindingModelPair('targetModel', String(value || ''))"
+            placeholder="输入真实目标模型，或选择 Provider 目录"
+            @update:value="(value) => updateBindingField('targetModel', String(value || ''))"
           />
           <a-input v-else v-model:value="formState.targetModel" />
         </a-form-item>
@@ -412,7 +430,7 @@ async function submit() {
       </div>
     </a-form>
 
-    <DrawerFooter @cancel="close" @confirm="submit">
+    <DrawerFooter :loading="submitting" @cancel="close" @confirm="submit">
       <template #extra>
         <a-button v-if="binding" @click="emit('open-history')">价格历史</a-button>
       </template>

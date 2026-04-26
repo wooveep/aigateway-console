@@ -15,6 +15,7 @@ const props = defineProps<{
   open: boolean;
   asset?: ModelAsset | null;
   assetOptions: ModelAssetOptions;
+  submitting?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -36,6 +37,9 @@ function close() {
 }
 
 async function submit() {
+  if (props.submitting) {
+    return;
+  }
   await formRef.value?.validate();
   emit('submit', {
     ...(props.asset || {}),
@@ -137,6 +141,6 @@ async function submit() {
         />
       </a-form-item>
     </a-form>
-    <DrawerFooter @cancel="close" @confirm="submit" />
+    <DrawerFooter :loading="submitting" @cancel="close" @confirm="submit" />
   </a-drawer>
 </template>

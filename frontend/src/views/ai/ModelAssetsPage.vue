@@ -77,6 +77,8 @@ const priceVersions = ref<any[]>([]);
 const priceVersionsLoading = ref(false);
 const grantLoading = ref(false);
 const grantSaving = ref(false);
+const assetSubmitting = ref(false);
+const bindingSubmitting = ref(false);
 const grantValues = ref({
   consumers: [] as string[],
   departments: [] as string[],
@@ -194,14 +196,19 @@ function openAssetDrawer(record?: any) {
 }
 
 async function saveAsset(payload: any, isEdit: boolean) {
-  if (isEdit && editingAsset.value) {
-    await updateModelAsset(editingAsset.value.assetId, payload);
-  } else {
-    await createModelAsset(payload);
+  assetSubmitting.value = true;
+  try {
+    if (isEdit && editingAsset.value) {
+      await updateModelAsset(editingAsset.value.assetId, payload);
+    } else {
+      await createModelAsset(payload);
+    }
+    assetDrawerOpen.value = false;
+    await loadAssets();
+    showSuccess(isEdit ? '模型资产已更新' : '模型资产已创建');
+  } finally {
+    assetSubmitting.value = false;
   }
-  assetDrawerOpen.value = false;
-  await loadAssets();
-  showSuccess(isEdit ? '模型资产已更新' : '模型资产已创建');
 }
 
 async function openBindingDrawer(record?: any) {
@@ -227,15 +234,20 @@ async function saveBinding(payload: any, isEdit: boolean) {
   if (!targetAssetId) {
     return;
   }
-  if (isEdit && editingBinding.value) {
-    await updateModelBinding(targetAssetId, editingBinding.value.bindingId, payload);
-  } else {
-    await createModelBinding(targetAssetId, payload);
+  bindingSubmitting.value = true;
+  try {
+    if (isEdit && editingBinding.value) {
+      await updateModelBinding(targetAssetId, editingBinding.value.bindingId, payload);
+    } else {
+      await createModelBinding(targetAssetId, payload);
+    }
+    bindingDrawerOpen.value = false;
+    selectedAssetId.value = targetAssetId;
+    await Promise.all([loadAssets(), loadSupportData()]);
+    showSuccess(isEdit ? '发布绑定已更新' : '发布绑定已创建');
+  } finally {
+    bindingSubmitting.value = false;
   }
-  bindingDrawerOpen.value = false;
-  selectedAssetId.value = targetAssetId;
-  await Promise.all([loadAssets(), loadSupportData()]);
-  showSuccess(isEdit ? '发布绑定已更新' : '发布绑定已创建');
 }
 
 async function toggleBinding(record: any) {
@@ -490,6 +502,7 @@ onMounted(async () => {
       v-model:open="assetDrawerOpen"
       :asset="editingAsset"
       :asset-options="assetOptions"
+      :submitting="assetSubmitting"
       @submit="saveAsset"
     />
 
@@ -502,6 +515,7 @@ onMounted(async () => {
       :protocol-directory="protocolDirectory"
       :asset-options="assetOptions"
       :active-price-version="activePriceVersion"
+      :submitting="bindingSubmitting"
       @submit="saveBinding"
       @open-history="editingBinding && openHistoryDrawer(editingBinding)"
     />

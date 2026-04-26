@@ -28,6 +28,7 @@ const props = defineProps<{
   open: boolean;
   provider?: (LlmProvider & Record<string, any>) | null;
   protocolDirectory?: ProviderProtocolDirectory | null;
+  submitting?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -36,7 +37,6 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
-const saving = ref(false);
 const secretModalOpen = ref(false);
 const loadingOptions = ref(false);
 const proxyServers = ref<ProxyServer[]>([]);
@@ -181,7 +181,9 @@ function removeGeminiSafetySetting(index: number) {
 }
 
 async function submit() {
-  saving.value = true;
+  if (props.submitting) {
+    return;
+  }
   try {
     const payload = buildProviderPayload(formState, {
       original: props.provider,
@@ -191,8 +193,6 @@ async function submit() {
     emit('submit', payload, Boolean(props.provider));
   } catch (error) {
     showError((error as Error).message || '表单校验失败');
-  } finally {
-    saving.value = false;
   }
 }
 </script>
@@ -630,7 +630,7 @@ async function submit() {
     </a-form>
 
     <DrawerFooter
-      :loading="saving"
+      :loading="submitting"
       @cancel="close"
       @confirm="submit"
     />

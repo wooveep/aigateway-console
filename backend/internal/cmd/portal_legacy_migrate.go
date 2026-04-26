@@ -22,6 +22,22 @@ var PortalLegacyMigrate = &gcmd.Command{
 	},
 }
 
+var PortalDBInit = &gcmd.Command{
+	Name:  "portaldb-init",
+	Usage: "portaldb-init",
+	Brief: "initialize console-owned portal database schema",
+	Func: func(ctx context.Context, parser *gcmd.Parser) error {
+		portalConfig := loadRuntimeDependencies(ctx).Portal
+		portalConfig.AutoMigrate = false
+		client := portaldbclient.New(portalConfig)
+		if err := client.Healthy(ctx); err != nil {
+			return err
+		}
+		return client.EnsureSchema(ctx)
+	},
+}
+
 func init() {
 	_ = Main.AddCommand(PortalLegacyMigrate)
+	_ = Main.AddCommand(PortalDBInit)
 }

@@ -20,6 +20,7 @@ const deleteOpen = ref(false);
 const editing = ref<(LlmProvider & Record<string, any>) | null>(null);
 const deleting = ref<(LlmProvider & Record<string, any>) | null>(null);
 const protocolDirectory = ref<ProviderProtocolDirectory | null>(null);
+const submitting = ref(false);
 
 const filtered = computed(() => rows.value.filter((item) => {
   const keyword = search.value.trim().toLowerCase();
@@ -49,14 +50,19 @@ function openDrawer(record?: LlmProvider & Record<string, any>) {
 }
 
 async function submit(payload: LlmProvider & Record<string, any>, isEdit: boolean) {
-  if (editing.value) {
-    await updateLlmProvider(payload as any);
-  } else {
-    await addLlmProvider(payload as any);
+  submitting.value = true;
+  try {
+    if (editing.value) {
+      await updateLlmProvider(payload as any);
+    } else {
+      await addLlmProvider(payload as any);
+    }
+    drawerOpen.value = false;
+    await load();
+    showSuccess(isEdit ? 'Provider 已更新' : 'Provider 已创建');
+  } finally {
+    submitting.value = false;
   }
-  drawerOpen.value = false;
-  await load();
-  showSuccess(isEdit ? 'Provider 已更新' : 'Provider 已创建');
 }
 
 async function confirmDelete() {
@@ -108,6 +114,7 @@ onMounted(load);
       v-model:open="drawerOpen"
       :provider="editing"
       :protocol-directory="protocolDirectory"
+      :submitting="submitting"
       @submit="submit"
     />
 
